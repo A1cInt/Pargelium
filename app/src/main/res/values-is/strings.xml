@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Tónlist fannst ekki</string>
+
+    <string name="nav_library">Safn</string>
+    <string name="nav_radio">Útvarp</string>
+    <string name="nav_playlists">Spilunarlistar</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Still.</string>
+
+    <string name="lyrics_not_found">Söngtexti fannst ekki</string>
+    <string name="header_lyrics">SÖNGTEXTI</string>
+    <string name="header_live_radio">Í BEINNI</string>
+    <string name="header_now_playing">Í SPILUN</string>
+    <string name="status_live_broadcast">BEIN ÚTSENDING</string>
+    <string name="meta_unknown">ÓÞEKKT</string>
+
+    <string name="radio_title">Netútvarp</string>
+    <string name="radio_search_hint">Tegund, land eða nafn...</string>
+
+    <string name="settings_title">Stillingar</string>
+
+    <string name="settings_appearance">Útlit</string>
+    <string name="theme_auto">Sjálfvirkt</string>
+    <string name="theme_auto_desc">Eftir kerfinu</string>
+    <string name="theme_light">Ljóst þema</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Dökkt þema</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Fullkominn svartur</string>
+    <string name="theme_opal">Svartur Ópal</string>
+    <string name="theme_opal_desc">Djúpur tónn</string>
+
+    <string name="settings_language">Tungumál / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Rússneska</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Enska</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Persónuvernd</string>
+    <string name="privacy_secure">Einkastilling</string>
+    <string name="privacy_secure_desc">Koma í veg fyrir skjáskot og skjáupptökur</string>
+
+    <string name="settings_data">Gögn</string>
+    <string name="data_clear_cache">Hreinsa skyndiminni texta</string>
+    <string name="data_clear_cache_desc">Eyða vistuðum söngtextum án nettengingar</string>
+    <string name="msg_cache_cleared">Eyddi %1$d textaskrám</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Forstilling: %1$s</string>
+    <string name="eq_preset_custom">Sérsniðið</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">Endurheimta glötuð smáatriði</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">Náttúrulegt hljóðsvið</string>
+
+    <string name="preset_flat">Flatt</string>
+    <string name="preset_bass_boost">Bass Boost</string>
+    <string name="preset_rock">Rokk</string>
+    <string name="preset_pop">Popp</string>
+    <string name="preset_vocal">Söngur</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Diskur %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d lag</item>
+        <item quantity="other">%1$d lög</item>
+    </plurals>
+
+    <string name="track_bookmarks">Bókamerki lags</string>
+    <string name="new_bookmark">Nýtt bókamerki</string>
+    <string name="create_bookmark">Búa til bókamerki</string>
+    <string name="no_bookmarks_yet">Engin bókamerki ennþá</string>
+    <string name="action_edit">Breyta</string>
+    <string name="action_delete">Eyða</string>
+    <string name="edit_bookmark">Breyta bókamerki</string>
+    <string name="bookmark_name">Nafn bókamerkis</string>
+    <string name="bookmark_time_hint">Tími (MM:SS eða KK:MM:SS)</string>
+    <string name="action_save">Vista</string>
+    <string name="action_cancel">Hætta við</string>
+    <string name="playback_queue">Spilunarröð</string>
+    <string name="action_repeat">Endurtaka</string>
+    <string name="choose_canvas">Veldu Canvas (Myndband/GIF)</string>
+    <string name="reset_canvas">Endurstilla Canvas</string>
+    <string name="background">Bakgrunnur</string>
+    <string name="bookmarks">Bókamerki</string>
+    <string name="translation">Þýðing</string>
+    <string name="action_collapse">Minnka</string>
+    <string name="action_lyrics">Texti</string>
+
+    <string name="unknown_artist">Óþekktur flytjandi</string>
+    <string name="artist_not_found">Flytjandi fannst ekki í safninu</string>
+    <string name="play_next_msg">Spila næst</string>
+    <string name="added_to_queue_msg">Bætt í biðröð</string>
+    <string name="watch_settings_saved">Úrstillingar vistaðar</string>
+    <string name="search_hint">Leita...</string>
+    <string name="search_no_results">Ekkert fannst</string>
+    <string name="tab_albums">Albúm</string>
+    <string name="tab_artists">Flytjendur</string>
+    <string name="tab_tracks">Lög</string>
+    <string name="no_artists">Engir flytjendur</string>
+    <string name="add_to_playlist">Bæta á spilunarlista</string>
+    <string name="no_playlists">Engir spilunarlistar.</string>
+    <string name="added_to_playlist_msg">Bætt við %1$s</string>
+    <string name="description_label">Lýsing</string>
+    <string name="click_to_add_description">Smelltu til að bæta við lýsingu...</string>
+    <string name="popular_tracks">Vinsæl lög</string>
+
+    <string name="profile_banner_desc">Prófílborði</string>
+    <string name="unknown_yet">Ekki vitað enn</string>
+    <string name="rank_novice">Byrjandi</string>
+    <string name="rank_listener">Hlustandi</string>
+    <string name="rank_melomane">Tónlistarunnandi</string>
+    <string name="rank_audiophile">Hljóðgæðaunnandi</string>
+    <string name="rank_music_maniac">Tónlistaróður</string>
+    <string name="plays_count_label">Spilanir</string>
+    <string name="favorite_artist_label">Uppáhalds flytjandi</string>
+    <string name="top_10_artists">Topp 10 flytjendur</string>
+    <string name="your_music_dna">Þitt tónlistar-DNA</string>
+    <string name="listen_music_for_stats">Hlustaðu á tónlist og tölfræðin þín mun birtast hér!</string>
+    <string name="music_ranks_title">Tónlistartitlar</string>
+    <string name="tracks_left_for_rank_fmt">Það eru %2$d lög eftir í titilinn «%1$s»</string>
+    <string name="max_rank_achieved">Þú hefur náð hæsta titlinum! Þú ert goðsögn.</string>
+    <string name="rank_unlocked">Ólæst</string>
+    <string name="rank_required_plays_fmt">Krafist: %1$d spilanir</string>
+
+    <string name="search_error_fmt">Leitarvilla: %1$s</string>
+    <string name="tab_online_radio">Netútvarp</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Leita að stöð...</string>
+    <string name="search_flac_hint">Leita að FLAC...</string>
+    <string name="search_saavn_hint">Leita á JioSaavn...</string>
+    <string name="stream_error_fmt">Straumvilla: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d sinn</item>
+        <item quantity="other">%1$d sinnum</item>
+    </plurals>
+
+    <string name="new_playlist">Nýr spilunarlisti</string>
+    <string name="create_your_collection">Búðu til þitt eigið safn</string>
+    <string name="click_to_add_banner">Smelltu til að bæta við borða</string>
+    <string name="playlist_empty_msg">Spilunarlistinn er tómur. Ýttu á \'+\' til að bæta við tónlist.</string>
+    <string name="playlist_name_label">Nafn</string>
+    <string name="action_create">Búa til</string>
+    <string name="add_tracks_title">Bæta við lögum</string>
+    <string name="search_track_hint">Leita að lagi...</string>
+    <string name="cd_banner">Borði</string>
+    <string name="cd_banner_blurred">Óskýr borði</string>
+    <string name="cd_cover">Umslag</string>
+    <string name="cd_track_cover">Umslag lags</string>
+
+    <string name="sound_effects_title">Hljóðbrellur</string>
+    <string name="eq_section_title">Tónjöfnun</string>
+    <string name="click_to_select_model">Smelltu til að velja gerð</string>
+    <string name="connected_device_fmt">Tengt: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Gagnagrunnur heyrnartóla)</string>
+    <string name="ten_band_eq_title">10-Banda Tónjafnari</string>
+    <string name="ten_band_eq_desc">Handvirk stilling á tíðnum</string>
+    <string name="reset_to_zero">Endurstilla á núll</string>
+    <string name="bass_management_title">Bassastjórnun</string>
+    <string name="deep_bass_title">Djúpur Bassi</string>
+    <string name="deep_bass_desc">Þéttur og hreinn stúdíóbassi án bjögunar</string>
+    <string name="setting_power">Afl</string>
+    <string name="setting_frequency">Tíðni</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Rými og brellur</string>
+    <string name="reverb_title">Ómun (Freeverb)</string>
+    <string name="reverb_desc">Hljóðrænt bergmál stúdíós</string>
+    <string name="setting_room_size">Herbergisstærð</string>
+    <string name="setting_wall_damp">Veggdeyfingu</string>
+    <string name="setting_mix_level">Stig (Mix)</string>
+    <string name="spatializer_title">3D-Víðóma (Spatializer)</string>
+    <string name="spatializer_desc">Víkkar senu út fyrir heyrnartól</string>
+    <string name="setting_stereo_width">Víðómbreidd</string>
+    <string name="haas_title">Haas-áhrif (Haas)</string>
+    <string name="haas_desc">Sálhljóðfræðilegt hljóð \'út úr höfðinu\'</string>
+    <string name="setting_right_delay">Töf hægri rásar</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Endurheimt (Exciter)</string>
+    <string name="exciter_desc">Kristöllun hátíðna</string>
+    <string name="setting_intensity">Styrkur</string>
+    <string name="tube_amp_title">Rörmagnari</string>
+    <string name="tube_amp_desc">Hlý hliðræn mettunar</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Blandar rásum fyrir náttúrulegt hljóð</string>
+    <string name="select_headphone_model">Veldu gerð heyrnartóla</string>
+
+    <string-array name="reverb_modes">
+        <item>Sérsniðið</item>
+        <item>Stúdíó</item>
+        <item>Herbergi</item>
+        <item>Salur</item>
+        <item>Dómkirkja</item>
+        <item>Hylur</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Samþætting</string>
+    <string name="integration_auto_detect">Greina heyrnartól</string>
+    <string name="integration_auto_detect_desc">Hleður AutoEQ prófíl sjálfkrafa</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Krefst WearOS úrs</string>
+    <string name="data_reset_autoeq">Endurstilla AutoEQ prófíl</string>
+    <string name="data_reset_autoeq_desc">Eyða niðurhalaðri tíðniforstillingu</string>
+    <string name="msg_autoeq_reset">AutoEQ stillingar endurstilltar</string>
+    <string name="settings_contact">Hafðu samband</string>
+    <string name="contact_pm">Einkaskilaboð</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Rásin mín</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Veldu tungumál</string>
+
+</resources>

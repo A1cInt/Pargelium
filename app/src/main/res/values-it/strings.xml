@@ -1,0 +1,237 @@
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Musica non trovata</string>
+
+    <string name="nav_library">Lib.</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Playlist</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Impost.</string>
+
+    <string name="lyrics_not_found">Testo non trovato</string>
+    <string name="header_lyrics">TESTO DELLA CANZONE</string>
+    <string name="header_live_radio">RADIO IN DIRETTA</string>
+    <string name="header_now_playing">IN RIPRODUZIONE</string>
+    <string name="status_live_broadcast">IN DIRETTA</string>
+    <string name="meta_unknown">SCONOSCIUTO</string>
+
+    <string name="radio_title">Radio Online</string>
+    <string name="radio_search_hint">Genere, paese o titolo...</string>
+
+    <string name="settings_title">Impostazioni</string>
+
+    <string name="settings_appearance">Aspetto</string>
+    <string name="theme_auto">Automatico</string>
+    <string name="theme_auto_desc">Predefinito di sistema</string>
+    <string name="theme_light">Tema chiaro</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Tema scuro</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Nero perfetto</string>
+    <string name="theme_opal">Opale nero</string>
+    <string name="theme_opal_desc">Tonalità profonda</string>
+
+    <string name="settings_language">Lingua / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Russo</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Inglese</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Privacy</string>
+    <string name="privacy_secure">Modalità sicura</string>
+    <string name="privacy_secure_desc">Impedisci screenshot e registrazione schermo</string>
+
+    <string name="settings_data">Dati</string>
+    <string name="data_clear_cache">Cancella cache testi</string>
+    <string name="data_clear_cache_desc">Elimina testi offline salvati</string>
+    <string name="msg_cache_cleared">Eliminati %1$d file di testo</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Personalizzato</string>
+
+    <string name="effect_bass">Bassi profondi</string>
+    <string name="effect_room">Stanza virtuale</string>
+    <string name="effect_tube">Calore valvolare</string>
+    <string name="effect_mp3">Ripristino MP3</string>
+    <string name="effect_mp3_desc">Ripristina i dettagli persi</string>
+    <string name="effect_crossfeed">Modalità cuffie</string>
+    <string name="effect_crossfeed_desc">Campo sonoro naturale</string>
+
+    <string name="preset_flat">Piatto</string>
+    <string name="preset_bass_boost">Bass Boost</string>
+    <string name="preset_rock">Rock</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Voce</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Disco %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d traccia</item>
+        <item quantity="other">%1$d tracce</item>
+    </plurals>
+
+    <string name="track_bookmarks">Segnalibri traccia</string>
+    <string name="new_bookmark">Nuovo segnalibro</string>
+    <string name="create_bookmark">Crea segnalibro</string>
+    <string name="no_bookmarks_yet">Nessun segnalibro ancora</string>
+    <string name="action_edit">Modifica</string>
+    <string name="action_delete">Elimina</string>
+    <string name="edit_bookmark">Modifica segnalibro</string>
+    <string name="bookmark_name">Nome segnalibro</string>
+    <string name="bookmark_time_hint">Tempo (MM:SS o HH:MM:SS)</string>
+    <string name="action_save">Salva</string>
+    <string name="action_cancel">Annulla</string>
+    <string name="playback_queue">Coda di riproduzione</string>
+    <string name="action_repeat">Ripeti</string>
+    <string name="choose_canvas">Scegli Canvas (Video/GIF)</string>
+    <string name="reset_canvas">Ripristina Canvas</string>
+    <string name="background">Sfondo</string>
+    <string name="bookmarks">Segnalibri</string>
+    <string name="translation">Traduzione</string>
+    <string name="action_collapse">Comprimi</string>
+    <string name="action_lyrics">Testo</string>
+
+    <string name="unknown_artist">Artista sconosciuto</string>
+    <string name="artist_not_found">Artista non trovato nella libreria</string>
+    <string name="play_next_msg">Riproduci successivo</string>
+    <string name="added_to_queue_msg">Aggiunto alla coda</string>
+    <string name="watch_settings_saved">Impostazioni dell\'orologio salvate</string>
+    <string name="search_hint">Cerca...</string>
+    <string name="search_no_results">Nessun risultato</string>
+    <string name="tab_albums">Album</string>
+    <string name="tab_artists">Artisti</string>
+    <string name="tab_tracks">Tracce</string>
+    <string name="no_artists">Nessun artista</string>
+    <string name="add_to_playlist">Aggiungi alla playlist</string>
+    <string name="no_playlists">Nessuna playlist.</string>
+    <string name="added_to_playlist_msg">Aggiunto a %1$s</string>
+    <string name="description_label">Descrizione</string>
+    <string name="click_to_add_description">Tocca per aggiungere una descrizione...</string>
+    <string name="popular_tracks">Tracce popolari</string>
+
+    <string name="profile_banner_desc">Banner del profilo</string>
+    <string name="unknown_yet">Ancora sconosciuto</string>
+    <string name="rank_novice">Novellino</string>
+    <string name="rank_listener">Ascoltatore</string>
+    <string name="rank_melomane">Melomane</string>
+    <string name="rank_audiophile">Audiofilo</string>
+    <string name="rank_music_maniac">Maniaco della musica</string>
+    <string name="plays_count_label">Riproduzioni</string>
+    <string name="favorite_artist_label">Artista preferito</string>
+    <string name="top_10_artists">Top 10 artisti</string>
+    <string name="your_music_dna">Il tuo DNA musicale</string>
+    <string name="listen_music_for_stats">Ascolta la musica e le tue statistiche appariranno qui!</string>
+    <string name="music_ranks_title">Livelli musicali</string>
+    <string name="tracks_left_for_rank_fmt">Mancano %2$d tracce per il livello «%1$s»</string>
+    <string name="max_rank_achieved">Hai raggiunto il livello massimo! Sei una leggenda.</string>
+    <string name="rank_unlocked">Sbloccato</string>
+    <string name="rank_required_plays_fmt">Richiesto: %1$d riproduzioni</string>
+
+    <string name="search_error_fmt">Errore di ricerca: %1$s</string>
+    <string name="tab_online_radio">Radio Online</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Cerca stazione...</string>
+    <string name="search_flac_hint">Cerca FLAC...</string>
+    <string name="search_saavn_hint">Cerca su JioSaavn...</string>
+    <string name="stream_error_fmt">Errore di streaming: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d volta</item>
+        <item quantity="other">%1$d volte</item>
+    </plurals>
+
+    <string name="new_playlist">Nuova playlist</string>
+    <string name="create_your_collection">Crea la tua raccolta</string>
+    <string name="click_to_add_banner">Tocca per aggiungere un banner</string>
+    <string name="playlist_empty_msg">La playlist è vuota. Premi \'+\' per aggiungere musica.</string>
+    <string name="playlist_name_label">Nome</string>
+    <string name="action_create">Crea</string>
+    <string name="add_tracks_title">Aggiungi tracce</string>
+    <string name="search_track_hint">Cerca traccia...</string>
+    <string name="cd_banner">Banner</string>
+    <string name="cd_banner_blurred">Banner sfocato</string>
+    <string name="cd_cover">Copertina</string>
+    <string name="cd_track_cover">Copertina traccia</string>
+
+    <string name="sound_effects_title">Effetti sonori</string>
+    <string name="eq_section_title">Equalizzazione</string>
+    <string name="click_to_select_model">Tocca per selezionare il modello</string>
+    <string name="connected_device_fmt">Connesso: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Database cuffie)</string>
+    <string name="ten_band_eq_title">Equalizzatore a 10 bande</string>
+    <string name="ten_band_eq_desc">Regolazione manuale della frequenza</string>
+    <string name="reset_to_zero">Azzera tutto</string>
+    <string name="bass_management_title">Gestione Bassi</string>
+    <string name="deep_bass_title">Bassi Profondi</string>
+    <string name="deep_bass_desc">Bassi da studio, compatti e puliti, senza distorsioni</string>
+    <string name="setting_power">Potenza</string>
+    <string name="setting_frequency">Frequenza</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Spazio ed Effetti</string>
+    <string name="reverb_title">Riverbero (Freeverb)</string>
+    <string name="reverb_desc">Eco acustico da studio</string>
+    <string name="setting_room_size">Dimensioni stanza</string>
+    <string name="setting_wall_damp">Assorbimento pareti</string>
+    <string name="setting_mix_level">Livello (Mix)</string>
+    <string name="spatializer_title">3D Stereo (Spatializer)</string>
+    <string name="spatializer_desc">Espande il palcoscenico oltre le cuffie</string>
+    <string name="setting_stereo_width">Ampiezza stereo</string>
+    <string name="haas_title">Effetto Haas (Haas)</string>
+    <string name="haas_desc">Esternalizzazione psicoacustica del suono</string>
+    <string name="setting_right_delay">Ritardo canale destro</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Ripristino (Exciter)</string>
+    <string name="exciter_desc">Cristallizzazione delle alte frequenze</string>
+    <string name="setting_intensity">Intensità</string>
+    <string name="tube_amp_title">Amplificatore valvolare</string>
+    <string name="tube_amp_desc">Calda saturazione analogica</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Miscela i canali per un suono naturale</string>
+    <string name="select_headphone_model">Seleziona il modello di cuffie</string>
+
+    <string-array name="reverb_modes">
+        <item>Personalizzato</item>
+        <item>Studio</item>
+        <item>Stanza</item>
+        <item>Sala</item>
+        <item>Cattedrale</item>
+        <item>Abisso</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integrazione</string>
+    <string name="integration_auto_detect">Rileva cuffie</string>
+    <string name="integration_auto_detect_desc">Carica automaticamente il profilo AutoEQ</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Richiede uno smartwatch WearOS</string>
+    <string name="data_reset_autoeq">Ripristina profilo AutoEQ</string>
+    <string name="data_reset_autoeq_desc">Elimina il preset di frequenza scaricato</string>
+    <string name="msg_autoeq_reset">Impostazioni AutoEQ ripristinate</string>
+    <string name="settings_contact">Contattami</string>
+    <string name="contact_pm">Messaggi privati</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Il mio canale</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Scegli la lingua</string>
+
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+
+</resources>

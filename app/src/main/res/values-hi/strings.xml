@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">संगीत नहीं मिला</string>
+
+    <string name="nav_library">लाइब्रेरी</string>
+    <string name="nav_radio">रेडियो</string>
+    <string name="nav_playlists">प्लेलिस्ट</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">सेटिंग</string>
+
+    <string name="lyrics_not_found">लिरिक्स नहीं मिले</string>
+    <string name="header_lyrics">लिरिक्स</string>
+    <string name="header_live_radio">लाइव रेडियो</string>
+    <string name="header_now_playing">अभी बज रहा है</string>
+    <string name="status_live_broadcast">लाइव प्रसारण</string>
+    <string name="meta_unknown">अज्ञात</string>
+
+    <string name="radio_title">ऑनलाइन रेडियो</string>
+    <string name="radio_search_hint">शैली, देश या नाम...</string>
+
+    <string name="settings_title">सेटिंग्स</string>
+
+    <string name="settings_appearance">रूप-रंग</string>
+    <string name="theme_auto">स्वचालित</string>
+    <string name="theme_auto_desc">सिस्टम के अनुसार</string>
+    <string name="theme_light">लाइट थीम</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">डार्क थीम</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">परफेक्ट ब्लैक</string>
+    <string name="theme_opal">ब्लैक ओपल</string>
+    <string name="theme_opal_desc">गहरा रंग</string>
+
+    <string name="settings_language">भाषा / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">रूसी</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">अंग्रेज़ी</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">गोपनीयता</string>
+    <string name="privacy_secure">प्राइवेट मोड</string>
+    <string name="privacy_secure_desc">स्क्रीनशॉट और स्क्रीन रिकॉर्डिंग रोकें</string>
+
+    <string name="settings_data">डेटा</string>
+    <string name="data_clear_cache">लिरिक्स कैश साफ़ करें</string>
+    <string name="data_clear_cache_desc">सहेजे गए ऑफ़लाइन लिरिक्स हटाएं</string>
+    <string name="msg_cache_cleared">%1$d टेक्स्ट फ़ाइलें हटाई गईं</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">कस्टम</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">खोए हुए विवरण पुनर्प्राप्त करें</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">प्राकृतिक ध्वनि क्षेत्र</string>
+
+    <string name="preset_flat">फ़्लैट</string>
+    <string name="preset_bass_boost">बास बूस्ट</string>
+    <string name="preset_rock">रॉक</string>
+    <string name="preset_pop">पॉप</string>
+    <string name="preset_vocal">वोकल</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">डिस्क %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d ट्रैक</item>
+        <item quantity="other">%1$d ट्रैक</item>
+    </plurals>
+
+    <string name="track_bookmarks">ट्रैक बुकमार्क</string>
+    <string name="new_bookmark">नया बुकमार्क</string>
+    <string name="create_bookmark">बुकमार्क बनाएं</string>
+    <string name="no_bookmarks_yet">अभी तक कोई बुकमार्क नहीं</string>
+    <string name="action_edit">संपादित करें</string>
+    <string name="action_delete">हटाएं</string>
+    <string name="edit_bookmark">बुकमार्क संपादित करें</string>
+    <string name="bookmark_name">बुकमार्क का नाम</string>
+    <string name="bookmark_time_hint">समय (MM:SS या HH:MM:SS)</string>
+    <string name="action_save">सहेजें</string>
+    <string name="action_cancel">रद्द करें</string>
+    <string name="playback_queue">प्लेबैक कतार</string>
+    <string name="action_repeat">दोहराएं</string>
+    <string name="choose_canvas">कैनवास चुनें (वीडियो/GIF)</string>
+    <string name="reset_canvas">कैनवास रीसेट करें</string>
+    <string name="background">पृष्ठभूमि</string>
+    <string name="bookmarks">बुकमार्क</string>
+    <string name="translation">अनुवाद</string>
+    <string name="action_collapse">छोटा करें</string>
+    <string name="action_lyrics">लिरिक्स</string>
+
+    <string name="unknown_artist">अज्ञात कलाकार</string>
+    <string name="artist_not_found">कलाकार लाइब्रेरी में नहीं मिला</string>
+    <string name="play_next_msg">इसके बाद चलाएं</string>
+    <string name="added_to_queue_msg">कतार में जोड़ा गया</string>
+    <string name="watch_settings_saved">घड़ी की सेटिंग सहेजी गई</string>
+    <string name="search_hint">खोजें...</string>
+    <string name="search_no_results">कुछ नहीं मिला</string>
+    <string name="tab_albums">एल्बम</string>
+    <string name="tab_artists">कलाकार</string>
+    <string name="tab_tracks">ट्रैक</string>
+    <string name="no_artists">कोई कलाकार नहीं</string>
+    <string name="add_to_playlist">प्लेलिस्ट में जोड़ें</string>
+    <string name="no_playlists">कोई प्लेलिस्ट नहीं।</string>
+    <string name="added_to_playlist_msg">%1$s में जोड़ा गया</string>
+    <string name="description_label">विवरण</string>
+    <string name="click_to_add_description">विवरण जोड़ने के लिए क्लिक करें...</string>
+    <string name="popular_tracks">लोकप्रिय ट्रैक</string>
+
+    <string name="profile_banner_desc">प्रोफ़ाइल बैनर</string>
+    <string name="unknown_yet">अभी तक अज्ञात</string>
+    <string name="rank_novice">नौसिखिया</string>
+    <string name="rank_listener">श्रोता</string>
+    <string name="rank_melomane">संगीत प्रेमी</string>
+    <string name="rank_audiophile">ऑडियोफ़ाइल</string>
+    <string name="rank_music_maniac">संगीत दीवाना</string>
+    <string name="plays_count_label">प्लेज़</string>
+    <string name="favorite_artist_label">पसंदीदा कलाकार</string>
+    <string name="top_10_artists">शीर्ष 10 कलाकार</string>
+    <string name="your_music_dna">आपका संगीत DNA</string>
+    <string name="listen_music_for_stats">संगीत सुनें, और आपके आंकड़े यहां दिखाई देंगे!</string>
+    <string name="music_ranks_title">संगीत रैंक</string>
+    <string name="tracks_left_for_rank_fmt">«%1$s» रैंक तक %2$d ट्रैक बाकी हैं</string>
+    <string name="max_rank_achieved">आपने उच्चतम रैंक प्राप्त कर ली है! आप लीजेंड हैं।</string>
+    <string name="rank_unlocked">अनलॉक किया गया</string>
+    <string name="rank_required_plays_fmt">आवश्यक: %1$d प्लेज़</string>
+
+    <string name="search_error_fmt">खोज त्रुटि: %1$s</string>
+    <string name="tab_online_radio">ऑनलाइन रेडियो</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">स्टेशन खोजें...</string>
+    <string name="search_flac_hint">FLAC खोजें...</string>
+    <string name="search_saavn_hint">JioSaavn में खोजें...</string>
+    <string name="stream_error_fmt">स्ट्रीम त्रुटि: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d बार</item>
+        <item quantity="other">%1$d बार</item>
+    </plurals>
+
+    <string name="new_playlist">नई प्लेलिस्ट</string>
+    <string name="create_your_collection">अपना खुद का संग्रह बनाएं</string>
+    <string name="click_to_add_banner">बैनर जोड़ने के लिए क्लिक करें</string>
+    <string name="playlist_empty_msg">प्लेलिस्ट खाली है। संगीत जोड़ने के लिए \'+\' दबाएं।</string>
+    <string name="playlist_name_label">नाम</string>
+    <string name="action_create">बनाएं</string>
+    <string name="add_tracks_title">ट्रैक जोड़ें</string>
+    <string name="search_track_hint">ट्रैक खोजें...</string>
+    <string name="cd_banner">बैनर</string>
+    <string name="cd_banner_blurred">धुंधला बैनर</string>
+    <string name="cd_cover">कवर</string>
+    <string name="cd_track_cover">ट्रैक कवर</string>
+
+    <string name="sound_effects_title">ध्वनि प्रभाव</string>
+    <string name="eq_section_title">इक्वलाइज़र</string>
+    <string name="click_to_select_model">मॉडल चुनने के लिए क्लिक करें</string>
+    <string name="connected_device_fmt">कनेक्टेड: %1$s</string>
+    <string name="autoeq_title">AutoEQ (हेडफ़ोन डेटाबेस)</string>
+    <string name="ten_band_eq_title">10-बैंड इक्वलाइज़र</string>
+    <string name="ten_band_eq_desc">मैन्युअल आवृत्ति सेटिंग</string>
+    <string name="reset_to_zero">शून्य पर रीसेट करें</string>
+    <string name="bass_management_title">बास प्रबंधन</string>
+    <string name="deep_bass_title">गहरा बास</string>
+    <string name="deep_bass_desc">बिना विरूपण के घना और साफ़ स्टूडियो बास</string>
+    <string name="setting_power">शक्ति</string>
+    <string name="setting_frequency">आवृत्ति</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">स्थान और प्रभाव</string>
+    <string name="reverb_title">रीवरब (Freeverb)</string>
+    <string name="reverb_desc">ध्वनिक स्टूडियो कक्ष गूंज</string>
+    <string name="setting_room_size">कमरे का आकार</string>
+    <string name="setting_wall_damp">दीवार अवशोषण</string>
+    <string name="setting_mix_level">स्तर (Mix)</string>
+    <string name="spatializer_title">3D स्टीरियो (Spatializer)</string>
+    <string name="spatializer_desc">हेडफ़ोन से परे मंच का विस्तार करता है</string>
+    <string name="setting_stereo_width">स्टीरियो चौड़ाई</string>
+    <string name="haas_title">हास प्रभाव (Haas)</string>
+    <string name="haas_desc">साइकोअकॉस्टिक \'आउट ऑफ हेड\' ध्वनि</string>
+    <string name="setting_right_delay">दायां चैनल विलंब</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">बहाली (Exciter)</string>
+    <string name="exciter_desc">उच्च आवृत्तियों का क्रिस्टलीकरण</string>
+    <string name="setting_intensity">तीव्रता</string>
+    <string name="tube_amp_title">ट्यूब एम्पलीफायर</string>
+    <string name="tube_amp_desc">गर्म एनालॉग संतृप्ति</string>
+    <string name="crossfeed_title">क्रॉसफ़ीड (Crossfeed)</string>
+    <string name="crossfeed_desc">प्राकृतिक ध्वनि के लिए चैनलों को मिलाता है</string>
+    <string name="select_headphone_model">हेडफ़ोन मॉडल चुनें</string>
+
+    <string-array name="reverb_modes">
+        <item>कस्टम</item>
+        <item>स्टूडियो</item>
+        <item>कमरा</item>
+        <item>हॉल</item>
+        <item>कैथेड्रल</item>
+        <item>पाताल</item>
+    </string-array>
+
+    <string name="theme_pargelia">परगेलिया</string>
+    <string name="settings_integration">एकीकरण</string>
+    <string name="integration_auto_detect">हेडफ़ोन पहचानें</string>
+    <string name="integration_auto_detect_desc">स्वचालित रूप से AutoEQ प्रोफ़ाइल लोड करता है</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">WearOS घड़ी की आवश्यकता है</string>
+    <string name="data_reset_autoeq">AutoEQ प्रोफ़ाइल रीसेट करें</string>
+    <string name="data_reset_autoeq_desc">डाउनलोड किया गया आवृत्ति प्रीसेट हटाएं</string>
+    <string name="msg_autoeq_reset">AutoEQ सेटिंग रीसेट की गईं</string>
+    <string name="settings_contact">मुझसे संपर्क करें</string>
+    <string name="contact_pm">निजी संदेश</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">मेरा चैनल</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">भाषा चुनें</string>
+
+</resources>

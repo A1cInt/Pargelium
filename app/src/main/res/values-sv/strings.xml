@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Musik hittades inte</string>
+
+    <string name="nav_library">Bibl.</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Spellistor</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Inst.</string>
+
+    <string name="lyrics_not_found">Låttext hittades inte</string>
+    <string name="header_lyrics">LÅTTEXT</string>
+    <string name="header_live_radio">LIVE RADIO</string>
+    <string name="header_now_playing">SPELAR NU</string>
+    <string name="status_live_broadcast">LIVESÄNDNING</string>
+    <string name="meta_unknown">OKÄND</string>
+
+    <string name="radio_title">Online Radio</string>
+    <string name="radio_search_hint">Genre, land eller namn...</string>
+
+    <string name="settings_title">Inställningar</string>
+
+    <string name="settings_appearance">Utseende</string>
+    <string name="theme_auto">Automatiskt</string>
+    <string name="theme_auto_desc">Som i systemet</string>
+    <string name="theme_light">Ljust tema</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Mörkt tema</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Perfekt svart</string>
+    <string name="theme_opal">Svart Opal</string>
+    <string name="theme_opal_desc">Djup nyans</string>
+
+    <string name="settings_language">Språk / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Ryska</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Engelska</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Integritet</string>
+    <string name="privacy_secure">Privat läge</string>
+    <string name="privacy_secure_desc">Förhindra skärmdumpar och skärminspelning</string>
+
+    <string name="settings_data">Data</string>
+    <string name="data_clear_cache">Rensa textcache</string>
+    <string name="data_clear_cache_desc">Ta bort sparade låttexter offline</string>
+    <string name="msg_cache_cleared">%1$d textfiler raderades</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Custom</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">Restore lost details</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">Natural sound field</string>
+
+    <string name="preset_flat">Platt</string>
+    <string name="preset_bass_boost">Basförstärkning</string>
+    <string name="preset_rock">Rock</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Sång</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Skiva %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d spår</item>
+        <item quantity="few">%1$d spår</item>
+        <item quantity="many">%1$d spår</item>
+        <item quantity="other">%1$d spår</item>
+    </plurals>
+
+    <string name="track_bookmarks">Spårbokmärken</string>
+    <string name="new_bookmark">Nytt bokmärke</string>
+    <string name="create_bookmark">Skapa bokmärke</string>
+    <string name="no_bookmarks_yet">Det finns inga bokmärken än</string>
+    <string name="action_edit">Redigera</string>
+    <string name="action_delete">Ta bort</string>
+    <string name="edit_bookmark">Redigera bokmärke</string>
+    <string name="bookmark_name">Bokmärkets namn</string>
+    <string name="bookmark_time_hint">Tid (MM:SS eller TT:MM:SS)</string>
+    <string name="action_save">Spara</string>
+    <string name="action_cancel">Avbryt</string>
+    <string name="playback_queue">Spelkö</string>
+    <string name="action_repeat">Upprepa</string>
+    <string name="choose_canvas">Välj Canvas (Video/GIF)</string>
+    <string name="reset_canvas">Återställ Canvas</string>
+    <string name="background">Bakgrund</string>
+    <string name="bookmarks">Bokmärken</string>
+    <string name="translation">Översättning</string>
+    <string name="action_collapse">Minimera</string>
+    <string name="action_lyrics">Text</string>
+
+    <string name="unknown_artist">Okänd artist</string>
+    <string name="artist_not_found">Artisten hittades inte i biblioteket</string>
+    <string name="play_next_msg">Spela härnäst</string>
+    <string name="added_to_queue_msg">Lades till i kön</string>
+    <string name="watch_settings_saved">Klockinställning sparad</string>
+    <string name="search_hint">Sök...</string>
+    <string name="search_no_results">Inget hittades</string>
+    <string name="tab_albums">Album</string>
+    <string name="tab_artists">Artister</string>
+    <string name="tab_tracks">Spår</string>
+    <string name="no_artists">Inga artister</string>
+    <string name="add_to_playlist">Lägg till i spellista</string>
+    <string name="no_playlists">Inga spellistor.</string>
+    <string name="added_to_playlist_msg">Lades till i %1$s</string>
+    <string name="description_label">Beskrivning</string>
+    <string name="click_to_add_description">Klicka för att lägga till beskrivning...</string>
+    <string name="popular_tracks">Populära spår</string>
+
+    <string name="profile_banner_desc">Profilbanner</string>
+    <string name="unknown_yet">Okänt ännu</string>
+    <string name="rank_novice">Nybörjare</string>
+    <string name="rank_listener">Lyssnare</string>
+    <string name="rank_melomane">Musikälskare</string>
+    <string name="rank_audiophile">Audiofil</string>
+    <string name="rank_music_maniac">Musikgalning</string>
+    <string name="plays_count_label">Spelningar</string>
+    <string name="favorite_artist_label">Favoritartist</string>
+    <string name="top_10_artists">Topp 10 artister</string>
+    <string name="your_music_dna">Ditt musik-DNA</string>
+    <string name="listen_music_for_stats">Lyssna på musik, så visas din statistik här!</string>
+    <string name="music_ranks_title">Musikaliska titlar</string>
+    <string name="tracks_left_for_rank_fmt">%2$d spår kvar till titeln «%1$s»</string>
+    <string name="max_rank_achieved">Du har nått den högsta titeln! Du är en legend.</string>
+    <string name="rank_unlocked">Upplåst</string>
+    <string name="rank_required_plays_fmt">Krävs: %1$d spelningar</string>
+
+    <string name="search_error_fmt">Sökfel: %1$s</string>
+    <string name="tab_online_radio">Online Radio</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Sök station...</string>
+    <string name="search_flac_hint">Sök FLAC...</string>
+    <string name="search_saavn_hint">Sök på JioSaavn...</string>
+    <string name="stream_error_fmt">Strömningsfel: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d gång</item>
+        <item quantity="few">%1$d gånger</item>
+        <item quantity="many">%1$d gånger</item>
+        <item quantity="other">%1$d gånger</item>
+    </plurals>
+
+    <string name="new_playlist">Ny spellista</string>
+    <string name="create_your_collection">Skapa din egen samling</string>
+    <string name="click_to_add_banner">Klicka för att lägga till en banner</string>
+    <string name="playlist_empty_msg">Spellistan är tom. Tryck på \'+\' för att lägga till musik.</string>
+    <string name="playlist_name_label">Namn</string>
+    <string name="action_create">Skapa</string>
+    <string name="add_tracks_title">Lägg till spår</string>
+    <string name="search_track_hint">Sök spår...</string>
+    <string name="cd_banner">Banner</string>
+    <string name="cd_banner_blurred">Oskarp banner</string>
+    <string name="cd_cover">Omslag</string>
+    <string name="cd_track_cover">Spåromslag</string>
+
+    <string name="sound_effects_title">Ljudeffekter</string>
+    <string name="eq_section_title">Equalizer</string>
+    <string name="click_to_select_model">Tryck för att välja modell</string>
+    <string name="connected_device_fmt">Ansluten: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Hörlursdatabas)</string>
+    <string name="ten_band_eq_title">10-Bands Equalizer</string>
+    <string name="ten_band_eq_desc">Manuell frekvensjustering</string>
+    <string name="reset_to_zero">Återställ till noll</string>
+    <string name="bass_management_title">Bashantering</string>
+    <string name="deep_bass_title">Djup Bas</string>
+    <string name="deep_bass_desc">Tät och ren studiobas utan distorsion och brus</string>
+    <string name="setting_power">Kraft</string>
+    <string name="setting_frequency">Frekvens</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Rymd och effekter</string>
+    <string name="reverb_title">Reverb (Freeverb)</string>
+    <string name="reverb_desc">Akustiskt eko i studion</string>
+    <string name="setting_room_size">Rumsstorlek</string>
+    <string name="setting_wall_damp">Väggdämpning</string>
+    <string name="setting_mix_level">Nivå (Mix)</string>
+    <string name="spatializer_title">3D-Stereo (Spatializer)</string>
+    <string name="spatializer_desc">Utökar scenen utanför hörlurarna</string>
+    <string name="setting_stereo_width">Stereobredd</string>
+    <string name="haas_title">Haas-effekt (Haas)</string>
+    <string name="haas_desc">Psykoakustiskt ljud \'ur huvudet\'</string>
+    <string name="setting_right_delay">Fördröjning i höger kanal</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Återställning (Exciter)</string>
+    <string name="exciter_desc">Kristallisering av höga frekvenser</string>
+    <string name="setting_intensity">Intensitet</string>
+    <string name="tube_amp_title">Rörförstärkare</string>
+    <string name="tube_amp_desc">Varm analog mättnad</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Blandar kanaler för ett naturligt ljud</string>
+    <string name="select_headphone_model">Välj hörlursmodell</string>
+
+    <string-array name="reverb_modes">
+        <item>Egen</item>
+        <item>Studio</item>
+        <item>Rum</item>
+        <item>Sal</item>
+        <item>Katedral</item>
+        <item>Avgrund</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integration</string>
+    <string name="integration_auto_detect">Känn igen hörlurar</string>
+    <string name="integration_auto_detect_desc">Laddar AutoEQ-profil automatiskt</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Kräver WearOS-klocka</string>
+    <string name="data_reset_autoeq">Återställ AutoEQ-profil</string>
+    <string name="data_reset_autoeq_desc">Ta bort nedladdad frekvensförinställning</string>
+    <string name="msg_autoeq_reset">AutoEQ-inställningar återställda</string>
+    <string name="settings_contact">Kontakta mig</string>
+    <string name="contact_pm">Privat meddelande</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Min kanal</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Välj språk</string>
+
+</resources>

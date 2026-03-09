@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Níor aimsíodh ceol</string>
+
+    <string name="nav_library">Leabh.</string>
+    <string name="nav_radio">Raidió</string>
+    <string name="nav_playlists">Seinnliostaí</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Socr.</string>
+
+    <string name="lyrics_not_found">Liricí gan aimsiú</string>
+    <string name="header_lyrics">LIRICÍ</string>
+    <string name="header_live_radio">RAIDIÓ BEO</string>
+    <string name="header_now_playing">Á SEINM ANOIS</string>
+    <string name="status_live_broadcast">CRAOLADH BEO</string>
+    <string name="meta_unknown">ANAITHNID</string>
+
+    <string name="radio_title">Raidió ar líne</string>
+    <string name="radio_search_hint">Seánra, tír nó ainm...</string>
+
+    <string name="settings_title">Socruithe</string>
+
+    <string name="settings_appearance">Cuma</string>
+    <string name="theme_auto">Uathoibríoch</string>
+    <string name="theme_auto_desc">De réir an chórais</string>
+    <string name="theme_light">Téama geal</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Téama dorcha</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Fíordhubh</string>
+    <string name="theme_opal">Opal Dubh</string>
+    <string name="theme_opal_desc">Dath domhain</string>
+
+    <string name="settings_language">Teanga / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Rúisis</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Béarla</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Príobháideachas</string>
+    <string name="privacy_secure">Mód príobháideach</string>
+    <string name="privacy_secure_desc">Cosc ar ghabháil agus taifeadadh scáileáin</string>
+
+    <string name="settings_data">Sonraí</string>
+    <string name="data_clear_cache">Glan taisce na liricí</string>
+    <string name="data_clear_cache_desc">Scrios liricí as líne sábháilte</string>
+    <string name="msg_cache_cleared">Scriosadh %1$d comhad liricí</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Saincheaptha</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">Athchóirigh sonraí caillte</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">Réimse fuaime nádúrtha</string>
+
+    <string name="preset_flat">Cothrom</string>
+    <string name="preset_bass_boost">Treisiú Dord</string>
+    <string name="preset_rock">Rac-cheol</string>
+    <string name="preset_pop">Popcheol</string>
+    <string name="preset_vocal">Guth</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Diosca %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d rian</item>
+        <item quantity="other">%1$d rianta</item>
+    </plurals>
+
+    <string name="track_bookmarks">Leabharmharcanna riain</string>
+    <string name="new_bookmark">Leabharmharc nua</string>
+    <string name="create_bookmark">Cruthaigh leabharmharc</string>
+    <string name="no_bookmarks_yet">Níl aon leabharmharc ann fós</string>
+    <string name="action_edit">Cuir in eagar</string>
+    <string name="action_delete">Scrios</string>
+    <string name="edit_bookmark">Cuir leabharmharc in eagar</string>
+    <string name="bookmark_name">Ainm an leabharmhairc</string>
+    <string name="bookmark_time_hint">Am (NN:SS nó UU:NN:SS)</string>
+    <string name="action_save">Sábháil</string>
+    <string name="action_cancel">Cealaigh</string>
+    <string name="playback_queue">Scuaine cóirithe</string>
+    <string name="action_repeat">Déan arís</string>
+    <string name="choose_canvas">Roghnaigh Canvas (Físeán/GIF)</string>
+    <string name="reset_canvas">Athshocraigh Canvas</string>
+    <string name="background">Cúlra</string>
+    <string name="bookmarks">Leabharmharcanna</string>
+    <string name="translation">Aistriúchán</string>
+    <string name="action_collapse">Laghdaigh</string>
+    <string name="action_lyrics">Liricí</string>
+
+    <string name="unknown_artist">Ealaíontóir anaithnid</string>
+    <string name="artist_not_found">Níor aimsíodh an t-ealaíontóir sa leabharlann</string>
+    <string name="play_next_msg">Seinn an chéad cheann eile</string>
+    <string name="added_to_queue_msg">Curtha leis an scuaine</string>
+    <string name="watch_settings_saved">Socrú uaireadóra sábháilte</string>
+    <string name="search_hint">Cuardaigh...</string>
+    <string name="search_no_results">Níor aimsíodh aon rud</string>
+    <string name="tab_albums">Albaim</string>
+    <string name="tab_artists">Ealaíontóirí</string>
+    <string name="tab_tracks">Rianta</string>
+    <string name="no_artists">Níl aon ealaíontóirí ann</string>
+    <string name="add_to_playlist">Cuir le seinnliosta</string>
+    <string name="no_playlists">Níl aon seinnliostaí ann.</string>
+    <string name="added_to_playlist_msg">Curtha le %1$s</string>
+    <string name="description_label">Cur síos</string>
+    <string name="click_to_add_description">Cliceáil chun cur síos a chur leis...</string>
+    <string name="popular_tracks">Rianta coitianta</string>
+
+    <string name="profile_banner_desc">Bratach an phróifíle</string>
+    <string name="unknown_yet">Anaithnid go fóill</string>
+    <string name="rank_novice">Tosaitheoir</string>
+    <string name="rank_listener">Éisteoir</string>
+    <string name="rank_melomane">Leannán ceoil</string>
+    <string name="rank_audiophile">Closfhile</string>
+    <string name="rank_music_maniac">Dúil sa cheol</string>
+    <string name="plays_count_label">Seinnte</string>
+    <string name="favorite_artist_label">Ealaíontóir is fearr</string>
+    <string name="top_10_artists">Na 10 n-ealaíontóir is fearr</string>
+    <string name="your_music_dna">Do DNA ceoil</string>
+    <string name="listen_music_for_stats">Éist le ceol, agus beidh do staitisticí le feiceáil anseo!</string>
+    <string name="music_ranks_title">Céimeanna ceoil</string>
+    <string name="tracks_left_for_rank_fmt">Tá %2$d rian fágtha go dtí an chéim «%1$s»</string>
+    <string name="max_rank_achieved">Tá an chéim is airde bainte amach agat! Is finscéal thú.</string>
+    <string name="rank_unlocked">Díghlasáilte</string>
+    <string name="rank_required_plays_fmt">Ag teastáil: %1$d seinnte</string>
+
+    <string name="search_error_fmt">Earráid chuardaigh: %1$s</string>
+    <string name="tab_online_radio">Raidió ar líne</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Cuardaigh stáisiún...</string>
+    <string name="search_flac_hint">Cuardaigh FLAC...</string>
+    <string name="search_saavn_hint">Cuardaigh ar JioSaavn...</string>
+    <string name="stream_error_fmt">Earráid srutha: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d uair</item>
+        <item quantity="other">%1$d uair</item>
+    </plurals>
+
+    <string name="new_playlist">Seinnliosta nua</string>
+    <string name="create_your_collection">Cruthaigh do bhailiúchán féin</string>
+    <string name="click_to_add_banner">Cliceáil chun bratach a chur leis</string>
+    <string name="playlist_empty_msg">Tá an seinnliosta folamh. Brúigh \'+\' chun ceol a chur leis.</string>
+    <string name="playlist_name_label">Ainm</string>
+    <string name="action_create">Cruthaigh</string>
+    <string name="add_tracks_title">Cuir rianta leis</string>
+    <string name="search_track_hint">Cuardaigh rian...</string>
+    <string name="cd_banner">Bratach</string>
+    <string name="cd_banner_blurred">Bratach dhoiléir</string>
+    <string name="cd_cover">Clúdach</string>
+    <string name="cd_track_cover">Clúdach riain</string>
+
+    <string name="sound_effects_title">Maisíochtaí fuaime</string>
+    <string name="eq_section_title">Cothromú</string>
+    <string name="click_to_select_model">Cliceáil chun múnla a roghnú</string>
+    <string name="connected_device_fmt">Ceangailte: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Bunachar cluasán)</string>
+    <string name="ten_band_eq_title">Cothromóir 10-Bhanda</string>
+    <string name="ten_band_eq_desc">Socrú minicíochta de láimh</string>
+    <string name="reset_to_zero">Athshocraigh go nialas</string>
+    <string name="bass_management_title">Bainistíocht dord</string>
+    <string name="deep_bass_title">Dord domhain</string>
+    <string name="deep_bass_desc">Dord stiúideo dlúth agus glan gan saobhadh</string>
+    <string name="setting_power">Cumhacht</string>
+    <string name="setting_frequency">Minicíocht</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Spás agus Maisíochtaí</string>
+    <string name="reverb_title">Athmhaisiú (Freeverb)</string>
+    <string name="reverb_desc">Macalla seomra stiúideo fuaimiúil</string>
+    <string name="setting_room_size">Méid an tseomra</string>
+    <string name="setting_wall_damp">Maolú balla</string>
+    <string name="setting_mix_level">Leibhéal (Mix)</string>
+    <string name="spatializer_title">Steiréó 3D (Spatializer)</string>
+    <string name="spatializer_desc">Leathnaíonn sé an stáitse lasmuigh de na cluasáin</string>
+    <string name="setting_stereo_width">Leithead steiréó</string>
+    <string name="haas_title">Éifeacht Haas (Haas)</string>
+    <string name="haas_desc">Fuaim shíc-fhuaimiúil \'as an gceann\'</string>
+    <string name="setting_right_delay">Moill chainéil ar dheis</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Athchóiriú (Exciter)</string>
+    <string name="exciter_desc">Criostalú ardmhinicíochtaí</string>
+    <string name="setting_intensity">Déine</string>
+    <string name="tube_amp_title">Aimplitheoir feadáin</string>
+    <string name="tube_amp_desc">Sáithiú te analógach</string>
+    <string name="crossfeed_title">Cros-bheathú (Crossfeed)</string>
+    <string name="crossfeed_desc">Meascann cainéil le haghaidh fuaim nádúrtha</string>
+    <string name="select_headphone_model">Roghnaigh múnla cluasáin</string>
+
+    <string-array name="reverb_modes">
+        <item>Saincheaptha</item>
+        <item>Stiúideo</item>
+        <item>Seomra</item>
+        <item>Halla</item>
+        <item>Ardeaglais</item>
+        <item>Duibheagán</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Comhtháthú</string>
+    <string name="integration_auto_detect">Aithin cluasáin</string>
+    <string name="integration_auto_detect_desc">Lódálann sé próifíl AutoEQ go huathoibríoch</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Teastaíonn uaireadóir WearOS</string>
+    <string name="data_reset_autoeq">Athshocraigh próifíl AutoEQ</string>
+    <string name="data_reset_autoeq_desc">Scrios réamhshocrú minicíochta íoslódáilte</string>
+    <string name="msg_autoeq_reset">Athshocraíodh socruithe AutoEQ</string>
+    <string name="settings_contact">Déan teagmháil liom</string>
+    <string name="contact_pm">Teachtaireacht phríobháideach</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Mo chainéal</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Roghnaigh teanga</string>
+
+</resources>

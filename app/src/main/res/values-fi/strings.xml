@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Musiikkia ei löytynyt</string>
+
+    <string name="nav_library">Kirj.</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Soittolistat</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Aset.</string>
+
+    <string name="lyrics_not_found">Sanoituksia ei löytynyt</string>
+    <string name="header_lyrics">SANOITUKSET</string>
+    <string name="header_live_radio">LIVE-RADIO</string>
+    <string name="header_now_playing">NYT SOI</string>
+    <string name="status_live_broadcast">SUORA LÄHETYS</string>
+    <string name="meta_unknown">TUNTEMATON</string>
+
+    <string name="radio_title">Nettiradio</string>
+    <string name="radio_search_hint">Tyylilaji, maa tai nimi...</string>
+
+    <string name="settings_title">Asetukset</string>
+
+    <string name="settings_appearance">Ulkoasu</string>
+    <string name="theme_auto">Automaattinen</string>
+    <string name="theme_auto_desc">Järjestelmän mukaan</string>
+    <string name="theme_light">Vaalea teema</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Tumma teema</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Täydellinen musta</string>
+    <string name="theme_opal">Musta Opaali</string>
+    <string name="theme_opal_desc">Syvä sävy</string>
+
+    <string name="settings_language">Kieli / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Venäjä</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Englanti</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Yksityisyys</string>
+    <string name="privacy_secure">Yksityinen tila</string>
+    <string name="privacy_secure_desc">Estä kuvakaappaukset ja näytön tallennus</string>
+
+    <string name="settings_data">Tiedot</string>
+    <string name="data_clear_cache">Tyhjennä sanoitusten välimuisti</string>
+    <string name="data_clear_cache_desc">Poista tallennetut offline-sanoitukset</string>
+    <string name="msg_cache_cleared">Poistettu %1$d sanoitustiedostoa</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Oma</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">Palauta kadonneet yksityiskohdat</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">Luonnollinen äänikenttä</string>
+
+    <string name="preset_flat">Tasainen</string>
+    <string name="preset_bass_boost">Bassokorostus</string>
+    <string name="preset_rock">Rock</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Laulu</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Levy %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d kappale</item>
+        <item quantity="other">%1$d kappaletta</item>
+    </plurals>
+
+    <string name="track_bookmarks">Kappaleen kirjanmerkit</string>
+    <string name="new_bookmark">Uusi kirjanmerkki</string>
+    <string name="create_bookmark">Luo kirjanmerkki</string>
+    <string name="no_bookmarks_yet">Ei kirjanmerkkejä vielä</string>
+    <string name="action_edit">Muokkaa</string>
+    <string name="action_delete">Poista</string>
+    <string name="edit_bookmark">Muokkaa kirjanmerkkiä</string>
+    <string name="bookmark_name">Kirjanmerkin nimi</string>
+    <string name="bookmark_time_hint">Aika (MM:SS tai HH:MM:SS)</string>
+    <string name="action_save">Tallenna</string>
+    <string name="action_cancel">Peruuta</string>
+    <string name="playback_queue">Toistojono</string>
+    <string name="action_repeat">Toista</string>
+    <string name="choose_canvas">Valitse Canvas (Video/GIF)</string>
+    <string name="reset_canvas">Nollaa Canvas</string>
+    <string name="background">Tausta</string>
+    <string name="bookmarks">Kirjanmerkit</string>
+    <string name="translation">Käännös</string>
+    <string name="action_collapse">Pienennä</string>
+    <string name="action_lyrics">Sanoitukset</string>
+
+    <string name="unknown_artist">Tuntematon esittäjä</string>
+    <string name="artist_not_found">Esittäjää ei löytynyt kirjastosta</string>
+    <string name="play_next_msg">Toista seuraavaksi</string>
+    <string name="added_to_queue_msg">Lisätty jonoon</string>
+    <string name="watch_settings_saved">Kellon asetukset tallennettu</string>
+    <string name="search_hint">Hae...</string>
+    <string name="search_no_results">Mitään ei löytynyt</string>
+    <string name="tab_albums">Albumit</string>
+    <string name="tab_artists">Esittäjät</string>
+    <string name="tab_tracks">Kappaleet</string>
+    <string name="no_artists">Ei esittäjiä</string>
+    <string name="add_to_playlist">Lisää soittolistaan</string>
+    <string name="no_playlists">Ei soittolistoja.</string>
+    <string name="added_to_playlist_msg">Lisätty soittolistaan %1$s</string>
+    <string name="description_label">Kuvaus</string>
+    <string name="click_to_add_description">Napauta lisätäksesi kuvaus...</string>
+    <string name="popular_tracks">Suositut kappaleet</string>
+
+    <string name="profile_banner_desc">Profiilin banneri</string>
+    <string name="unknown_yet">Ei vielä tiedossa</string>
+    <string name="rank_novice">Aloittelija</string>
+    <string name="rank_listener">Kuuntelija</string>
+    <string name="rank_melomane">Melomaani</string>
+    <string name="rank_audiophile">Audiofiili</string>
+    <string name="rank_music_maniac">Musiikkifanaatikko</string>
+    <string name="plays_count_label">Kuuntelukerrat</string>
+    <string name="favorite_artist_label">Suosikkiesittäjä</string>
+    <string name="top_10_artists">Top 10 esittäjät</string>
+    <string name="your_music_dna">Musiikki-DNA:si</string>
+    <string name="listen_music_for_stats">Kuuntele musiikkia, niin tilastosi ilmestyvät tänne!</string>
+    <string name="music_ranks_title">Musiikkitittelit</string>
+    <string name="tracks_left_for_rank_fmt">%2$d kappaletta jäljellä titteliin «%1$s»</string>
+    <string name="max_rank_achieved">Olet saavuttanut korkeimman tittelin! Olet legenda.</string>
+    <string name="rank_unlocked">Avattu</string>
+    <string name="rank_required_plays_fmt">Vaaditaan: %1$d kuuntelukertaa</string>
+
+    <string name="search_error_fmt">Hakuvirhe: %1$s</string>
+    <string name="tab_online_radio">Nettiradio</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Etsi asemaa...</string>
+    <string name="search_flac_hint">Etsi FLAC...</string>
+    <string name="search_saavn_hint">Etsi JioSaavnista...</string>
+    <string name="stream_error_fmt">Striimivirhe: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d kerta</item>
+        <item quantity="other">%1$d kertaa</item>
+    </plurals>
+
+    <string name="new_playlist">Uusi soittolista</string>
+    <string name="create_your_collection">Luo oma kokoelma</string>
+    <string name="click_to_add_banner">Napauta lisätäksesi banneri</string>
+    <string name="playlist_empty_msg">Soittolista on tyhjä. Paina \'+\' lisätäksesi musiikkia.</string>
+    <string name="playlist_name_label">Nimi</string>
+    <string name="action_create">Luo</string>
+    <string name="add_tracks_title">Lisää kappaleita</string>
+    <string name="search_track_hint">Etsi kappaletta...</string>
+    <string name="cd_banner">Banneri</string>
+    <string name="cd_banner_blurred">Sumennettu banneri</string>
+    <string name="cd_cover">Kansi</string>
+    <string name="cd_track_cover">Kappaleen kansi</string>
+
+    <string name="sound_effects_title">Äänitehosteet</string>
+    <string name="eq_section_title">Taajuuskorjain</string>
+    <string name="click_to_select_model">Napauta valitaksesi malli</string>
+    <string name="connected_device_fmt">Yhdistetty: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Kuuloketietokanta)</string>
+    <string name="ten_band_eq_title">10-kaistainen taajuuskorjain</string>
+    <string name="ten_band_eq_desc">Manuaalinen taajuuksien säätö</string>
+    <string name="reset_to_zero">Nollaa</string>
+    <string name="bass_management_title">Basson hallinta</string>
+    <string name="deep_bass_title">Syvä Basso</string>
+    <string name="deep_bass_desc">Tiheä ja puhdas studiobasso ilman säröä</string>
+    <string name="setting_power">Teho</string>
+    <string name="setting_frequency">Taajuus</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Tila ja Tehosteet</string>
+    <string name="reverb_title">Kaiku (Freeverb)</string>
+    <string name="reverb_desc">Akustinen studiohuonekaiku</string>
+    <string name="setting_room_size">Huoneen koko</string>
+    <string name="setting_wall_damp">Seinän vaimennus</string>
+    <string name="setting_mix_level">Taso (Mix)</string>
+    <string name="spatializer_title">3D Stereo (Spatializer)</string>
+    <string name="spatializer_desc">Laajentaa äänimaisemaa kuulokkeiden ulkopuolelle</string>
+    <string name="setting_stereo_width">Stereon leveys</string>
+    <string name="haas_title">Haas-ilmiö (Haas)</string>
+    <string name="haas_desc">Psykoakustinen ääni \'pään ulkopuolelta\'</string>
+    <string name="setting_right_delay">Oikean kanavan viive</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Palautus (Exciter)</string>
+    <string name="exciter_desc">Korkeiden taajuuksien kristallisointi</string>
+    <string name="setting_intensity">Voimakkuus</string>
+    <string name="tube_amp_title">Putkivahvistin</string>
+    <string name="tube_amp_desc">Lämmin analoginen saturaatio</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Sekoittaa kanavia luonnollisen äänen saavuttamiseksi</string>
+    <string name="select_headphone_model">Valitse kuulokemalli</string>
+
+    <string-array name="reverb_modes">
+        <item>Oma</item>
+        <item>Studio</item>
+        <item>Huone</item>
+        <item>Sali</item>
+        <item>Katedraali</item>
+        <item>Kuilu</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integraatio</string>
+    <string name="integration_auto_detect">Tunnista kuulokkeet</string>
+    <string name="integration_auto_detect_desc">Lataa AutoEQ-profiilin automaattisesti</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Vaatii WearOS-kellon</string>
+    <string name="data_reset_autoeq">Nollaa AutoEQ-profiili</string>
+    <string name="data_reset_autoeq_desc">Poista ladattu taajuusesiasetus</string>
+    <string name="msg_autoeq_reset">AutoEQ-asetukset nollattu</string>
+    <string name="settings_contact">Ota yhteyttä</string>
+    <string name="contact_pm">Yksityisviesti</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Kanavani</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Valitse kieli</string>
+
+</resources>

@@ -1,0 +1,235 @@
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">音楽が見つかりません</string>
+
+    <string name="nav_library">ライブラリ</string>
+    <string name="nav_radio">ラジオ</string>
+    <string name="nav_playlists">プレイリスト</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">設定</string>
+
+    <string name="lyrics_not_found">歌詞が見つかりません</string>
+    <string name="header_lyrics">歌詞</string>
+    <string name="header_live_radio">ライブ・ラジオ</string>
+    <string name="header_now_playing">再生中</string>
+    <string name="status_live_broadcast">ライブ</string>
+    <string name="meta_unknown">不明</string>
+
+    <string name="radio_title">オンラインラジオ</string>
+    <string name="radio_search_hint">ジャンル、国、またはタイトル...</string>
+
+    <string name="settings_title">設定</string>
+
+    <string name="settings_appearance">外観</string>
+    <string name="theme_auto">自動</string>
+    <string name="theme_auto_desc">システムのデフォルト</string>
+    <string name="theme_light">ライトテーマ</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">ダークテーマ</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">パーフェクトブラック</string>
+    <string name="theme_opal">ブラックオパール</string>
+    <string name="theme_opal_desc">深い色合い</string>
+
+    <string name="settings_language">言語 / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">ロシア語</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">英語</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">プライバシー</string>
+    <string name="privacy_secure">セキュアモード</string>
+    <string name="privacy_secure_desc">スクリーンショットと画面録画を防止</string>
+
+    <string name="settings_data">データ</string>
+    <string name="data_clear_cache">歌詞のキャッシュをクリア</string>
+    <string name="data_clear_cache_desc">保存されたオフライン歌詞を削除</string>
+    <string name="msg_cache_cleared">%1$d 個の歌詞ファイルを削除しました</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">カスタム</string>
+
+    <string name="effect_bass">ディープベース</string>
+    <string name="effect_room">バーチャルルーム</string>
+    <string name="effect_tube">真空管の温かみ</string>
+    <string name="effect_mp3">MP3 復元</string>
+    <string name="effect_mp3_desc">失われたディテールを復元</string>
+    <string name="effect_crossfeed">ヘッドフォンモード</string>
+    <string name="effect_crossfeed_desc">自然な音場</string>
+
+    <string name="preset_flat">フラット</string>
+    <string name="preset_bass_boost">バスブースト</string>
+    <string name="preset_rock">ロック</string>
+    <string name="preset_pop">ポップ</string>
+    <string name="preset_vocal">ボーカル</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">ディスク %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="other">%1$d 曲</item>
+    </plurals>
+
+    <string name="track_bookmarks">トラックのブックマーク</string>
+    <string name="new_bookmark">新しいブックマーク</string>
+    <string name="create_bookmark">ブックマークを作成</string>
+    <string name="no_bookmarks_yet">ブックマークはまだありません</string>
+    <string name="action_edit">編集</string>
+    <string name="action_delete">削除</string>
+    <string name="edit_bookmark">ブックマークを編集</string>
+    <string name="bookmark_name">ブックマーク名</string>
+    <string name="bookmark_time_hint">時間 (MM:SS または HH:MM:SS)</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="playback_queue">再生キュー</string>
+    <string name="action_repeat">リピート</string>
+    <string name="choose_canvas">Canvasを選択 (Video/GIF)</string>
+    <string name="reset_canvas">Canvasをリセット</string>
+    <string name="background">背景</string>
+    <string name="bookmarks">ブックマーク</string>
+    <string name="translation">翻訳</string>
+    <string name="action_collapse">折りたたむ</string>
+    <string name="action_lyrics">歌詞</string>
+
+    <string name="unknown_artist">不明なアーティスト</string>
+    <string name="artist_not_found">ライブラリにアーティストが見つかりません</string>
+    <string name="play_next_msg">次に再生</string>
+    <string name="added_to_queue_msg">キューに追加しました</string>
+    <string name="watch_settings_saved">時計の設定を保存しました</string>
+    <string name="search_hint">検索...</string>
+    <string name="search_no_results">何も見つかりませんでした</string>
+    <string name="tab_albums">アルバム</string>
+    <string name="tab_artists">アーティスト</string>
+    <string name="tab_tracks">トラック</string>
+    <string name="no_artists">アーティストなし</string>
+    <string name="add_to_playlist">プレイリストに追加</string>
+    <string name="no_playlists">プレイリストなし。</string>
+    <string name="added_to_playlist_msg">%1$s に追加しました</string>
+    <string name="description_label">説明</string>
+    <string name="click_to_add_description">タップして説明を追加...</string>
+    <string name="popular_tracks">人気のトラック</string>
+
+    <string name="profile_banner_desc">プロフィールバナー</string>
+    <string name="unknown_yet">まだ不明</string>
+    <string name="rank_novice">初心者</string>
+    <string name="rank_listener">リスナー</string>
+    <string name="rank_melomane">音楽好き</string>
+    <string name="rank_audiophile">オーディオファイル</string>
+    <string name="rank_music_maniac">音楽マニア</string>
+    <string name="plays_count_label">再生回数</string>
+    <string name="favorite_artist_label">お気に入りのアーティスト</string>
+    <string name="top_10_artists">トップ10アーティスト</string>
+    <string name="your_music_dna">あなたの音楽DNA</string>
+    <string name="listen_music_for_stats">音楽を聴くと、ここに統計が表示されます！</string>
+    <string name="music_ranks_title">音楽ランク</string>
+    <string name="tracks_left_for_rank_fmt">「%1$s」ランクまであと %2$d 曲</string>
+    <string name="max_rank_achieved">最高ランクに到達しました！あなたは伝説です。</string>
+    <string name="rank_unlocked">ロック解除</string>
+    <string name="rank_required_plays_fmt">必要条件: %1$d 回再生</string>
+
+    <string name="search_error_fmt">検索エラー: %1$s</string>
+    <string name="tab_online_radio">オンラインラジオ</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">ステーションを検索...</string>
+    <string name="search_flac_hint">FLACを検索...</string>
+    <string name="search_saavn_hint">JioSaavnで検索...</string>
+    <string name="stream_error_fmt">ストリームエラー: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="other">%1$d 回</item>
+    </plurals>
+
+    <string name="new_playlist">新しいプレイリスト</string>
+    <string name="create_your_collection">あなたのコレクションを作成</string>
+    <string name="click_to_add_banner">タップしてバナーを追加</string>
+    <string name="playlist_empty_msg">プレイリストは空です。「+」を押して音楽を追加してください。</string>
+    <string name="playlist_name_label">名前</string>
+    <string name="action_create">作成</string>
+    <string name="add_tracks_title">トラックを追加</string>
+    <string name="search_track_hint">トラックを検索...</string>
+    <string name="cd_banner">バナー</string>
+    <string name="cd_banner_blurred">ぼやけたバナー</string>
+    <string name="cd_cover">カバー</string>
+    <string name="cd_track_cover">トラックカバー</string>
+
+    <string name="sound_effects_title">サウンドエフェクト</string>
+    <string name="eq_section_title">イコライザー</string>
+    <string name="click_to_select_model">タップしてモデルを選択</string>
+    <string name="connected_device_fmt">接続済み: %1$s</string>
+    <string name="autoeq_title">AutoEQ (ヘッドフォンデータベース)</string>
+    <string name="ten_band_eq_title">10バンドイコライザー</string>
+    <string name="ten_band_eq_desc">手動周波数調整</string>
+    <string name="reset_to_zero">ゼロにリセット</string>
+    <string name="bass_management_title">低音管理</string>
+    <string name="deep_bass_title">ディープベース</string>
+    <string name="deep_bass_desc">歪みやノイズのない、タイトでクリーンなスタジオベース</string>
+    <string name="setting_power">パワー</string>
+    <string name="setting_frequency">周波数</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">空間とエフェクト</string>
+    <string name="reverb_title">リバーブ (Freeverb)</string>
+    <string name="reverb_desc">スタジオの音響ホールエコー</string>
+    <string name="setting_room_size">部屋の広さ</string>
+    <string name="setting_wall_damp">壁の減衰</string>
+    <string name="setting_mix_level">レベル (Mix)</string>
+    <string name="spatializer_title">3D ステレオ (Spatializer)</string>
+    <string name="spatializer_desc">ヘッドフォンを超えて音場を広げる</string>
+    <string name="setting_stereo_width">ステレオ幅</string>
+    <string name="haas_title">ハース効果 (Haas)</string>
+    <string name="haas_desc">音響心理学的な「頭外定位」</string>
+    <string name="setting_right_delay">右チャンネルの遅延</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">エキサイター (Exciter)</string>
+    <string name="exciter_desc">高周波の結晶化</string>
+    <string name="setting_intensity">強度</string>
+    <string name="tube_amp_title">真空管アンプ</string>
+    <string name="tube_amp_desc">温かみのあるアナログサチュレーション</string>
+    <string name="crossfeed_title">クロスフィード (Crossfeed)</string>
+    <string name="crossfeed_desc">チャンネルをミックスして自然なサウンドに</string>
+    <string name="select_headphone_model">ヘッドフォンモデルを選択</string>
+
+    <string-array name="reverb_modes">
+        <item>カスタム</item>
+        <item>スタジオ</item>
+        <item>部屋</item>
+        <item>ホール</item>
+        <item>大聖堂</item>
+        <item>深淵</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">統合</string>
+    <string name="integration_auto_detect">ヘッドフォンを検出</string>
+    <string name="integration_auto_detect_desc">AutoEQプロファイルを自動的にロードします</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">WearOSウォッチが必要です</string>
+    <string name="data_reset_autoeq">AutoEQプロファイルをリセット</string>
+    <string name="data_reset_autoeq_desc">ダウンロードした周波数プリセットを削除</string>
+    <string name="msg_autoeq_reset">AutoEQの設定がリセットされました</string>
+    <string name="settings_contact">お問い合わせ</string>
+    <string name="contact_pm">プライベートメッセージ</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">私のチャンネル</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">言語を選択</string>
+
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+
+</resources>

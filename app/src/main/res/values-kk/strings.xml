@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Музыка табылмады</string>
+
+    <string name="nav_library">Кітапх.</string>
+    <string name="nav_radio">Радио</string>
+    <string name="nav_playlists">Плейлисттер</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Бапт.</string>
+
+    <string name="lyrics_not_found">Өлең мәтіні табылмады</string>
+    <string name="header_lyrics">ӨЛЕҢ МӘТІНІ</string>
+    <string name="header_live_radio">ТІКЕЛЕЙ ЭФИР РАДИО</string>
+    <string name="header_now_playing">ҚАЗІР ОЙНАП ТҰР</string>
+    <string name="status_live_broadcast">ТІКЕЛЕЙ ЭФИР</string>
+    <string name="meta_unknown">БЕЛГІСІЗ</string>
+
+    <string name="radio_title">Онлайн Радио</string>
+    <string name="radio_search_hint">Жанр, ел немесе атауы...</string>
+
+    <string name="settings_title">Баптаулар</string>
+
+    <string name="settings_appearance">Сыртқы түрі</string>
+    <string name="theme_auto">Автоматты түрде</string>
+    <string name="theme_auto_desc">Жүйедегідей</string>
+    <string name="theme_light">Ашық тақырып</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Қараңғы тақырып</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Мінсіз қара</string>
+    <string name="theme_opal">Қара Опал</string>
+    <string name="theme_opal_desc">Терең реңк</string>
+
+    <string name="settings_language">Тіл / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Орыс тілі</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Ағылшын тілі</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Құпиялылық</string>
+    <string name="privacy_secure">Жеке режим</string>
+    <string name="privacy_secure_desc">Скриншоттар мен экранға жазуға тыйым салу</string>
+
+    <string name="settings_data">Деректер</string>
+    <string name="data_clear_cache">Мәтіндер кэшін тазалау</string>
+    <string name="data_clear_cache_desc">Сақталған офлайн мәтіндерді жою</string>
+    <string name="msg_cache_cleared">%1$d мәтін файлы жойылды</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Пайдаланушы</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">Жоғалған бөлшектерді қалпына келтіру</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">Табиғи дыбыс өрісі</string>
+
+    <string name="preset_flat">Тегіс</string>
+    <string name="preset_bass_boost">Басс күшейту</string>
+    <string name="preset_rock">Рок</string>
+    <string name="preset_pop">Поп</string>
+    <string name="preset_vocal">Вокал</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Диск %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d трек</item>
+        <item quantity="other">%1$d трек</item>
+    </plurals>
+
+    <string name="track_bookmarks">Трек белгібелгілері</string>
+    <string name="new_bookmark">Жаңа белгібелгі</string>
+    <string name="create_bookmark">Белгібелгі жасау</string>
+    <string name="no_bookmarks_yet">Әзірге белгібелгілер жоқ</string>
+    <string name="action_edit">Өңдеу</string>
+    <string name="action_delete">Жою</string>
+    <string name="edit_bookmark">Белгібелгіні өңдеу</string>
+    <string name="bookmark_name">Белгібелгі атауы</string>
+    <string name="bookmark_time_hint">Уақыт (АА:СС немесе СС:АА:СС)</string>
+    <string name="action_save">Сақтау</string>
+    <string name="action_cancel">Болдырмау</string>
+    <string name="playback_queue">Ойнату кезегі</string>
+    <string name="action_repeat">Қайталау</string>
+    <string name="choose_canvas">Canvas таңдау (Бейне/GIF)</string>
+    <string name="reset_canvas">Canvas қалпына келтіру</string>
+    <string name="background">Фон</string>
+    <string name="bookmarks">Белгібелгілер</string>
+    <string name="translation">Аударма</string>
+    <string name="action_collapse">Жиыру</string>
+    <string name="action_lyrics">Мәтін</string>
+
+    <string name="unknown_artist">Белгісіз орындаушы</string>
+    <string name="artist_not_found">Орындаушы медиатекадан табылмады</string>
+    <string name="play_next_msg">Келесіні тыңдау</string>
+    <string name="added_to_queue_msg">Кезекке қосылды</string>
+    <string name="watch_settings_saved">Сағат баптаулары сақталды</string>
+    <string name="search_hint">Іздеу...</string>
+    <string name="search_no_results">Ештеңе табылмады</string>
+    <string name="tab_albums">Альбомдар</string>
+    <string name="tab_artists">Орындаушылар</string>
+    <string name="tab_tracks">Тректер</string>
+    <string name="no_artists">Орындаушылар жоқ</string>
+    <string name="add_to_playlist">Плейлистке қосу</string>
+    <string name="no_playlists">Плейлисттер жоқ.</string>
+    <string name="added_to_playlist_msg">%1$s-қа қосылды</string>
+    <string name="description_label">Сипаттама</string>
+    <string name="click_to_add_description">Сипаттама қосу үшін басыңыз...</string>
+    <string name="popular_tracks">Танымал тректер</string>
+
+    <string name="profile_banner_desc">Профиль баннері</string>
+    <string name="unknown_yet">Әзірге белгісіз</string>
+    <string name="rank_novice">Жаңадан бастаушы</string>
+    <string name="rank_listener">Тыңдаушы</string>
+    <string name="rank_melomane">Меломан</string>
+    <string name="rank_audiophile">Аудиофил</string>
+    <string name="rank_music_maniac">Музыка маньягы</string>
+    <string name="plays_count_label">Тыңдалымдар</string>
+    <string name="favorite_artist_label">Сүйікті орындаушы</string>
+    <string name="top_10_artists">Топ 10 орындаушы</string>
+    <string name="your_music_dna">Сіздің музыкалық ДНҚ-ңыз</string>
+    <string name="listen_music_for_stats">Музыка тыңдаңыз, статистикаңыз осында пайда болады!</string>
+    <string name="music_ranks_title">Музыкалық атақтар</string>
+    <string name="tracks_left_for_rank_fmt">«%1$s» атағына %2$d трек қалды</string>
+    <string name="max_rank_achieved">Сіз ең жоғарғы атаққа жеттіңіз! Сіз аңызсыз.</string>
+    <string name="rank_unlocked">Құлпы ашылды</string>
+    <string name="rank_required_plays_fmt">Қажет: %1$d тыңдалым</string>
+
+    <string name="search_error_fmt">Іздеу қатесі: %1$s</string>
+    <string name="tab_online_radio">Онлайн Радио</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Станцияны іздеу...</string>
+    <string name="search_flac_hint">FLAC іздеу...</string>
+    <string name="search_saavn_hint">JioSaavn-нан іздеу...</string>
+    <string name="stream_error_fmt">Стрим қатесі: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d рет</item>
+        <item quantity="other">%1$d рет</item>
+    </plurals>
+
+    <string name="new_playlist">Жаңа плейлист</string>
+    <string name="create_your_collection">Өз топтамаңызды жасаңыз</string>
+    <string name="click_to_add_banner">Баннер қосу үшін басыңыз</string>
+    <string name="playlist_empty_msg">Плейлист бос. Музыка қосу үшін \u002B басыңыз.</string>
+    <string name="playlist_name_label">Атауы</string>
+    <string name="action_create">Жасау</string>
+    <string name="add_tracks_title">Тректер қосу</string>
+    <string name="search_track_hint">Тректі іздеу...</string>
+    <string name="cd_banner">Баннер</string>
+    <string name="cd_banner_blurred">Бұлыңғыр баннер</string>
+    <string name="cd_cover">Мұқаба</string>
+    <string name="cd_track_cover">Трек мұқабасы</string>
+
+    <string name="sound_effects_title">Дыбыс эффектілері</string>
+    <string name="eq_section_title">Эквалайзер</string>
+    <string name="click_to_select_model">Модельді таңдау үшін басыңыз</string>
+    <string name="connected_device_fmt">Қосылды: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Құлаққаптар базасы)</string>
+    <string name="ten_band_eq_title">10 жолақты эквалайзер</string>
+    <string name="ten_band_eq_desc">Жиіліктерді қолмен баптау</string>
+    <string name="reset_to_zero">Нөлге қайтару</string>
+    <string name="bass_management_title">Бассты басқару</string>
+    <string name="deep_bass_title">Терең Басс</string>
+    <string name="deep_bass_desc">Бұрмалаусыз тығыз әрі таза студиялық басс</string>
+    <string name="setting_power">Қуат</string>
+    <string name="setting_frequency">Жиілік</string>
+    <string name="unit_hz">Гц</string>
+    <string name="space_and_effects_title">Кеңістік пен Эффектілер</string>
+    <string name="reverb_title">Реверберация (Freeverb)</string>
+    <string name="reverb_desc">Студиялық бөлменің акустикалық жаңғырығы</string>
+    <string name="setting_room_size">Бөлме өлшемі</string>
+    <string name="setting_wall_damp">Қабырғаның жұтылуы</string>
+    <string name="setting_mix_level">Деңгей (Mix)</string>
+    <string name="spatializer_title">3D Стерео (Spatializer)</string>
+    <string name="spatializer_desc">Сахнаны құлаққаптан тыс кеңейтеді</string>
+    <string name="setting_stereo_width">Стереобазаның ені</string>
+    <string name="haas_title">Хаас эффектісі (Haas)</string>
+    <string name="haas_desc">Психоакустикалық \'бастан тыс\' дыбыс</string>
+    <string name="setting_right_delay">Оң арнаның кідірісі</string>
+    <string name="unit_ms">мс</string>
+    <string name="exciter_title">Қалпына келтіру (Exciter)</string>
+    <string name="exciter_desc">Жоғары жиіліктерді кристаллизациялау</string>
+    <string name="setting_intensity">Қарқындылығы</string>
+    <string name="tube_amp_title">Лампалық күшейткіш</string>
+    <string name="tube_amp_desc">Жылы аналогтық сатурация</string>
+    <string name="crossfeed_title">Кроссфид (Crossfeed)</string>
+    <string name="crossfeed_desc">Табиғи дыбысталу үшін арналарды араластырады</string>
+    <string name="select_headphone_model">Құлаққап үлгісін таңдаңыз</string>
+
+    <string-array name="reverb_modes">
+        <item>Өз</item>
+        <item>Студия</item>
+        <item>Бөлме</item>
+        <item>Зал</item>
+        <item>Собор</item>
+        <item>Тұңғиық</item>
+    </string-array>
+
+    <string name="theme_pargelia">Паргелия</string>
+    <string name="settings_integration">Интеграция</string>
+    <string name="integration_auto_detect">Құлаққапты анықтау</string>
+    <string name="integration_auto_detect_desc">AutoEQ профилін автоматты түрде жүктейді</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">WearOS сағатын қажет етеді</string>
+    <string name="data_reset_autoeq">AutoEQ профилін қалпына келтіру</string>
+    <string name="data_reset_autoeq_desc">Жүктелген жиіліктер пресетін жою</string>
+    <string name="msg_autoeq_reset">AutoEQ баптаулары қалпына келтірілді</string>
+    <string name="settings_contact">Менімен байланысу</string>
+    <string name="contact_pm">Жеке хабарлама</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Менің арнам</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Тілді таңдаңыз</string>
+
+</resources>

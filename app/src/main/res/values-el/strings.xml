@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pargelium Music</string>
+
+    <string name="music_not_found">Δεν βρέθηκε μουσική</string>
+
+    <string name="nav_library">Βιβλ.</string>
+    <string name="nav_radio">Ραδιόφωνο</string>
+    <string name="nav_playlists">Λίστες</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Ρυθμ.</string>
+
+    <string name="lyrics_not_found">Οι στίχοι δεν βρέθηκαν</string>
+    <string name="header_lyrics">ΣΤΙΧΟΙ</string>
+    <string name="header_live_radio">LIVE ΡΑΔΙΟΦΩΝΟ</string>
+    <string name="header_now_playing">ΠΑΙΖΕΙ ΤΩΡΑ</string>
+    <string name="status_live_broadcast">ΖΩΝΤΑΝΗ ΜΕΤΑΔΟΣΗ</string>
+    <string name="meta_unknown">ΑΓΝΩΣΤΟ</string>
+
+    <string name="radio_title">Διαδικτυακό Ραδιόφωνο</string>
+    <string name="radio_search_hint">Είδος, χώρα ή όνομα...</string>
+
+    <string name="settings_title">Ρυθμίσεις</string>
+
+    <string name="settings_appearance">Εμφάνιση</string>
+    <string name="theme_auto">Αυτόματα</string>
+    <string name="theme_auto_desc">Όπως στο σύστημα</string>
+    <string name="theme_light">Ανοιχτό θέμα</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">Σκούρο θέμα</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Τέλειο μαύρο</string>
+    <string name="theme_opal">Μαύρο Οπάλιο</string>
+    <string name="theme_opal_desc">Βαθιά απόχρωση</string>
+
+    <string name="settings_language">Γλώσσα / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Ρωσικά</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Αγγλικά</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Απόρρητο</string>
+    <string name="privacy_secure">Ιδιωτική λειτουργία</string>
+    <string name="privacy_secure_desc">Αποτροπή στιγμιότυπων και εγγραφής οθόνης</string>
+
+    <string name="settings_data">Δεδομένα</string>
+    <string name="data_clear_cache">Εκκαθάριση προσωρινής μνήμης στίχων</string>
+    <string name="data_clear_cache_desc">Διαγραφή αποθηκευμένων στίχων εκτός σύνδεσης</string>
+    <string name="msg_cache_cleared">Διαγράφηκαν %1$d αρχεία στίχων</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Προσαρμοσμένο</string>
+
+    <string name="effect_bass">Deep Bass</string>
+    <string name="effect_room">Virtual Room</string>
+    <string name="effect_tube">Tube Warmth</string>
+    <string name="effect_mp3">MP3 Restoration</string>
+    <string name="effect_mp3_desc">Επαναφορά χαμένων λεπτομερειών</string>
+    <string name="effect_crossfeed">Headphone Mode</string>
+    <string name="effect_crossfeed_desc">Φυσικό ηχητικό πεδίο</string>
+
+    <string name="preset_flat">Επίπεδο</string>
+    <string name="preset_bass_boost">Ενίσχυση Μπάσων</string>
+    <string name="preset_rock">Ροκ</string>
+    <string name="preset_pop">Ποπ</string>
+    <string name="preset_vocal">Φωνητικά</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Δίσκος %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d κομμάτι</item>
+        <item quantity="other">%1$d κομμάτια</item>
+    </plurals>
+
+    <string name="track_bookmarks">Σελιδοδείκτες κομματιού</string>
+    <string name="new_bookmark">Νέος σελιδοδείκτης</string>
+    <string name="create_bookmark">Δημιουργία σελιδοδείκτη</string>
+    <string name="no_bookmarks_yet">Δεν υπάρχουν σελιδοδείκτες ακόμα</string>
+    <string name="action_edit">Επεξεργασία</string>
+    <string name="action_delete">Διαγραφή</string>
+    <string name="edit_bookmark">Επεξεργασία σελιδοδείκτη</string>
+    <string name="bookmark_name">Όνομα σελιδοδείκτη</string>
+    <string name="bookmark_time_hint">Χρόνος (ΛΛ:ΔΔ ή ΩΩ:ΛΛ:ΔΔ)</string>
+    <string name="action_save">Αποθήκευση</string>
+    <string name="action_cancel">Ακύρωση</string>
+    <string name="playback_queue">Ουρά αναπαραγωγής</string>
+    <string name="action_repeat">Επανάληψη</string>
+    <string name="choose_canvas">Επιλογή Canvas (Βίντεο/GIF)</string>
+    <string name="reset_canvas">Επαναφορά Canvas</string>
+    <string name="background">Φόντο</string>
+    <string name="bookmarks">Σελιδοδείκτες</string>
+    <string name="translation">Μετάφραση</string>
+    <string name="action_collapse">Σύμπτυξη</string>
+    <string name="action_lyrics">Στίχοι</string>
+
+    <string name="unknown_artist">Άγνωστος καλλιτέχνης</string>
+    <string name="artist_not_found">Ο καλλιτέχνης δεν βρέθηκε στη βιβλιοθήκη</string>
+    <string name="play_next_msg">Αναπαραγωγή στη συνέχεια</string>
+    <string name="added_to_queue_msg">Προστέθηκε στην ουρά</string>
+    <string name="watch_settings_saved">Η ρύθμιση ρολογιού αποθηκεύτηκε</string>
+    <string name="search_hint">Αναζήτηση...</string>
+    <string name="search_no_results">Δεν βρέθηκε τίποτα</string>
+    <string name="tab_albums">Άλμπουμ</string>
+    <string name="tab_artists">Καλλιτέχνες</string>
+    <string name="tab_tracks">Κομμάτια</string>
+    <string name="no_artists">Δεν υπάρχουν καλλιτέχνες</string>
+    <string name="add_to_playlist">Προσθήκη σε λίστα αναπαραγωγής</string>
+    <string name="no_playlists">Δεν υπάρχουν λίστες.</string>
+    <string name="added_to_playlist_msg">Προστέθηκε στο %1$s</string>
+    <string name="description_label">Περιγραφή</string>
+    <string name="click_to_add_description">Πατήστε για να προσθέσετε περιγραφή...</string>
+    <string name="popular_tracks">Δημοφιλή κομμάτια</string>
+
+    <string name="profile_banner_desc">Banner προφίλ</string>
+    <string name="unknown_yet">Άγνωστο ακόμα</string>
+    <string name="rank_novice">Αρχάριος</string>
+    <string name="rank_listener">Ακροατής</string>
+    <string name="rank_melomane">Μουσικόφιλος</string>
+    <string name="rank_audiophile">Audiophile</string>
+    <string name="rank_music_maniac">Μανιακός με τη μουσική</string>
+    <string name="plays_count_label">Αναπαραγωγές</string>
+    <string name="favorite_artist_label">Αγαπημένος καλλιτέχνης</string>
+    <string name="top_10_artists">Κορυφαίοι 10 καλλιτέχνες</string>
+    <string name="your_music_dna">Το μουσικό σας DNA</string>
+    <string name="listen_music_for_stats">Ακούστε μουσική και τα στατιστικά σας θα εμφανιστούν εδώ!</string>
+    <string name="music_ranks_title">Μουσικές κατατάξεις</string>
+    <string name="tracks_left_for_rank_fmt">Απομένουν %2$d κομμάτια για την κατάταξη «%1$s»</string>
+    <string name="max_rank_achieved">Φτάσατε στην κορυφαία κατάταξη! Είστε θρύλος.</string>
+    <string name="rank_unlocked">Ξεκλειδώθηκε</string>
+    <string name="rank_required_plays_fmt">Απαιτούνται: %1$d αναπαραγωγές</string>
+
+    <string name="search_error_fmt">Σφάλμα αναζήτησης: %1$s</string>
+    <string name="tab_online_radio">Διαδικτυακό Ραδιόφωνο</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Αναζήτηση σταθμού...</string>
+    <string name="search_flac_hint">Αναζήτηση FLAC...</string>
+    <string name="search_saavn_hint">Αναζήτηση στο JioSaavn...</string>
+    <string name="stream_error_fmt">Σφάλμα ροής: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d φορά</item>
+        <item quantity="other">%1$d φορές</item>
+    </plurals>
+
+    <string name="new_playlist">Νέα λίστα</string>
+    <string name="create_your_collection">Δημιουργήστε τη δική σας συλλογή</string>
+    <string name="click_to_add_banner">Πατήστε για προσθήκη banner</string>
+    <string name="playlist_empty_msg">Η λίστα είναι άδεια. Πατήστε το \'+\' για να προσθέσετε μουσική.</string>
+    <string name="playlist_name_label">Όνομα</string>
+    <string name="action_create">Δημιουργία</string>
+    <string name="add_tracks_title">Προσθήκη κομματιών</string>
+    <string name="search_track_hint">Αναζήτηση κομματιού...</string>
+    <string name="cd_banner">Banner</string>
+    <string name="cd_banner_blurred">Θολό banner</string>
+    <string name="cd_cover">Εξώφυλλο</string>
+    <string name="cd_track_cover">Εξώφυλλο κομματιού</string>
+
+    <string name="sound_effects_title">Ηχητικά Εφέ</string>
+    <string name="eq_section_title">Ισοστάθμιση</string>
+    <string name="click_to_select_model">Πατήστε για επιλογή μοντέλου</string>
+    <string name="connected_device_fmt">Συνδέθηκε: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Βάση Ακουστικών)</string>
+    <string name="ten_band_eq_title">Ισοσταθμιστής 10 ζωνών</string>
+    <string name="ten_band_eq_desc">Χειροκίνητη ρύθμιση συχνοτήτων</string>
+    <string name="reset_to_zero">Μηδενισμός</string>
+    <string name="bass_management_title">Διαχείριση Μπάσων</string>
+    <string name="deep_bass_title">Βαθύ Μπάσο</string>
+    <string name="deep_bass_desc">Πυκνό και καθαρό μπάσο στούντιο χωρίς παραμόρφωση</string>
+    <string name="setting_power">Ισχύς</string>
+    <string name="setting_frequency">Συχνότητα</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Χώρος και Εφέ</string>
+    <string name="reverb_title">Αντήχηση (Freeverb)</string>
+    <string name="reverb_desc">Ακουστική ηχώ δωματίου στούντιο</string>
+    <string name="setting_room_size">Μέγεθος δωματίου</string>
+    <string name="setting_wall_damp">Απόσβεση τοίχου</string>
+    <string name="setting_mix_level">Επίπεδο (Mix)</string>
+    <string name="spatializer_title">3D Stereo (Spatializer)</string>
+    <string name="spatializer_desc">Επεκτείνει τη σκηνή πέρα από τα ακουστικά</string>
+    <string name="setting_stereo_width">Πλάτος στερεοφωνικού</string>
+    <string name="haas_title">Εφέ Haas (Haas)</string>
+    <string name="haas_desc">Ψυχοακουστικός ήχος \'έξω από το κεφάλι\'</string>
+    <string name="setting_right_delay">Καθυστέρηση δεξιού καναλιού</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Επαναφορά (Exciter)</string>
+    <string name="exciter_desc">Κρυσταλλοποίηση υψηλών συχνοτήτων</string>
+    <string name="setting_intensity">Ένταση</string>
+    <string name="tube_amp_title">Ενισχυτής Λυχνίας</string>
+    <string name="tube_amp_desc">Ζεστός αναλογικός κορεσμός</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Μιξάρει κανάλια για φυσικό ήχο</string>
+    <string name="select_headphone_model">Επιλέξτε μοντέλο ακουστικών</string>
+
+    <string-array name="reverb_modes">
+        <item>Προσαρμοσμένο</item>
+        <item>Στούντιο</item>
+        <item>Δωμάτιο</item>
+        <item>Αίθουσα</item>
+        <item>Καθεδρικός</item>
+        <item>Άβυσσος</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Ενσωμάτωση</string>
+    <string name="integration_auto_detect">Αναγνώριση ακουστικών</string>
+    <string name="integration_auto_detect_desc">Φορτώνει αυτόματα το προφίλ AutoEQ</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Απαιτεί ρολόι WearOS</string>
+    <string name="data_reset_autoeq">Επαναφορά προφίλ AutoEQ</string>
+    <string name="data_reset_autoeq_desc">Διαγραφή ληφθείσας προεπιλογής συχνότητας</string>
+    <string name="msg_autoeq_reset">Οι ρυθμίσεις AutoEQ επαναφέρθηκαν</string>
+    <string name="settings_contact">Επικοινωνήστε μαζί μου</string>
+    <string name="contact_pm">Προσωπικό μήνυμα</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Το κανάλι μου</string>
+    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="choose_language">Επιλέξτε γλώσσα</string>
+
+</resources>
