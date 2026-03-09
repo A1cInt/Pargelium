@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SettingsSuggest
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -383,6 +384,45 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+
+        // О приложении (Пасхалка)
+        Text(
+            text = "О приложении",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
+        )
+
+        var easterEggClickCount by remember { mutableStateOf(0) }
+        var lastClickTime by remember { mutableStateOf(0L) }
+
+        SettingsGroup {
+            ListItem(
+                headlineContent = { Text("Версия приложения", fontWeight = FontWeight.Bold) },
+                supportingContent = { Text("Pargelium 1.0.0\nПлеер, который делает то, что должен.") },
+                leadingContent = {
+                    IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.primary)
+                },
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastClickTime < 400) {
+                        easterEggClickCount++
+                        if (easterEggClickCount >= 5) {
+                            easterEggClickCount = 0
+                            context.startActivity(Intent(context, EasterEggActivity::class.java))
+                        }
+                    } else {
+                        easterEggClickCount = 1
+                    }
+                    lastClickTime = currentTime
+                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
         }
 
         Spacer(modifier = Modifier.height(280.dp))

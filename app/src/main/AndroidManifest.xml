@@ -34,6 +34,7 @@
         android:localeConfig="@xml/locales_config"
         android:usesCleartextTraffic="true"
         tools:replace="android:allowBackup,android:label,android:theme">
+
         <service
             android:name=".PlaybackService"
             android:foregroundServiceType="mediaPlayback"
@@ -54,6 +55,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".EasterEggActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Wallpaper.NoTitleBar" />
+
     </application>
 
 </manifest>
