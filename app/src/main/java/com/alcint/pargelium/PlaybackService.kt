@@ -28,34 +28,49 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.ArrayList
-
-var activeAudioProcessor: CustomAudioProcessor? = null
+import kotlin.math.abs
 
 @UnstableApi
 class PlaybackService : MediaLibraryService() {
+
+    companion object {
+        var activeAudioProcessor: CustomAudioProcessor? = null
+            private set
+        private val SAAVN_HEADERS = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        )
+    }
+
     private var mediaLibrarySession: MediaLibrarySession? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var fossApiManager: FossWearApiManager? = null
-
     private var continuousMixManager: ContinuousMixManager? = null
+    private var wearUpdateJob: Job? = null
+
+    private var lastWearTitle = ""
+    private var lastWearIsPlaying = false
+    private var lastWearPos = -1L
 
     override fun onCreate() {
         super.onCreate()
-        PrefsManager.init(this)
+        PrefsManager.init(applicationContext)
 
         val customProcessor = CustomAudioProcessor()
         activeAudioProcessor = customProcessor
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(50000, 50000, 2500, 5000)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        val renderersFactory = object : DefaultRenderersFactory(this) {
+        val renderersFactory = object : DefaultRenderersFactory(applicationContext) {
             override fun buildAudioRenderers(
                 context: Context,
                 extensionRendererMode: Int,
@@ -82,64 +97,53 @@ class PlaybackService : MediaLibraryService() {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
 
-        val baseDataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+        val baseDataSourceFactory = DefaultDataSource.Factory(applicationContext, httpDataSourceFactory)
 
-        val resolvingDataSourceFactory = ResolvingDataSource.Factory(baseDataSourceFactory, object : ResolvingDataSource.Resolver {
-            override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
-                val uri = dataSpec.uri
+        val resolvingDataSourceFactory = ResolvingDataSource.Factory(baseDataSourceFactory) { dataSpec ->
+            val uri = dataSpec.uri
 
-                if (uri.scheme == "saavn") {
-                    val trackIdStr = uri.schemeSpecificPart
-                    try {
-                        val trackId = trackIdStr.toLongOrNull() ?: return dataSpec
-                        val streamUri = runBlocking(Dispatchers.IO) { SaavnApi.getStreamUri(trackId) }
+            if (uri.scheme == "saavn") {
+                val trackId = uri.schemeSpecificPart.toLongOrNull() ?: return@Factory dataSpec
+                try {
+                    val streamUri = runBlocking(Dispatchers.IO) { SaavnApi.getStreamUri(trackId) }
 
-                        val headers = mutableMapOf<String, String>()
-                        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-
-                        return dataSpec.buildUpon()
-                            .setUri(streamUri)
-                            .setHttpRequestHeaders(headers)
-                            .build()
-
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    return@Factory dataSpec.buildUpon()
+                        .setUri(streamUri)
+                        .setHttpRequestHeaders(SAAVN_HEADERS)
+                        .build()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                return dataSpec
             }
-        })
+            dataSpec
+        }
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(this)
+        val mediaSourceFactory = DefaultMediaSourceFactory(applicationContext)
             .setDataSourceFactory(resolvingDataSourceFactory)
 
-        val player = ExoPlayer.Builder(this, renderersFactory)
+        val player = ExoPlayer.Builder(applicationContext, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setHandleAudioBecomingNoisy(true)
             .build()
 
-        // Тот самый нищий Continuous Mix
-        continuousMixManager = ContinuousMixManager(this, player, mediaSourceFactory)
+        continuousMixManager = ContinuousMixManager(applicationContext, player, mediaSourceFactory)
         continuousMixManager?.start()
 
-        fossApiManager = FossWearApiManager(this, serviceScope) { command ->
-            serviceScope.launch {
-                when (command) {
-                    "PLAY" -> player.play()
-                    "PAUSE" -> player.pause()
-                    "NEXT" -> if (player.hasNextMediaItem()) player.seekToNext()
-                    "PREV" -> if (player.hasPreviousMediaItem()) player.seekToPrevious() else player.seekTo(0)
-                }
-            }
+        val playerHandler = Handler(player.applicationLooper)
+        fossApiManager = FossWearApiManager(applicationContext, serviceScope) { command ->
+            playerHandler.post { handlePlayerCommand(player, command) }
         }
         fossApiManager?.syncTheme(PrefsManager.getThemeMode())
 
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) { updateWearState(player) }
             override fun onPlaybackStateChanged(playbackState: Int) { updateWearState(player) }
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { updateWearState(player) }
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { updateWearState(player, true) }
+            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                updateWearState(player, true)
+            }
         })
 
         val callback = object : MediaLibrarySession.Callback {
@@ -173,15 +177,33 @@ class PlaybackService : MediaLibraryService() {
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, callback).build()
     }
 
-    private fun updateWearState(player: Player) {
+    private fun handlePlayerCommand(player: ExoPlayer, command: String) {
+        when (command) {
+            "PLAY" -> player.play()
+            "PAUSE" -> player.pause()
+            "NEXT" -> if (player.hasNextMediaItem()) player.seekToNext()
+            "PREV" -> if (player.hasPreviousMediaItem()) player.seekToPrevious() else player.seekTo(0)
+        }
+    }
+
+    private fun updateWearState(player: Player, force: Boolean = false) {
         val currentItem = player.currentMediaItem
         val title = currentItem?.mediaMetadata?.title?.toString() ?: "Pargelium"
         val artist = currentItem?.mediaMetadata?.artist?.toString() ?: "Выберите трек"
         val isPlaying = player.isPlaying
         val pos = player.currentPosition
-        val dur = if (player.duration > 0) player.duration else 1L
 
-        serviceScope.launch(Dispatchers.IO) {
+        val dur = if (player.duration != C.TIME_UNSET && player.duration > 0) player.duration else 1L
+
+        if (!force && title == lastWearTitle && isPlaying == lastWearIsPlaying && abs(pos - lastWearPos) < 1000) return
+
+        lastWearTitle = title
+        lastWearIsPlaying = isPlaying
+        lastWearPos = pos
+
+        wearUpdateJob?.cancel()
+        wearUpdateJob = serviceScope.launch(Dispatchers.IO) {
+            delay(300)
             fossApiManager?.updatePlaybackState(title, artist, isPlaying, pos, dur, Color.DKGRAY)
         }
     }
@@ -192,14 +214,19 @@ class PlaybackService : MediaLibraryService() {
         continuousMixManager?.stop()
         continuousMixManager = null
 
+        wearUpdateJob?.cancel()
         serviceScope.cancel()
         fossApiManager?.release()
+        fossApiManager = null
+
+        activeAudioProcessor?.release()
         activeAudioProcessor = null
+
         mediaLibrarySession?.run {
             player.release()
             release()
-            mediaLibrarySession = null
         }
+        mediaLibrarySession = null
         super.onDestroy()
     }
 

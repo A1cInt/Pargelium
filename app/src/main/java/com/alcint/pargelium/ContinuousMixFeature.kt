@@ -22,7 +22,7 @@ object ContinuousMixPrefs {
     private const val PREF_MIX_ENABLED = "continuous_mix_enabled"
     private const val PREF_MIX_OVERLAP = "continuous_mix_overlap"
 
-    private fun getPrefs(context: Context): SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun getPrefs(context: Context): SharedPreferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun isEnabled(context: Context): Boolean = getPrefs(context).getBoolean(PREF_MIX_ENABLED, false)
     fun setEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(PREF_MIX_ENABLED, enabled).apply()
@@ -32,11 +32,14 @@ object ContinuousMixPrefs {
 }
 
 class ContinuousMixManager(
-    private val context: Context,
+    context: Context,
     private val mainPlayer: Player,
     private val mediaSourceFactory: MediaSource.Factory
 ) {
-    private var secondaryPlayer: ExoPlayer? = null
+    private val appContext = context.applicationContext
+
+    private var fadeOutPlayer: ExoPlayer? = null
+
     private var isMixing = false
     private var isAutoSkipping = false
 
@@ -54,40 +57,46 @@ class ContinuousMixManager(
                     isAutoSkipping = false
                     return
                 }
-                if (isMixing && reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
-                    finishMix()
+                if (isMixing && (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK || reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)) {
+                    abortMix()
                 }
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (!playWhenReady && isMixing) {
-                    finishMix()
+                    fadeOutPlayer?.pause()
+                } else if (playWhenReady && isMixing) {
+                    fadeOutPlayer?.play()
                 }
             }
         })
     }
 
     fun start() {
-        cachedEnabled = ContinuousMixPrefs.isEnabled(context)
-        cachedOverlapMs = (ContinuousMixPrefs.getOverlapSeconds(context) * 1000).toLong()
+        updatePrefs()
 
         monitorJob = mixScope.launch {
             while (isActive) {
                 if (!isMixing) {
-                    cachedEnabled = ContinuousMixPrefs.isEnabled(context)
-                    if (cachedEnabled) {
-                        cachedOverlapMs = (ContinuousMixPrefs.getOverlapSeconds(context) * 1000).toLong()
-                    }
+                    updatePrefs()
                 }
                 checkMixLogic()
-                delay(1000)
+
+                delay(200)
             }
+        }
+    }
+
+    private fun updatePrefs() {
+        cachedEnabled = ContinuousMixPrefs.isEnabled(appContext)
+        if (cachedEnabled) {
+            cachedOverlapMs = (ContinuousMixPrefs.getOverlapSeconds(appContext) * 1000).toLong()
         }
     }
 
     fun stop() {
         mixScope.coroutineContext.cancelChildren()
-        finishMix()
+        abortMix()
     }
 
     private fun checkMixLogic() {
@@ -103,92 +112,102 @@ class ContinuousMixManager(
 
         val remaining = duration - currentPos
 
-        if (remaining in 1..cachedOverlapMs) {
+        if (remaining > 0 && remaining <= cachedOverlapMs + 500) {
             startCrossfade(nextIndex, cachedOverlapMs)
         }
     }
 
     private fun startCrossfade(nextIndex: Int, overlapMs: Long) {
         isMixing = true
-        val nextItem = mainPlayer.getMediaItemAt(nextIndex)
+        isAutoSkipping = true
 
-        secondaryPlayer = ExoPlayer.Builder(context)
+        val currentItem = mainPlayer.currentMediaItem ?: return
+        val currentPos = mainPlayer.currentPosition
+
+        fadeOutPlayer = ExoPlayer.Builder(appContext)
             .setMediaSourceFactory(mediaSourceFactory)
             .build().apply {
-                setMediaItem(nextItem)
-                volume = 0f
+                setMediaItem(currentItem)
+                volume = mainPlayer.volume
                 prepare()
+                seekTo(currentPos)
 
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state == Player.STATE_READY && isMixing && mixJob == null) {
+                            playWhenReady = true
+
+                            mainPlayer.volume = 0f
+                            mainPlayer.seekToNextMediaItem()
+                            mainPlayer.playWhenReady = true
+
                             mixJob = mixScope.launch {
-                                executeSmoothCrossfade(overlapMs, nextIndex)
+                                executeSmoothCrossfade(overlapMs)
                             }
                         }
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        finishMix()
+                        abortMix()
                     }
                 })
-                playWhenReady = true
             }
     }
 
-    private suspend fun executeSmoothCrossfade(overlapMs: Long, nextIndex: Int) {
-        while (mixScope.isActive && isMixing) {
-            val duration = mainPlayer.duration
-            val pos = mainPlayer.currentPosition
-            if (duration == C.TIME_UNSET || pos == C.TIME_UNSET) {
-                delay(50)
-                continue
+    private suspend fun executeSmoothCrossfade(overlapMs: Long) {
+        val fader = fadeOutPlayer ?: return
+        val startTime = System.currentTimeMillis()
+
+        withTimeoutOrNull(2000) {
+            while (mainPlayer.playbackState != Player.STATE_READY) {
+                delay(20)
             }
+        }
 
-            val remaining = duration - pos
-
-            if (remaining <= 150) {
+        while (mixScope.isActive && isMixing) {
+            val elapsed = System.currentTimeMillis() - startTime
+            if (elapsed >= overlapMs) {
                 break
             }
 
-            val progress = 1f - (remaining.toFloat() / overlapMs.toFloat()).coerceIn(0f, 1f)
+            val progress = (elapsed.toFloat() / overlapMs.toFloat()).coerceIn(0f, 1f)
 
-            val newVol = progress.toDouble().pow(1.5).toFloat()
-            val oldVol = (1f - progress).toDouble().pow(1.5).toFloat()
+            val newVol = kotlin.math.sin(progress * Math.PI / 2).toFloat()
+            val oldVol = kotlin.math.cos(progress * Math.PI / 2).toFloat()
 
-            secondaryPlayer?.volume = newVol
-            mainPlayer.volume = oldVol
+            mainPlayer.volume = newVol
+            fader.volume = oldVol
 
             delay(30)
         }
 
-        if (!isMixing) return
-
-        isAutoSkipping = true
-
-        val targetPos = secondaryPlayer?.currentPosition ?: 0L
-
-        mainPlayer.volume = 0f // Глушим старый
-        mainPlayer.seekTo(nextIndex, targetPos)
-
-        var timeout = 0
-        while (mainPlayer.playbackState != Player.STATE_READY && timeout < 50) {
-            delay(10)
-            timeout++
-        }
-
-        mainPlayer.volume = 1f
         finishMix()
     }
 
     private fun finishMix() {
+        if (!isMixing) return
         isMixing = false
         mixJob?.cancel()
         mixJob = null
+
         mainPlayer.volume = 1f
-        secondaryPlayer?.stop()
-        secondaryPlayer?.release()
-        secondaryPlayer = null
+
+        fadeOutPlayer?.stop()
+        fadeOutPlayer?.release()
+        fadeOutPlayer = null
+    }
+
+    private fun abortMix() {
+        isMixing = false
+        isAutoSkipping = false
+        mixJob?.cancel()
+        mixJob = null
+
+        mainPlayer.volume = 1f
+
+        fadeOutPlayer?.stop()
+        fadeOutPlayer?.release()
+        fadeOutPlayer = null
     }
 }
 

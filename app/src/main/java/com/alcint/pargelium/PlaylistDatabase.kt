@@ -10,52 +10,111 @@ import com.google.gson.reflect.TypeToken
 object PlaylistDatabase {
     private lateinit var dbHelper: PlaylistDbHelper
     private val gson = Gson()
+    private val trackListType = object : TypeToken<List<Long>>() {}.type
+
+    @Volatile
     private var isInitialized = false
 
     fun init(context: Context) {
         if (isInitialized) return
-        dbHelper = PlaylistDbHelper(context.applicationContext)
-        migrateFromPrefsIfNeeded()
-        isInitialized = true
+        synchronized(this) {
+            if (isInitialized) return
+            dbHelper = PlaylistDbHelper(context.applicationContext)
+            migrateFromPrefsIfNeeded()
+            isInitialized = true
+        }
     }
 
     private fun migrateFromPrefsIfNeeded() {
         val oldPlaylists = PrefsManager.getOldPlaylists()
         if (oldPlaylists.isNotEmpty()) {
-            oldPlaylists.forEach { savePlaylist(it) }
-            PrefsManager.clearOldPlaylists()
+            val db = dbHelper.writableDatabase
+            db.beginTransaction()
+            try {
+                oldPlaylists.forEach { savePlaylistInternal(db, it) }
+                db.setTransactionSuccessful()
+                PrefsManager.clearOldPlaylists()
+            } finally {
+                db.endTransaction()
+            }
         }
     }
 
     fun getPlaylists(): List<PlaylistModel> {
         if (!isInitialized) return emptyList()
 
-        val db = dbHelper.readableDatabase
-        val cursor = db.query(PlaylistDbHelper.TABLE_NAME, null, null, null, null, null, "${PlaylistDbHelper.COL_CREATED_AT} ASC")
         val list = mutableListOf<PlaylistModel>()
 
-        with(cursor) {
-            while (moveToNext()) {
-                val id = getString(getColumnIndexOrThrow(PlaylistDbHelper.COL_ID))
-                val name = getString(getColumnIndexOrThrow(PlaylistDbHelper.COL_NAME))
-                val trackIdsJson = getString(getColumnIndexOrThrow(PlaylistDbHelper.COL_TRACK_IDS))
-                val coverUri = getString(getColumnIndexOrThrow(PlaylistDbHelper.COL_COVER_URI))
-                val bannerUri = getString(getColumnIndexOrThrow(PlaylistDbHelper.COL_BANNER_URI))
-                val createdAt = getLong(getColumnIndexOrThrow(PlaylistDbHelper.COL_CREATED_AT))
+        dbHelper.readableDatabase.query(
+            PlaylistDbHelper.TABLE_NAME,
+            null, null, null, null, null,
+            "${PlaylistDbHelper.COL_CREATED_AT} ASC"
+        ).use { cursor ->
+            val idIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_ID)
+            val nameIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_NAME)
+            val trackIdsIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_TRACK_IDS)
+            val coverUriIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_COVER_URI)
+            val bannerUriIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_BANNER_URI)
+            val createdAtIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_CREATED_AT)
 
-                val type = object : TypeToken<List<Long>>() {}.type
-                val trackIds: List<Long> = try { gson.fromJson(trackIdsJson, type) } catch (e: Exception) { emptyList() }
+            while (cursor.moveToNext()) {
+                val trackIds: List<Long> = try {
+                    gson.fromJson(cursor.getString(trackIdsIdx), trackListType) ?: emptyList()
+                } catch (_: Exception) {
+                    emptyList()
+                }
 
-                list.add(PlaylistModel(id, name, trackIds, coverUri, bannerUri, createdAt))
+                list.add(
+                    PlaylistModel(
+                        cursor.getString(idIdx),
+                        cursor.getString(nameIdx),
+                        trackIds,
+                        cursor.getString(coverUriIdx),
+                        cursor.getString(bannerUriIdx),
+                        cursor.getLong(createdAtIdx)
+                    )
+                )
             }
         }
-        cursor.close()
         return list
+    }
+
+    fun getPlaylistById(playlistId: String): PlaylistModel? {
+        if (!isInitialized) return null
+
+        dbHelper.readableDatabase.query(
+            PlaylistDbHelper.TABLE_NAME,
+            null,
+            "${PlaylistDbHelper.COL_ID} = ?",
+            arrayOf(playlistId),
+            null, null, null
+        ).use { cursor ->
+            if (cursor.moveToFirst()) {
+                val trackIds: List<Long> = try {
+                    gson.fromJson(cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_TRACK_IDS)), trackListType) ?: emptyList()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+
+                return PlaylistModel(
+                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_ID)),
+                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_NAME)),
+                    trackIds,
+                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_COVER_URI)),
+                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_BANNER_URI)),
+                    cursor.getLong(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_CREATED_AT))
+                )
+            }
+        }
+        return null
     }
 
     fun savePlaylist(playlist: PlaylistModel) {
         if (!isInitialized) return
-        val db = dbHelper.writableDatabase
+        savePlaylistInternal(dbHelper.writableDatabase, playlist)
+    }
+
+    private fun savePlaylistInternal(db: SQLiteDatabase, playlist: PlaylistModel) {
         val values = ContentValues().apply {
             put(PlaylistDbHelper.COL_ID, playlist.id)
             put(PlaylistDbHelper.COL_NAME, playlist.name)
@@ -69,23 +128,24 @@ object PlaylistDatabase {
 
     fun deletePlaylist(playlistId: String) {
         if (!isInitialized) return
-        val db = dbHelper.writableDatabase
-        db.delete(PlaylistDbHelper.TABLE_NAME, "${PlaylistDbHelper.COL_ID} = ?", arrayOf(playlistId))
+        dbHelper.writableDatabase.delete(PlaylistDbHelper.TABLE_NAME, "${PlaylistDbHelper.COL_ID} = ?", arrayOf(playlistId))
     }
 
     fun addTrackToPlaylist(playlistId: String, trackId: Long) {
-        val playlists = getPlaylists()
-        val playlist = playlists.find { it.id == playlistId }
-        if (playlist != null && !playlist.trackIds.contains(trackId)) {
-            savePlaylist(playlist.copy(trackIds = playlist.trackIds + trackId))
+        val playlist = getPlaylistById(playlistId) ?: return
+        if (!playlist.trackIds.contains(trackId)) {
+            val newTrackIds = ArrayList<Long>(playlist.trackIds.size + 1).apply {
+                addAll(playlist.trackIds)
+                add(trackId)
+            }
+            savePlaylist(playlist.copy(trackIds = newTrackIds))
         }
     }
 
     fun removeTrackFromPlaylist(playlistId: String, trackId: Long) {
-        val playlists = getPlaylists()
-        val playlist = playlists.find { it.id == playlistId }
-        if (playlist != null) {
-            savePlaylist(playlist.copy(trackIds = playlist.trackIds.filter { it != trackId }))
+        val playlist = getPlaylistById(playlistId) ?: return
+        if (playlist.trackIds.contains(trackId)) {
+            savePlaylist(playlist.copy(trackIds = playlist.trackIds.filterNot { it == trackId }))
         }
     }
 }

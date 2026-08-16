@@ -2,6 +2,7 @@ package com.alcint.pargelium
 
 import android.Manifest
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -26,8 +27,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -40,6 +41,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -65,6 +67,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.media3.common.C
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.common.util.concurrent.MoreExecutors
@@ -75,15 +78,11 @@ import kotlinx.coroutines.withContext
 
 data class ArtistModel(val name: String, val tracks: List<AudioTrack>, val albums: List<AlbumModel>)
 
+private val artistDelimiterRegex = Regex(" feat\\.? | ft\\.? | & | vs\\.? | x |,")
+
 fun getPrimaryArtist(rawName: String, unknownStr: String): String {
     if (rawName.isBlank() || rawName.lowercase() == "<unknown>") return unknownStr
-    val delimiters = arrayOf(" feat. ", " ft. ", " feat ", " ft ", " & ", " vs. ", " vs ", " x ", ",")
-    var primary = rawName
-    for (delim in delimiters) {
-        val index = primary.indexOf(delim, ignoreCase = true)
-        if (index > 0) primary = primary.substring(0, index)
-    }
-    return primary.trim()
+    return rawName.split(artistDelimiterRegex, limit = 2).first().trim()
 }
 
 @Composable
@@ -118,16 +117,18 @@ fun HeadlessPlaybackTracker(
 fun PlayerPositionProvider(
     playerController: MediaController?,
     isPlaying: Boolean,
-    content: @Composable (currentPosition: Long) -> Unit
+    content: @Composable (currentPositionProvider: () -> Long) -> Unit
 ) {
     var pos by remember { mutableLongStateOf(playerController?.currentPosition ?: 0L) }
+
     LaunchedEffect(isPlaying, playerController) {
         while (isPlaying) {
             playerController?.let { pos = it.currentPosition }
             delay(500)
         }
     }
-    content(pos)
+
+    content { pos }
 }
 
 @Composable
@@ -320,7 +321,11 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         controllerFuture.addListener({
             try { playerController = controllerFuture.get() } catch (e: Exception) {}
         }, MoreExecutors.directExecutor())
-        onDispose { playerController?.release() }
+
+        onDispose {
+            controllerFuture.cancel(true)
+            playerController?.release()
+        }
     }
 
     DisposableEffect(playerController) {
@@ -333,21 +338,34 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                     currentTrack = found
                     PrefsManager.saveLastTrackId(found.id)
                 }
-                trackDuration = player.duration.coerceAtLeast(1L)
+
+                val currentDuration = player.duration
+                if (currentDuration != C.TIME_UNSET) {
+                    trackDuration = currentDuration.coerceAtLeast(1L)
+                }
             }
             override fun onIsPlayingChanged(isPlayingState: Boolean) {
                 isPlaying = isPlayingState
                 if (!isPlayingState) PrefsManager.saveLastPosition(player.currentPosition)
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) trackDuration = player.duration.coerceAtLeast(1L)
+                if (playbackState == Player.STATE_READY) {
+                    val currentDuration = player.duration
+                    if (currentDuration != C.TIME_UNSET) {
+                        trackDuration = currentDuration.coerceAtLeast(1L)
+                    }
+                }
             }
             override fun onRepeatModeChanged(mode: Int) { repeatMode = mode }
         }
         player.addListener(listener)
         isPlaying = player.isPlaying
         repeatMode = player.repeatMode
-        trackDuration = player.duration.coerceAtLeast(1L)
+
+        val currentDuration = player.duration
+        if (currentDuration != C.TIME_UNSET) {
+            trackDuration = currentDuration.coerceAtLeast(1L)
+        }
 
         val currentId = player.currentMediaItem?.mediaId?.toLongOrNull()
         if (currentId != null) {
@@ -367,7 +385,11 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                 val foundTrack = allTracks.find { it.id == currentId }
                 if (foundTrack != null) {
                     currentTrack = foundTrack
-                    trackDuration = player.duration.coerceAtLeast(1L)
+
+                    val currentDuration = player.duration
+                    if (currentDuration != C.TIME_UNSET) {
+                        trackDuration = currentDuration.coerceAtLeast(1L)
+                    }
                     isPlaying = player.isPlaying
                 }
             }
@@ -631,17 +653,21 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         }
                     }
 
-                    val handleArtistClick: (String) -> Unit = { rawArtistName ->
-                        val primaryName = getPrimaryArtist(rawArtistName, unknownArtistStr)
-                        val foundArtist = allArtists.find { it.name.equals(primaryName, ignoreCase = true) }
-                        if (foundArtist != null) {
-                            selectedArtist = foundArtist
-                            selectedAlbum = null
-                            currentScreen = 0
-                            isSearchActive = false
-                            snapPlayer(false)
-                        } else {
-                            Toast.makeText(context, context.getString(R.string.artist_not_found), Toast.LENGTH_SHORT).show()
+                    val updatedAllArtists by rememberUpdatedState(allArtists)
+
+                    val handleArtistClick: (String) -> Unit = remember {
+                        { rawArtistName ->
+                            val primaryName = getPrimaryArtist(rawArtistName, unknownArtistStr)
+                            val foundArtist = updatedAllArtists.find { it.name.equals(primaryName, ignoreCase = true) }
+                            if (foundArtist != null) {
+                                selectedArtist = foundArtist
+                                selectedAlbum = null
+                                currentScreen = 0
+                                isSearchActive = false
+                                snapPlayer(false)
+                            } else {
+                                Toast.makeText(context, context.getString(R.string.artist_not_found), Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
 
@@ -720,11 +746,11 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                     ) { active ->
                                                         if (active) {
                                                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                                IconButton(onClick = { isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) }
+                                                                IconButton(onClick = remember {{ isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }}) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) }
                                                                 OutlinedTextField(
                                                                     value = searchQuery, onValueChange = { searchQuery = it }, placeholder = { Text(stringResource(id = R.string.search_hint)) }, modifier = Modifier.weight(1f).height(56.dp), singleLine = true, shape = RoundedCornerShape(24.dp),
                                                                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
-                                                                    trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, null) } },
+                                                                    trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = remember {{ searchQuery = "" }}) { Icon(Icons.Default.Close, null) } },
                                                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
                                                                 )
                                                             }
@@ -746,13 +772,13 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                                         Spacer(Modifier.width(12.dp))
                                                                         Text(text = userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                                     }
-                                                                    IconButton(onClick = { isSearchActive = true }) { Icon(Icons.Default.Search, "Search", tint = MaterialTheme.colorScheme.onBackground) }
+                                                                    IconButton(onClick = remember {{ isSearchActive = true }}) { Icon(Icons.Default.Search, "Search", tint = MaterialTheme.colorScheme.onBackground) }
                                                                 }
                                                                 TabRow(selectedTabIndex = libraryTab, containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary, divider = {}) {
-                                                                    Tab(selected = libraryTab == 0, onClick = { libraryTab = 0 }) {
+                                                                    Tab(selected = libraryTab == 0, onClick = remember {{ libraryTab = 0 }}) {
                                                                         Text(stringResource(id = R.string.tab_albums), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
                                                                     }
-                                                                    Tab(selected = libraryTab == 1, onClick = { libraryTab = 1 }) {
+                                                                    Tab(selected = libraryTab == 1, onClick = remember {{ libraryTab = 1 }}) {
                                                                         Text(stringResource(id = R.string.tab_artists), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
                                                                     }
                                                                 }
@@ -854,21 +880,21 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                 3 -> EqualizerScreen(seedColor = targetColor)
                                 4 -> {
                                     if (showAdvancedSettings) {
-                                        AdvancedSettingsScreen(onBackClick = { showAdvancedSettings = false })
+                                        AdvancedSettingsScreen(onBackClick = remember {{ showAdvancedSettings = false }})
                                     } else {
                                         SettingsScreen(
                                             currentThemeMode = themeMode,
                                             onThemeChanged = { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) },
                                             onSecureChanged = onSecureRequest,
                                             onFossWearChanged = { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() },
-                                            onNavigateToAdvanced = { showAdvancedSettings = true }
+                                            onNavigateToAdvanced = remember {{ showAdvancedSettings = true }}
                                         )
                                     }
                                 }
                                 5 -> ProfileScreen(
                                     allTracks = allTracks,
                                     seedColor = targetColor,
-                                    onBack = { currentScreen = 0 },
+                                    onBack = remember {{ currentScreen = 0 }},
                                     onArtistClick = handleArtistClick
                                 )
                             }
@@ -881,20 +907,23 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         Column(modifier = Modifier.align(Alignment.BottomCenter).zIndex(0f)) {
                             if (currentScreen == 0 && !isSearchActive && selectedAlbum == null && selectedArtist == null) {
                                 FloatingActionRow(
-                                    onRefresh = { loadTracks(true) },
-                                    onShuffleAll = { shuffleAll() })
+                                    onRefresh = remember {{ loadTracks(true) }},
+                                    onShuffleAll = remember {{ shuffleAll() }})
                             }
 
                             if (currentTrack != null) {
-                                PlayerPositionProvider(playerController, isPlaying) { currentPos ->
+                                PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
+                                    val currentPos = currentPosProvider()
+                                    val calculatedProgress = if (trackDuration > 0) currentPos.toFloat() / trackDuration else 0f
+
                                     MiniPlayer(
                                         track = currentTrack!!,
                                         isPlaying = isPlaying,
-                                        progress = if (trackDuration > 0) currentPos.toFloat() / trackDuration else 0f,
+                                        progress = calculatedProgress,
                                         albumArt = currentAlbumArt,
-                                        onPlayPause = { togglePlayPause() },
-                                        onSkipNext = { skipNext() },
-                                        onClick = { snapPlayer(true) }
+                                        onPlayPause = remember {{ togglePlayPause() }},
+                                        onSkipNext = remember {{ skipNext() }},
+                                        onClick = remember {{ snapPlayer(true) }}
                                     )
                                 }
                             }
@@ -911,15 +940,15 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                NavigationBarItem(selected = currentScreen == 0, onClick = { currentScreen = 0; selectedAlbum = null; selectedArtist = null }, icon = { Icon(painterResource(id = R.drawable.ic_action_key), null) }, label = { Text(stringResource(R.string.nav_library)) }, colors = navColors)
-                                NavigationBarItem(selected = currentScreen == 1, onClick = { currentScreen = 1 }, icon = { Icon(painterResource(id = R.drawable.ic_satellite_alt), null) }, label = { Text(stringResource(R.string.nav_radio)) }, colors = navColors)
+                                NavigationBarItem(selected = currentScreen == 0, onClick = remember {{ currentScreen = 0; selectedAlbum = null; selectedArtist = null }}, icon = { Icon(painterResource(id = R.drawable.ic_action_key), null) }, label = { Text(stringResource(R.string.nav_library)) }, colors = navColors)
+                                NavigationBarItem(selected = currentScreen == 1, onClick = remember {{ currentScreen = 1 }}, icon = { Icon(painterResource(id = R.drawable.ic_satellite_alt), null) }, label = { Text(stringResource(R.string.nav_radio)) }, colors = navColors)
 
                                 if (PrefsManager.getFeaturePlaylists()) {
-                                    NavigationBarItem(selected = currentScreen == 2, onClick = { currentScreen = 2 }, icon = { Icon(painterResource(id = R.drawable.ic_package_2), null) }, label = { Text(stringResource(id = R.string.nav_playlists)) }, colors = navColors)
+                                    NavigationBarItem(selected = currentScreen == 2, onClick = remember {{ currentScreen = 2 }}, icon = { Icon(painterResource(id = R.drawable.ic_package_2), null) }, label = { Text(stringResource(id = R.string.nav_playlists)) }, colors = navColors)
                                 }
 
-                                NavigationBarItem(selected = currentScreen == 3, onClick = { currentScreen = 3 }, icon = { Icon(painterResource(id = R.drawable.ic_instant_mix), null) }, label = { Text(stringResource(R.string.nav_eq)) }, colors = navColors)
-                                NavigationBarItem(selected = currentScreen == 4, onClick = { currentScreen = 4 }, icon = { Icon(painterResource(id = R.drawable.ic_settings_heart), null) }, label = { Text(stringResource(R.string.nav_settings)) }, colors = navColors)
+                                NavigationBarItem(selected = currentScreen == 3, onClick = remember {{ currentScreen = 3 }}, icon = { Icon(painterResource(id = R.drawable.ic_instant_mix), null) }, label = { Text(stringResource(R.string.nav_eq)) }, colors = navColors)
+                                NavigationBarItem(selected = currentScreen == 4, onClick = remember {{ currentScreen = 4 }}, icon = { Icon(painterResource(id = R.drawable.ic_settings_heart), null) }, label = { Text(stringResource(R.string.nav_settings)) }, colors = navColors)
                             }
                         }
                         if (currentTrack != null) {
@@ -944,27 +973,27 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                         }
                                     }
                             ) {
-                                PlayerPositionProvider(playerController, isPlaying) { currentPos ->
+                                PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
                                     FullPlayerScreen(
                                         track = currentTrack!!,
                                         isPlaying = isPlaying,
-                                        currentPosition = currentPos,
+                                        currentPosition = currentPosProvider(),
                                         duration = trackDuration,
                                         metadata = trackMetadata,
                                         seedColor = targetColor,
                                         repeatMode = repeatMode,
                                         playlist = currentPlaylist,
                                         currentQueueIndex = if (playerController != null) playerController!!.currentMediaItemIndex else -1,
-                                        onPlayPause = { togglePlayPause() },
-                                        onSeek = { seekTo(it) },
-                                        onSkipNext = { skipNext() },
-                                        onSkipPrevious = { skipPrevious() },
-                                        onToggleRepeat = { toggleRepeat() },
-                                        onQueueItemClick = { jumpToQueueItem(it) },
-                                        onRemoveFromQueue = { removeFromQueue(it) },
-                                        onCollapse = { snapPlayer(false) },
+                                        onPlayPause = remember {{ togglePlayPause() }},
+                                        onSeek = remember {{ seekTo(it) }},
+                                        onSkipNext = remember {{ skipNext() }},
+                                        onSkipPrevious = remember {{ skipPrevious() }},
+                                        onToggleRepeat = remember {{ toggleRepeat() }},
+                                        onQueueItemClick = remember {{ jumpToQueueItem(it) }},
+                                        onRemoveFromQueue = remember {{ removeFromQueue(it) }},
+                                        onCollapse = remember {{ snapPlayer(false) }},
                                         currentTab = currentScreen,
-                                        onTabSelected = { newTab -> currentScreen = newTab; snapPlayer(false) },
+                                        onTabSelected = remember {{ newTab -> currentScreen = newTab; snapPlayer(false) }},
                                         onArtistClick = handleArtistClick
                                     )
                                 }

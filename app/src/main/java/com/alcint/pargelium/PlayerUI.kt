@@ -179,16 +179,14 @@ fun LyricsView(
     }
 
     LaunchedEffect(activeIndex) {
-        if (activeIndex >= 0 && !listState.isScrollInProgress) {
+        if (activeIndex >= 0 && !listState.isScrollInProgress && lyrics.isNotEmpty()) {
             val layoutInfo = listState.layoutInfo
             val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == activeIndex }
 
             if (itemInfo != null) {
                 val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
                 val targetY = (viewportHeight * 0.35f).toInt()
-
                 val itemCenter = itemInfo.offset + (itemInfo.size / 2)
-
                 val scrollDistance = itemCenter - targetY
 
                 if (kotlin.math.abs(scrollDistance) > 10) {
@@ -198,7 +196,8 @@ fun LyricsView(
                     )
                 }
             } else {
-                listState.animateScrollToItem((activeIndex - 1).coerceAtLeast(0))
+                val safeTarget = (activeIndex - 1).coerceIn(0, lyrics.lastIndex)
+                listState.animateScrollToItem(safeTarget)
             }
         }
     }
@@ -293,13 +292,31 @@ fun VideoBackground(videoUri: Uri) {
 
     AndroidView(
         factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = false
+            val aspectRatioFrame = AspectRatioFrameLayout(ctx).apply {
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                setShutterBackgroundColor(android.graphics.Color.BLACK)
                 layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
             }
+
+            val textureView = android.view.TextureView(ctx).apply {
+                layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+            }
+
+            aspectRatioFrame.addView(textureView)
+            exoPlayer.setVideoTextureView(textureView)
+
+            exoPlayer.addListener(object : Player.Listener {
+                override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                    if (videoSize.width > 0 && videoSize.height > 0) {
+                        val ratio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
+                        aspectRatioFrame.setAspectRatio(ratio)
+                    }
+                }
+            })
+
+            aspectRatioFrame
+        },
+        onRelease = {
+            exoPlayer.clearVideoSurface()
         },
         modifier = Modifier.fillMaxSize().background(Color.Black)
     )
@@ -463,6 +480,7 @@ fun FullPlayerScreen(
     onArtistClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
 
     val isRadio = duration <= 0
@@ -472,14 +490,17 @@ fun FullPlayerScreen(
     var showBookmarks by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<List<LyricLine>>(emptyList()) }
 
-    val trackKey = remember(track) { "${track.artist}_${track.title}".hashCode().toString() }
+    val trackKey = remember(track.artist, track.title) {
+        (track.artist.hashCode() xor track.title.hashCode()).toString()
+    }
+
     var canvasUri by remember { mutableStateOf<Uri?>(null) }
     var isVideo by remember { mutableStateOf(false) }
 
     val iconTint = if (seedColor == Color.Unspecified || seedColor == Color.Transparent) MaterialTheme.colorScheme.primary else seedColor
 
     val initialPage = currentQueueIndex.coerceAtLeast(0)
-    val pageCount = if (playlist.isEmpty()) 1 else playlist.size
+    val pageCount = playlist.size.coerceAtLeast(1)
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { pageCount })
 
     var dynamicSeedColor by remember(seedColor) { mutableStateOf(seedColor) }
@@ -488,7 +509,7 @@ fun FullPlayerScreen(
         if (uri != null) {
             try {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
             PrefsManager.saveCustomCanvas(trackKey, uri.toString())
             canvasUri = uri
             isVideo = context.contentResolver.getType(uri)?.startsWith("video") == true || uri.toString().contains("video", ignoreCase = true)
@@ -509,9 +530,7 @@ fun FullPlayerScreen(
     }
 
     LaunchedEffect(track) {
-        lyrics = emptyList()
-        val loadedLyrics = LyricsManager.getLyrics(context, track)
-        lyrics = loadedLyrics
+        lyrics = LyricsManager.getLyrics(appContext, track)
 
         val customCanvasStr = PrefsManager.getCustomCanvas(trackKey)
         if (customCanvasStr != null) {
@@ -519,7 +538,7 @@ fun FullPlayerScreen(
             canvasUri = uri
             isVideo = context.contentResolver.getType(uri)?.startsWith("video") == true || customCanvasStr.contains("video", ignoreCase = true)
         } else {
-            val foundCanvas = withContext(Dispatchers.IO) { AudioRepository.findCanvasForTrack(context, track.uri) }
+            val foundCanvas = withContext(Dispatchers.IO) { AudioRepository.findCanvasForTrack(appContext, track.uri) }
             canvasUri = foundCanvas
             isVideo = foundCanvas?.let { context.contentResolver.getType(it)?.startsWith("video") == true || it.toString().contains("video", ignoreCase = true) } ?: false
         }
@@ -534,26 +553,29 @@ fun FullPlayerScreen(
         if (imageUrl != null && !isVideo) {
             withContext(Dispatchers.IO) {
                 try {
-                    val request = ImageRequest.Builder(context)
+                    val request = ImageRequest.Builder(appContext)
                         .data(imageUrl)
                         .size(100)
                         .allowHardware(false)
                         .build()
-                    val result = context.imageLoader.execute(request)
+
+                    val result = appContext.imageLoader.execute(request)
                     val drawable = result.drawable as? android.graphics.drawable.BitmapDrawable
                     drawable?.bitmap?.let { bitmap ->
                         var r = 0L; var g = 0L; var b = 0L
-                        val pixels = IntArray(bitmap.width * bitmap.height)
-                        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-
-                        val step = 10
                         var count = 0
-                        for (i in pixels.indices step step) {
-                            val color = pixels[i]
-                            r += android.graphics.Color.red(color)
-                            g += android.graphics.Color.green(color)
-                            b += android.graphics.Color.blue(color)
-                            count++
+                        val w = bitmap.width
+                        val h = bitmap.height
+                        val step = 4
+
+                        for (x in 0 until w step step) {
+                            for (y in 0 until h step step) {
+                                val color = bitmap.getPixel(x, y)
+                                r += android.graphics.Color.red(color)
+                                g += android.graphics.Color.green(color)
+                                b += android.graphics.Color.blue(color)
+                                count++
+                            }
                         }
 
                         if (count > 0) {
@@ -565,15 +587,15 @@ fun FullPlayerScreen(
                             dynamicSeedColor = Color(android.graphics.Color.HSVToColor(hsv))
                         }
                     }
-                } catch (e: Exception) { e.printStackTrace() }
+                } catch (_: Exception) {}
             }
         } else {
             dynamicSeedColor = seedColor
         }
     }
 
-    val imageLoader = remember {
-        ImageLoader.Builder(context)
+    val imageLoader = remember(appContext) {
+        ImageLoader.Builder(appContext)
             .components { add(ImageDecoderDecoder.Factory()) }
             .build()
     }
@@ -585,7 +607,7 @@ fun FullPlayerScreen(
     if (showQueue) {
         val listState = rememberLazyListState()
         LaunchedEffect(showQueue) {
-            if (currentQueueIndex >= 0 && currentQueueIndex < playlist.size) {
+            if (currentQueueIndex in playlist.indices) {
                 listState.scrollToItem((currentQueueIndex - 2).coerceAtLeast(0))
             }
         }
@@ -612,7 +634,7 @@ fun FullPlayerScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-        val bgModifier = if (blurRadius > 0.dp) {
+        val bgModifier = if (blurRadius > 0.dp && !isVideo) {
             Modifier.fillMaxSize().blur(blurRadius)
         } else {
             Modifier.fillMaxSize()
@@ -635,7 +657,7 @@ fun FullPlayerScreen(
                         }
                     } else {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(uri).build(),
+                            model = ImageRequest.Builder(appContext).data(uri).build(),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
@@ -650,13 +672,22 @@ fun FullPlayerScreen(
 
         Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(0.0f to Color.Transparent, 0.6f to Color.Black.copy(alpha = 0.4f), 1.0f to Color.Black.copy(alpha = 0.8f))))
 
-        val parallaxTransitionSpec: AnimatedContentTransitionScope<Boolean>.() -> ContentTransform = {
-            if (targetState) {
-                (slideInVertically(tween(500, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(500)))
-                    .togetherWith(slideOutVertically(tween(500, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(500)))
-            } else {
-                (slideInVertically(tween(500, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(500)))
-                    .togetherWith(slideOutVertically(tween(500, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(500)))
+        val parallaxTransitionSpec: AnimatedContentTransitionScope<Boolean>.() -> ContentTransform = remember {
+            {
+                if (targetState) {
+                    (slideInVertically(tween(500, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(500)))
+                        .togetherWith(slideOutVertically(tween(500, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(500)))
+                } else {
+                    (slideInVertically(tween(500, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(500)))
+                        .togetherWith(slideOutVertically(tween(500, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(500)))
+                }
+            }
+        }
+
+        val trackInfoTransitionSpec: AnimatedContentTransitionScope<AudioTrack>.() -> ContentTransform = remember {
+            {
+                (fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 0.9f, animationSpec = tween(400)))
+                    .togetherWith(fadeOut(animationSpec = tween(400)) + scaleOut(targetScale = 0.9f, animationSpec = tween(400)))
             }
         }
 
@@ -819,7 +850,7 @@ fun FullPlayerScreen(
                                             showCanvasMenu = false
                                             PrefsManager.saveCustomCanvas(trackKey, null)
                                             scope.launch {
-                                                val foundCanvas = withContext(Dispatchers.IO) { AudioRepository.findCanvasForTrack(context, track.uri) }
+                                                val foundCanvas = withContext(Dispatchers.IO) { AudioRepository.findCanvasForTrack(appContext, track.uri) }
                                                 canvasUri = foundCanvas
                                                 isVideo = foundCanvas?.let { context.contentResolver.getType(it)?.startsWith("video") == true || it.toString().contains("video", ignoreCase = true) } ?: false
                                             }
@@ -838,7 +869,7 @@ fun FullPlayerScreen(
                                     if (!hasTranslation) {
                                         isTranslating = true
                                         scope.launch {
-                                            lyrics = LyricsManager.translateLyrics(context, track, lyrics)
+                                            lyrics = LyricsManager.translateLyrics(appContext, track, lyrics)
                                             isTranslating = false
                                         }
                                     }
@@ -905,7 +936,7 @@ fun FullPlayerScreen(
                                         }
                                     }
                                     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        AnimatedContent(targetState = track, transitionSpec = { (fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 0.9f, animationSpec = tween(400))).togetherWith(fadeOut(animationSpec = tween(400)) + scaleOut(targetScale = 0.9f, animationSpec = tween(400))) }, label = "TrackInfo") { targetTrack ->
+                                        AnimatedContent(targetState = track, transitionSpec = trackInfoTransitionSpec, label = "TrackInfo") { targetTrack ->
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(text = targetTrack.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, modifier = Modifier.basicMarquee())
                                                 Spacer(modifier = Modifier.height(4.dp))

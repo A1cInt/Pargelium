@@ -1,6 +1,7 @@
 package com.alcint.pargelium
 
 import android.content.Context
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import androidx.compose.animation.AnimatedVisibility
@@ -33,7 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -43,40 +43,58 @@ fun EqualizerScreen(seedColor: Color) {
     val context = LocalContext.current
     var isEnabled by remember { mutableStateOf(PrefsManager.getEnabled()) }
 
-    // AutoEQ
     var autoEqEnabled by remember { mutableStateOf(PrefsManager.getAutoEqEnabled()) }
     var currentProfile by remember { mutableStateOf(PrefsManager.getCurrentAutoEqProfile()) }
     var showAutoEqSheet by remember { mutableStateOf(false) }
 
-    var connectedDeviceName by remember { mutableStateOf<String?>(null) }
+    var autoEqDatabaseList by remember { mutableStateOf<List<AutoEqProfile>>(emptyList()) }
+    var isAutoEqListLoading by remember { mutableStateOf(true) }
+    var autoEqErrorText by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(Unit) {
+        try {
+            isAutoEqListLoading = true
+            autoEqErrorText = null
+            autoEqDatabaseList = withContext(Dispatchers.IO) { AutoEqApi.getDatabaseIndex() }
+        } catch (e: Exception) {
+            autoEqErrorText = e.message
+        } finally {
+            isAutoEqListLoading = false
+        }
+    }
+
+    var connectedDeviceName by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        while (true) {
+        val updateDevice = {
             val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val btDevice = devices.firstOrNull {
                 it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
                         it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
                         it.type == AudioDeviceInfo.TYPE_BLE_BROADCAST
             }
-            val newDeviceName = btDevice?.productName?.toString()?.takeIf { it.isNotBlank() }
-            if (connectedDeviceName != newDeviceName) {
-                connectedDeviceName = newDeviceName
-            }
-            delay(2500)
+            connectedDeviceName = btDevice?.productName?.toString()?.takeIf { it.isNotBlank() }
+        }
+        val callback = object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) = updateDevice()
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) = updateDevice()
+        }
+        audioManager.registerAudioDeviceCallback(callback, null)
+        updateDevice()
+        onDispose {
+            audioManager.unregisterAudioDeviceCallback(callback)
         }
     }
 
-    // 10-Band EQ
     var userEqEnabled by remember { mutableStateOf(PrefsManager.getUserEqEnabled()) }
-    var userEqGains by remember { mutableStateOf(PrefsManager.getUserEqGains().toList()) }
+    val userEqGains = remember { mutableStateListOf(*PrefsManager.getUserEqGains().toTypedArray()) }
     val eqLabels = listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k")
 
-    // Бас
     var bassEnabled by remember { mutableStateOf(PrefsManager.getBassEnabled()) }
     var bass by remember { mutableFloatStateOf(PrefsManager.getBass().toFloat()) }
     var bassFreq by remember { mutableFloatStateOf(PrefsManager.getBassFreq().toFloat()) }
 
-    // Эффекты
     var roomEnabled by remember { mutableStateOf(PrefsManager.getRoom()) }
     var reverbMode by remember { mutableIntStateOf(PrefsManager.getReverbMode()) }
     var reverbSize by remember { mutableFloatStateOf(PrefsManager.getReverbSize().toFloat()) }
@@ -114,7 +132,7 @@ fun EqualizerScreen(seedColor: Color) {
 
                 val autoEqDesc = buildString {
                     append(currentProfile?.name ?: stringResource(id = R.string.click_to_select_model))
-                    if (connectedDeviceName != null) append("\n🎧 ${stringResource(id = R.string.connected_device_fmt, connectedDeviceName!!)}")
+                    if (connectedDeviceName != null) append("\n\uD83C\uDFA7 ${stringResource(id = R.string.connected_device_fmt, connectedDeviceName!!)}")
                 }
                 EffectCardWithSettings(title = stringResource(id = R.string.autoeq_title), desc = autoEqDesc, checked = autoEqEnabled, onChecked = { autoEqEnabled = it; PrefsManager.saveAutoEqEnabled(it) }, onClick = { showAutoEqSheet = true }) {}
 
@@ -126,12 +144,8 @@ fun EqualizerScreen(seedColor: Color) {
                                 Box(modifier = Modifier.height(150.dp).width(40.dp), contentAlignment = Alignment.Center) {
                                     Slider(
                                         value = userEqGains[i],
-                                        onValueChange = {
-                                            val newGains = userEqGains.toMutableList()
-                                            newGains[i] = it
-                                            userEqGains = newGains
-                                            PrefsManager.saveUserEqGains(newGains.toFloatArray())
-                                        },
+                                        onValueChange = { userEqGains[i] = it },
+                                        onValueChangeFinished = { PrefsManager.saveUserEqGains(userEqGains.toFloatArray()) },
                                         valueRange = -15f..15f,
                                         modifier = Modifier.requiredWidth(150.dp).graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0.5f, 0.5f) }
                                     )
@@ -141,9 +155,8 @@ fun EqualizerScreen(seedColor: Color) {
                         }
                     }
                     Button(onClick = {
-                        val reset = List(10) { 0f }
-                        userEqGains = reset
-                        PrefsManager.saveUserEqGains(reset.toFloatArray())
+                        for (i in 0..9) userEqGains[i] = 0f
+                        PrefsManager.saveUserEqGains(FloatArray(10) { 0f })
                     }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp)) {
                         Text(stringResource(id = R.string.reset_to_zero))
                     }
@@ -160,8 +173,8 @@ fun EqualizerScreen(seedColor: Color) {
                     checked = bassEnabled,
                     onChecked = { bassEnabled = it; PrefsManager.saveBassEnabled(it) }
                 ) {
-                    SettingSlider(stringResource(id = R.string.setting_power), bass, unit = "%") { bass = it; PrefsManager.saveBass(it.toInt()) }
-                    SettingSlider(stringResource(id = R.string.setting_frequency), bassFreq, 30f..150f, " ${stringResource(id = R.string.unit_hz)}") { bassFreq = it; PrefsManager.saveBassFreq(it.toInt()) }
+                    SettingSlider(stringResource(id = R.string.setting_power), bass, 0f..100f, "%", { bass = it }, { PrefsManager.saveBass(bass.toInt()) })
+                    SettingSlider(stringResource(id = R.string.setting_frequency), bassFreq, 30f..150f, " ${stringResource(id = R.string.unit_hz)}", { bassFreq = it }, { PrefsManager.saveBassFreq(bassFreq.toInt()) })
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -199,30 +212,21 @@ fun EqualizerScreen(seedColor: Color) {
                         }
                     }
 
-                    SettingSlider(stringResource(id = R.string.setting_room_size), reverbSize, unit = "%") {
-                        reverbSize = it; PrefsManager.saveReverbSize(it.toInt())
-                        reverbMode = 0; PrefsManager.saveReverbMode(0)
-                    }
-                    SettingSlider(stringResource(id = R.string.setting_wall_damp), reverbDamp, unit = "%") {
-                        reverbDamp = it; PrefsManager.saveReverbDamp(it.toInt())
-                        reverbMode = 0; PrefsManager.saveReverbMode(0)
-                    }
-                    SettingSlider(stringResource(id = R.string.setting_mix_level), reverbMix, unit = "%") {
-                        reverbMix = it; PrefsManager.saveReverbMix(it.toInt())
-                        reverbMode = 0; PrefsManager.saveReverbMode(0)
-                    }
+                    SettingSlider(stringResource(id = R.string.setting_room_size), reverbSize, 0f..100f, "%", { reverbSize = it; reverbMode = 0 }, { PrefsManager.saveReverbSize(reverbSize.toInt()); PrefsManager.saveReverbMode(0) })
+                    SettingSlider(stringResource(id = R.string.setting_wall_damp), reverbDamp, 0f..100f, "%", { reverbDamp = it; reverbMode = 0 }, { PrefsManager.saveReverbDamp(reverbDamp.toInt()); PrefsManager.saveReverbMode(0) })
+                    SettingSlider(stringResource(id = R.string.setting_mix_level), reverbMix, 0f..100f, "%", { reverbMix = it; reverbMode = 0 }, { PrefsManager.saveReverbMix(reverbMix.toInt()); PrefsManager.saveReverbMode(0) })
                 }
 
                 EffectCardWithSettings(title = stringResource(id = R.string.spatializer_title), desc = stringResource(id = R.string.spatializer_desc), checked = spatializer, onChecked = { spatializer = it; PrefsManager.saveSpatializer(it) }) {
-                    SettingSlider(stringResource(id = R.string.setting_stereo_width), spatialWidth, unit = "%") { spatialWidth = it; PrefsManager.saveSpatialWidth(it.toInt()) }
+                    SettingSlider(stringResource(id = R.string.setting_stereo_width), spatialWidth, 0f..100f, "%", { spatialWidth = it }, { PrefsManager.saveSpatialWidth(spatialWidth.toInt()) })
                 }
 
                 EffectCardWithSettings(title = stringResource(id = R.string.haas_title), desc = stringResource(id = R.string.haas_desc), checked = haasEnabled, onChecked = { haasEnabled = it; PrefsManager.saveHaas(it) }) {
-                    SettingSlider(stringResource(id = R.string.setting_right_delay), haasDelay, 1f..20f, " ${stringResource(id = R.string.unit_ms)}") { haasDelay = it; PrefsManager.saveHaasDelay(it.toInt()) }
+                    SettingSlider(stringResource(id = R.string.setting_right_delay), haasDelay, 1f..20f, " ${stringResource(id = R.string.unit_ms)}", { haasDelay = it }, { PrefsManager.saveHaasDelay(haasDelay.toInt()) })
                 }
 
                 EffectCardWithSettings(title = stringResource(id = R.string.exciter_title), desc = stringResource(id = R.string.exciter_desc), checked = mp3, onChecked = { mp3 = it; PrefsManager.saveMp3Restorer(it) }) {
-                    SettingSlider(stringResource(id = R.string.setting_intensity), exciterIntensity, unit = "%") { exciterIntensity = it; PrefsManager.saveExciterIntensity(it.toInt()) }
+                    SettingSlider(stringResource(id = R.string.setting_intensity), exciterIntensity, 0f..100f, "%", { exciterIntensity = it }, { PrefsManager.saveExciterIntensity(exciterIntensity.toInt()) })
                 }
 
                 EffectCardWithSettings(stringResource(id = R.string.tube_amp_title), stringResource(id = R.string.tube_amp_desc), tube, { tube = it; PrefsManager.saveTube(it) }) {}
@@ -232,22 +236,29 @@ fun EqualizerScreen(seedColor: Color) {
     }
 
     if (showAutoEqSheet) {
-        AutoEqSelectionSheet(currentProfileName = currentProfile?.name, onDismiss = { showAutoEqSheet = false }, onProfileSelected = {
-            currentProfile = PrefsManager.getCurrentAutoEqProfile()
-            autoEqEnabled = true
-            showAutoEqSheet = false
-        })
+        AutoEqSelectionSheet(
+            currentProfileName = currentProfile?.name,
+            databaseList = autoEqDatabaseList,
+            isListLoading = isAutoEqListLoading,
+            errorText = autoEqErrorText,
+            onDismiss = { showAutoEqSheet = false },
+            onProfileSelected = {
+                currentProfile = PrefsManager.getCurrentAutoEqProfile()
+                autoEqEnabled = true
+                showAutoEqSheet = false
+            }
+        )
     }
 }
 
 @Composable
-fun SettingSlider(name: String, value: Float, range: ClosedFloatingPointRange<Float> = 0f..100f, unit: String = "%", onValueChange: (Float) -> Unit) {
+fun SettingSlider(name: String, value: Float, range: ClosedFloatingPointRange<Float> = 0f..100f, unit: String = "%", onValueChange: (Float) -> Unit, onValueChangeFinished: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(name, style = MaterialTheme.typography.bodyMedium)
             Text("${value.toInt()}$unit", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = range)
+        Slider(value = value, onValueChange = onValueChange, onValueChangeFinished = onValueChangeFinished, valueRange = range)
     }
 }
 
@@ -277,21 +288,18 @@ fun EffectCardWithSettings(title: String, desc: String, checked: Boolean, onChec
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AutoEqSelectionSheet(currentProfileName: String?, onDismiss: () -> Unit, onProfileSelected: () -> Unit) {
+fun AutoEqSelectionSheet(
+    currentProfileName: String?,
+    databaseList: List<AutoEqProfile>,
+    isListLoading: Boolean,
+    errorText: String?,
+    onDismiss: () -> Unit,
+    onProfileSelected: () -> Unit
+) {
     val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
-    var isListLoading by remember { mutableStateOf(true) }
     var isPresetDownloading by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
-    var databaseList by remember { mutableStateOf<List<AutoEqProfile>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-        try {
-            isListLoading = true
-            errorText = null
-            databaseList = withContext(Dispatchers.IO) { AutoEqApi.getDatabaseIndex() }
-        } catch (e: Exception) { errorText = e.message } finally { isListLoading = false }
-    }
+    var downloadError by remember { mutableStateOf<String?>(null) }
 
     val filtered = databaseList.filter { it.name.contains(searchQuery, ignoreCase = true) }
 
@@ -305,7 +313,7 @@ fun AutoEqSelectionSheet(currentProfileName: String?, onDismiss: () -> Unit, onP
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (isListLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                else if (errorText != null) Text(errorText!!, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.Center).padding(32.dp))
+                else if (errorText != null || downloadError != null) Text(errorText ?: downloadError ?: "", color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.Center).padding(32.dp))
                 else if (filtered.isEmpty()) Text(stringResource(id = R.string.search_no_results), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Center))
                 else {
                     LazyColumn {
@@ -319,7 +327,7 @@ fun AutoEqSelectionSheet(currentProfileName: String?, onDismiss: () -> Unit, onP
                                     scope.launch {
                                         try {
                                             isPresetDownloading = true
-                                            errorText = null
+                                            downloadError = null
                                             val fullProfileWithGains = withContext(Dispatchers.IO) {
                                                 val downloadedGains = AutoEqApi.downloadPresetGains(profile)
                                                 profile.copy(gains = downloadedGains)
@@ -328,7 +336,7 @@ fun AutoEqSelectionSheet(currentProfileName: String?, onDismiss: () -> Unit, onP
                                             PrefsManager.saveEqGains(fullProfileWithGains.gains)
                                             PrefsManager.saveAutoEqEnabled(true)
                                             onProfileSelected()
-                                        } catch (e: Exception) { errorText = e.message } finally { isPresetDownloading = false }
+                                        } catch (e: Exception) { downloadError = e.message } finally { isPresetDownloading = false }
                                     }
                                 }
                             )

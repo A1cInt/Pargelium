@@ -25,8 +25,8 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -65,7 +65,7 @@ fun RadioScreen(
 
     val tabs = listOf(
         stringResource(id = R.string.tab_online_radio),
-        "Стриминг" // YouTube Music, SoundCloud, Audius, Saavn и др.
+        "Стриминг"
     )
 
     LaunchedEffect(RadioState.selectedTab) {
@@ -79,19 +79,30 @@ fun RadioScreen(
     LaunchedEffect(RadioState.selectedTab) {
         if (RadioState.selectedTab == 1 && RadioState.streamTracks.isEmpty() && RadioState.streamQuery.isBlank()) {
             RadioState.isStreamLoading = true
-            scope.launch {
-                try {
-                    val tracks = withContext(Dispatchers.IO) {
-                        val saavnTop = try { SaavnApi.getTopTracks() } catch (e: Exception) { emptyList() }
-
-                        val mappedSaavn = saavnTop.map { AudioTrack(id = it.longId, title = it.title, artist = it.artist, album = "JioSaavn", uri = Uri.parse(it.streamUrl), albumId = -5L, duration = it.duration * 1000L, trackNumber = 1, discNumber = 1, source = "saavn", coverUrl = it.coverUrl) }
-
-                        (mappedSaavn).shuffled()
-                    }
-                    RadioState.streamTracks = tracks
-                } catch (e: Exception) {
-                    android.util.Log.e("RadioScreen", "Ошибка загрузки топа стриминга", e)
-                } finally { RadioState.isStreamLoading = false }
+            try {
+                val tracks = withContext(Dispatchers.IO) {
+                    val saavnTop = try { SaavnApi.getTopTracks() } catch (e: Exception) { emptyList() }
+                    saavnTop.map {
+                        AudioTrack(
+                            id = it.longId,
+                            title = it.title,
+                            artist = it.artist,
+                            album = "JioSaavn",
+                            uri = Uri.parse(it.streamUrl),
+                            albumId = -5L,
+                            duration = it.duration * 1000L,
+                            trackNumber = 1,
+                            discNumber = 1,
+                            source = "saavn",
+                            coverUrl = it.coverUrl
+                        )
+                    }.shuffled()
+                }
+                RadioState.streamTracks = tracks
+            } catch (e: Exception) {
+                android.util.Log.e("RadioScreen", "Ошибка загрузки топа стриминга", e)
+            } finally {
+                RadioState.isStreamLoading = false
             }
         }
     }
@@ -200,7 +211,11 @@ fun RadioScreen(
                     } else if (RadioState.stations.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.search_no_results), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) }
                     } else {
-                        LazyColumn { items(RadioState.stations) { station -> RadioItem(station) { onStationSelect(station) } } }
+                        LazyColumn {
+                            items(RadioState.stations, key = { it.id }) { station ->
+                                RadioItem(station) { onStationSelect(station) }
+                            }
+                        }
                     }
                 }
                 1 -> {
@@ -210,7 +225,7 @@ fun RadioScreen(
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.search_no_results), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)) }
                     } else {
                         LazyColumn {
-                            items(RadioState.streamTracks) { track ->
+                            items(RadioState.streamTracks, key = { it.id }) { track ->
                                 StreamItem(
                                     track = track,
                                     primaryColor = primaryColor,
@@ -267,5 +282,20 @@ fun AuroraBackground(seedColor: Color) {
     val smoothColor by animateColorAsState(targetValue = seedColor, animationSpec = tween(1000, easing = LinearOutSlowInEasing), label = "smoothColor")
     val infiniteTransition = rememberInfiniteTransition(label = "aurora")
     val alpha by infiniteTransition.animateFloat(initialValue = 0.3f, targetValue = 0.1f, animationSpec = infiniteRepeatable(animation = tween(4000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "alpha")
-    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(smoothColor.copy(alpha = alpha), MaterialTheme.colorScheme.background))))
+    val backgroundColor = MaterialTheme.colorScheme.background
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            smoothColor.copy(alpha = alpha),
+                            backgroundColor
+                        )
+                    )
+                )
+            }
+    )
 }

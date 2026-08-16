@@ -48,12 +48,16 @@ fun PlaylistScreen(
     val context = LocalContext.current
     val contentResolver = context.contentResolver
 
-    val useDynamicColors = PrefsManager.getPlaylistDynamicColors()
-    val showBanners = PrefsManager.getPlaylistBanners()
-    val showCovers = PrefsManager.getPlaylistTrackCovers()
-    val useAnimations = PrefsManager.getPlaylistAnimations()
+    val useDynamicColors = remember { PrefsManager.getPlaylistDynamicColors() }
+    val showBanners = remember { PrefsManager.getPlaylistBanners() }
+    val showCovers = remember { PrefsManager.getPlaylistTrackCovers() }
+    val useAnimations = remember { PrefsManager.getPlaylistAnimations() }
+    val themeMode = remember { PrefsManager.getThemeMode() }
+    val systemDark = isSystemInDarkTheme()
 
-    var playlists by remember { mutableStateOf(PrefsManager.getPlaylists()) }
+    val trackMap = remember(allTracks) { allTracks.associateBy { it.id } }
+
+    var playlists by remember { mutableStateOf(PlaylistDatabase.getPlaylists()) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var selectedPlaylist by remember { mutableStateOf<PlaylistModel?>(null) }
@@ -61,50 +65,45 @@ fun PlaylistScreen(
     var showAddTracksSheet by remember { mutableStateOf(false) }
     var trackSearchQuery by remember { mutableStateOf("") }
 
-    // Выбор обложки с вечным доступом
     val coverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
             if (uri != null && selectedPlaylist != null) {
                 try {
                     contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (e: Exception) { e.printStackTrace() }
+                } catch (_: Exception) {}
 
                 val updated = selectedPlaylist!!.copy(coverUri = uri.toString())
-                PrefsManager.savePlaylist(updated)
+                PlaylistDatabase.savePlaylist(updated)
                 selectedPlaylist = updated
-                playlists = PrefsManager.getPlaylists()
+                playlists = PlaylistDatabase.getPlaylists()
             }
         }
     )
 
-    // Выбор баннера с вечным доступом
     val bannerPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
             if (uri != null && selectedPlaylist != null) {
                 try {
                     contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (e: Exception) { e.printStackTrace() }
+                } catch (_: Exception) {}
 
                 val updated = selectedPlaylist!!.copy(bannerUri = uri.toString())
-                PrefsManager.savePlaylist(updated)
+                PlaylistDatabase.savePlaylist(updated)
                 selectedPlaylist = updated
-                playlists = PrefsManager.getPlaylists()
+                playlists = PlaylistDatabase.getPlaylists()
             }
         }
     )
 
     fun refresh() {
-        playlists = PrefsManager.getPlaylists()
+        playlists = PlaylistDatabase.getPlaylists()
         if (selectedPlaylist != null) {
             selectedPlaylist = playlists.find { it.id == selectedPlaylist!!.id }
         }
     }
 
-    // Обработка динамических цветов
-    val themeMode = PrefsManager.getThemeMode()
-    val systemDark = isSystemInDarkTheme()
     val safeColor = if (useDynamicColors) seedColor else Color(0xFFD0BCFF)
     val localScheme = rememberPargeliumScheme(safeColor, themeMode, systemDark)
 
@@ -124,9 +123,6 @@ fun PlaylistScreen(
             ) { currentPlaylist ->
                 if (currentPlaylist == null) {
 
-                    // ==========================================
-                    // Главный экран
-                    // ==========================================
                     Column(modifier = Modifier.fillMaxSize()) {
                         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
@@ -142,7 +138,6 @@ fun PlaylistScreen(
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 250.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Кнопка создания нового плейлиста
                             item {
                                 Card(
                                     shape = RoundedCornerShape(24.dp),
@@ -151,7 +146,7 @@ fun PlaylistScreen(
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .tiltOnTouch() // 3D-Эффект нажатия
+                                        .tiltOnTouch()
                                         .clip(RoundedCornerShape(24.dp))
                                         .clickable { showCreateDialog = true }
                                 ) {
@@ -201,21 +196,16 @@ fun PlaylistScreen(
                         }
                     }
                 } else {
-
-                    // ==========================================
-                    // Экран внутри плейлиста
-                    // ==========================================
-                    val playlistTracks = currentPlaylist.trackIds.mapNotNull { id -> allTracks.find { it.id == id } }
+                    val playlistTracks = remember(currentPlaylist.trackIds, trackMap) {
+                        currentPlaylist.trackIds.mapNotNull { trackMap[it] }
+                    }
 
                     Box(modifier = Modifier.fillMaxSize()) {
 
-                        // Основной скроллируемый контент
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = 250.dp)
                         ) {
-
-                            // 1. ШАПКА (Баннер, Обложка, Название)
                             item {
                                 Box(
                                     modifier = Modifier
@@ -249,7 +239,6 @@ fun PlaylistScreen(
                                         }
                                     }
 
-                                    // Градиент
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -263,7 +252,6 @@ fun PlaylistScreen(
                                             )
                                     )
 
-                                    // Обложка и Тексты
                                     Column(
                                         modifier = Modifier
                                             .align(Alignment.BottomStart)
@@ -323,7 +311,6 @@ fun PlaylistScreen(
                                 }
                             }
 
-                            // 2. ПАНЕЛЬ УПРАВЛЕНИЯ
                             item {
                                 Row(
                                     modifier = Modifier
@@ -332,7 +319,6 @@ fun PlaylistScreen(
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Массивная кнопка Play
                                     Button(
                                         onClick = { if (playlistTracks.isNotEmpty()) onPlayTrack(playlistTracks.first(), playlistTracks) },
                                         modifier = Modifier
@@ -358,7 +344,6 @@ fun PlaylistScreen(
                                         )
                                     }
 
-                                    // Кнопка Shuffle
                                     IconButton(
                                         onClick = {
                                             if (playlistTracks.isNotEmpty()) {
@@ -374,7 +359,6 @@ fun PlaylistScreen(
                                         Icon(Icons.Default.Shuffle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
                                     }
 
-                                    // Кнопка Добавить треки
                                     IconButton(
                                         onClick = { showAddTracksSheet = true },
                                         modifier = Modifier
@@ -385,10 +369,9 @@ fun PlaylistScreen(
                                         Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
                                     }
 
-                                    // Кнопка Удалить плейлист
                                     IconButton(
                                         onClick = {
-                                            PrefsManager.deletePlaylist(currentPlaylist.id)
+                                            PlaylistDatabase.deletePlaylist(currentPlaylist.id)
                                             selectedPlaylist = null
                                             refresh()
                                         },
@@ -402,7 +385,6 @@ fun PlaylistScreen(
                                 }
                             }
 
-                            // 3. СПИСОК ТРЕКОВ
                             if (playlistTracks.isEmpty()) {
                                 item {
                                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -439,7 +421,7 @@ fun PlaylistScreen(
                                     },
                                     leadingContent = {
                                         if (showCovers) {
-                                            val artUri = remember(track.id) { AudioRepository.getAlbumArtUri(track.albumId) }
+                                            val artUri = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }
                                             AsyncImage(
                                                 model = artUri,
                                                 contentDescription = stringResource(id = R.string.cd_track_cover),
@@ -462,7 +444,7 @@ fun PlaylistScreen(
                                         }
                                     },
                                     trailingContent = {
-                                        IconButton(onClick = { PrefsManager.removeTrackFromPlaylist(currentPlaylist.id, track.id); refresh() }) {
+                                        IconButton(onClick = { PlaylistDatabase.removeTrackFromPlaylist(currentPlaylist.id, track.id); refresh() }) {
                                             Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     },
@@ -507,7 +489,7 @@ fun PlaylistScreen(
             confirmButton = {
                 Button(onClick = {
                     if (newPlaylistName.isNotBlank()) {
-                        PrefsManager.savePlaylist(PlaylistModel(name = newPlaylistName, trackIds = emptyList()))
+                        PlaylistDatabase.savePlaylist(PlaylistModel(name = newPlaylistName, trackIds = emptyList()))
                         newPlaylistName = ""
                         refresh()
                         showCreateDialog = false
@@ -519,7 +501,16 @@ fun PlaylistScreen(
     }
 
     if (showAddTracksSheet && selectedPlaylist != null) {
-        val filteredTracks = allTracks.filter { it.title.contains(trackSearchQuery, ignoreCase = true) || it.artist.contains(trackSearchQuery, ignoreCase = true) }
+        val filteredTracks = remember(trackSearchQuery, allTracks) {
+            if (trackSearchQuery.isBlank()) {
+                allTracks
+            } else {
+                allTracks.filter {
+                    it.title.contains(trackSearchQuery, ignoreCase = true) ||
+                            it.artist.contains(trackSearchQuery, ignoreCase = true)
+                }
+            }
+        }
 
         ModalBottomSheet(onDismissRequest = { showAddTracksSheet = false }, containerColor = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.fillMaxHeight(0.85f).padding(bottom = 16.dp)) {
@@ -527,14 +518,17 @@ fun PlaylistScreen(
                 OutlinedTextField(value = trackSearchQuery, onValueChange = { trackSearchQuery = it }, placeholder = { Text(stringResource(id = R.string.search_track_hint)) }, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), shape = RoundedCornerShape(24.dp), singleLine = true)
 
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(filteredTracks) { track ->
-                        val inPlaylist = selectedPlaylist!!.trackIds.contains(track.id)
+                    items(filteredTracks, key = { it.id }) { track ->
+                        val inPlaylist = remember(selectedPlaylist!!.trackIds, track.id) {
+                            selectedPlaylist!!.trackIds.contains(track.id)
+                        }
+
                         ListItem(
                             headlineContent = { Text(track.title, maxLines = 1, fontWeight = FontWeight.Bold) },
                             supportingContent = { Text(track.artist, maxLines = 1) },
                             leadingContent = {
                                 if (showCovers) {
-                                    val artUri = remember(track.id) { AudioRepository.getAlbumArtUri(track.albumId) }
+                                    val artUri = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }
                                     AsyncImage(
                                         model = artUri,
                                         contentDescription = stringResource(id = R.string.cd_track_cover),
@@ -549,9 +543,12 @@ fun PlaylistScreen(
                             },
                             trailingContent = {
                                 if (inPlaylist) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                                else IconButton(onClick = { PrefsManager.addTrackToPlaylist(selectedPlaylist!!.id, track.id); refresh() }) { Icon(Icons.Default.Add, null) }
+                                else IconButton(onClick = { PlaylistDatabase.addTrackToPlaylist(selectedPlaylist!!.id, track.id); refresh() }) { Icon(Icons.Default.Add, null) }
                             },
-                            modifier = Modifier.clickable { if (!inPlaylist) { PrefsManager.addTrackToPlaylist(selectedPlaylist!!.id, track.id); refresh() } }
+                            modifier = Modifier.clickable(enabled = !inPlaylist) {
+                                PlaylistDatabase.addTrackToPlaylist(selectedPlaylist!!.id, track.id)
+                                refresh()
+                            }
                         )
                     }
                 }
@@ -560,9 +557,6 @@ fun PlaylistScreen(
     }
 }
 
-// ==========================================
-// Карточка плейлиста
-// ==========================================
 @Composable
 fun PlaylistKsuCard(
     playlist: PlaylistModel,
@@ -574,6 +568,11 @@ fun PlaylistKsuCard(
 
     val textColor = if (hasBanner) Color.White else MaterialTheme.colorScheme.onSurface
     val secondaryTextColor = if (hasBanner) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+
+    val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
+    val dateStr = remember(playlist.createdAt, dateFormatter) {
+        dateFormatter.format(Date(playlist.createdAt))
+    }
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -589,7 +588,6 @@ fun PlaylistKsuCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
 
-            // 1. Слой с картинкой
             if (hasBanner) {
                 AsyncImage(
                     model = imgModel,
@@ -598,7 +596,6 @@ fun PlaylistKsuCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Плавный градиент для того, чтобы текст внизу легко читался
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -612,14 +609,12 @@ fun PlaylistKsuCard(
                 )
             }
 
-            // 2. Слой с контентом
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                // Обложка плейлиста
                 if (playlist.coverUri != null) {
                     AsyncImage(
                         model = playlist.coverUri,
@@ -649,7 +644,6 @@ fun PlaylistKsuCard(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Текстовая информация
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.Bottom
@@ -665,9 +659,6 @@ fun PlaylistKsuCard(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    val dateStr = remember(playlist.createdAt) {
-                        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(playlist.createdAt))
-                    }
                     val tracksText = pluralStringResource(
                         id = R.plurals.tracks_count,
                         count = playlist.trackIds.size,

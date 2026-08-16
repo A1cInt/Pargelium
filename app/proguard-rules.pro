@@ -1,21 +1,30 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+-keep class com.alcint.pargelium.CustomAudioProcessor { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes Signature, Exceptions, *Annotation*
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+-keep class com.alcint.pargelium.PlaylistModel { *; }
+-keep class com.alcint.pargelium.AudioTrack { *; }
+-keep class com.alcint.pargelium.LyricLine { *; }
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+
+-keep class coil.** { *; }
+-dontwarn coil.**
+-keep public class * implements com.bumptech.glide.module.GlideModule
+-keep class com.bumptech.glide.** { *; }
+-dontwarn com.bumptech.glide.**
+
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable *;
+}

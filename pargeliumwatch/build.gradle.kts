@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.alcint.pargelium"
-    compileSdk = 34
+    namespace = "com.alcint.pargeliumwatch"
+    compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.alcint.pargelium"
+        applicationId = "com.alcint.pargeliumwatch"
         minSdk = 30
-        targetSdk = 34
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
     }
@@ -29,17 +29,19 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
     buildFeatures {
         compose = true
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
-
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     // UI Compose

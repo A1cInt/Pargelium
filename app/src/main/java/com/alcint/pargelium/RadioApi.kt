@@ -4,12 +4,14 @@ import android.net.Uri
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
-// Модель данных для радио
 data class RadioStation(
     val stationuuid: String,
     val name: String,
@@ -19,7 +21,6 @@ data class RadioStation(
     val country: String
 )
 
-// API интерфейс
 interface RadioBrowserApi {
     @GET("json/stations/search")
     suspend fun search(
@@ -32,37 +33,45 @@ interface RadioBrowserApi {
     suspend fun getTop(@Query("limit") limit: Int = 40): List<RadioStation>
 }
 
-// Репозиторий
 object RadioRepository {
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .build()
+
     private val api = Retrofit.Builder()
-        .baseUrl("https://de1.api.radio-browser.info/") // Стабильный немецкий сервер. Потом добавлю больше
+        .baseUrl("https://de1.api.radio-browser.info/")
+        .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(RadioBrowserApi::class.java)
 
-    suspend fun getStations(query: String): List<AudioTrack> {
-        return withContext(Dispatchers.IO) {
-            try {
-                val stations = if (query.isBlank()) api.getTop() else api.search(query)
+    suspend fun getStations(query: String): List<AudioTrack> = withContext(Dispatchers.IO) {
+        try {
+            val stations = if (query.isBlank()) api.getTop() else api.search(query)
 
-                stations.map { station ->
-                    // Превращаем станцию в понятный плееру AudioTrack
-                    AudioTrack(
-                        id = station.stationuuid.hashCode().toLong(),
-                        title = station.name.trim(),
-                        artist = if (station.tags.isNotEmpty()) station.tags else station.country,
-                        album = "Radio Stream",
-                        uri = Uri.parse(station.url_resolved),
-                        albumId = 0L,
-                        duration = -1L,
-                        trackNumber = 0,
-                        discNumber = 1
-                    )
+            stations.map { station ->
+                val trackId = try {
+                    UUID.fromString(station.stationuuid).mostSignificantBits
+                } catch (e: Exception) {
+                    station.stationuuid.hashCode().toLong()
                 }
-            } catch (e: Exception) {
-                Log.e("Radio", "Error: ${e.message}")
-                emptyList()
+
+                AudioTrack(
+                    id = trackId,
+                    title = station.name.trim().ifEmpty { "Unknown Station" },
+                    artist = station.tags.takeIf { it.isNotBlank() } ?: station.country.takeIf { it.isNotBlank() } ?: "Radio",
+                    album = "Radio Stream",
+                    uri = Uri.parse(station.url_resolved),
+                    albumId = 0L,
+                    duration = -1L,
+                    trackNumber = 0,
+                    discNumber = 1
+                )
             }
+        } catch (e: Exception) {
+            Log.e("Radio", "Error: ${e.message}")
+            emptyList()
         }
     }
 }

@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -198,7 +199,7 @@ fun TrackRow(
             .padding(horizontal = 8.dp, vertical = 2.dp)
             .background(backgroundColor, RoundedCornerShape(12.dp)),
         backgroundContent = {
-            val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled || dismissState.progress > 0f
+            val isSwiping = dismissState.targetValue != SwipeToDismissBoxValue.Settled || dismissState.currentValue != SwipeToDismissBoxValue.Settled
 
             val iconScale by animateFloatAsState(
                 targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd) 1.3f else 0.8f,
@@ -239,7 +240,6 @@ fun TrackRow(
                 supportingContent = { Text(track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, color = contentColor.copy(alpha = 0.7f)) },
                 leadingContent = {
                     Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                        // Чистая обложка без дополнительных слоев и свечения
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -309,7 +309,7 @@ fun SharedTransitionScope.AlbumDetailView(
     val onBgColor = MaterialTheme.colorScheme.onBackground
     val bgColor = MaterialTheme.colorScheme.background
 
-    val barAlpha by remember {
+    val barAlphaState = remember {
         derivedStateOf {
             val offset = scrollState.firstVisibleItemScrollOffset
             val index = scrollState.firstVisibleItemIndex
@@ -318,9 +318,11 @@ fun SharedTransitionScope.AlbumDetailView(
     }
 
     val showBarTitle by remember {
-        derivedStateOf {
-            scrollState.firstVisibleItemIndex > 0
-        }
+        derivedStateOf { scrollState.firstVisibleItemIndex > 0 }
+    }
+
+    val isDarkIcon by remember {
+        derivedStateOf { barAlphaState.value > 0.5f }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
@@ -394,7 +396,7 @@ fun SharedTransitionScope.AlbumDetailView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .background(bgColor.copy(alpha = barAlpha))
+                .drawBehind { drawRect(color = bgColor, alpha = barAlphaState.value) }
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .height(56.dp)
                 .zIndex(2f)
@@ -403,12 +405,14 @@ fun SharedTransitionScope.AlbumDetailView(
                 onClick = onBack,
                 modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)
             ) {
-                val btnBgAlpha = (1f - barAlpha).coerceIn(0f, 0.4f)
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     "Back",
-                    modifier = Modifier.background(Color.Black.copy(alpha = btnBgAlpha), CircleShape),
-                    tint = if (barAlpha > 0.5f) onBgColor else Color.White
+                    modifier = Modifier.drawBehind {
+                        val btnBgAlpha = (1f - barAlphaState.value).coerceIn(0f, 0.4f)
+                        drawCircle(Color.Black, alpha = btnBgAlpha)
+                    },
+                    tint = if (isDarkIcon) onBgColor else Color.White
                 )
             }
 

@@ -19,6 +19,7 @@ import retrofit2.http.Query
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -51,6 +52,7 @@ object LyricsManager {
         .create(LrcLibApi::class.java)
 
     private val gson = Gson()
+    private val lrcRegex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
 
     private fun getCurrentAppLanguage(): String {
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -92,19 +94,27 @@ object LyricsManager {
                     val response = api.getLyrics(track.artist, track.title, track.album.takeIf { it.isNotBlank() }, (track.duration / 1000).toInt())
                     rawLyrics = response.syncedLyrics ?: response.plainLyrics
                 }
-            } catch (e: Exception) { Log.e("LyricsManager", "LRCLIB error: ${e.message}") }
+            } catch (e: Exception) {
+                Log.e("LyricsManager", "LRCLIB error: ${e.message}")
+            }
 
             if (rawLyrics.isNullOrBlank() && track.artist.isNotBlank() && track.title.isNotBlank()) {
                 try {
-                    val ovhUrl = URL("https://api.lyrics.ovh/v1/${URLEncoder.encode(track.artist, "UTF-8")}/${URLEncoder.encode(track.title, "UTF-8")}")
+                    val ovhUrl = URL("https://api.lyrics.ovh/v1/${URLEncoder.encode(track.artist, "UTF-8").replace("+", "%20")}/${URLEncoder.encode(track.title, "UTF-8").replace("+", "%20")}")
                     val conn = ovhUrl.openConnection() as HttpURLConnection
-                    conn.requestMethod = "GET"
-                    conn.connectTimeout = 4000
-                    if (conn.responseCode == 200) {
-                        val json = JSONObject(conn.inputStream.bufferedReader().readText())
-                        rawLyrics = json.optString("lyrics", "")
+                    try {
+                        conn.requestMethod = "GET"
+                        conn.connectTimeout = 4000
+                        if (conn.responseCode == 200) {
+                            val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
+                            rawLyrics = JSONObject(jsonText).optString("lyrics", "")
+                        }
+                    } finally {
+                        conn.disconnect()
                     }
-                } catch (e: Exception) { Log.e("LyricsManager", "OVH fallback error: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e("LyricsManager", "OVH fallback error: ${e.message}")
+                }
             }
 
             if (!rawLyrics.isNullOrBlank()) {
@@ -119,12 +129,11 @@ object LyricsManager {
 
     private fun parseLrcOrPlain(lrcContent: String, trackDuration: Long): List<LyricLine> {
         val lines = mutableListOf<LyricLine>()
-        val regex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
         var isSynced = false
 
         lrcContent.lines().forEach { line ->
             if (line.isBlank()) return@forEach
-            val match = regex.find(line)
+            val match = lrcRegex.find(line)
             if (match != null) {
                 isSynced = true
                 val (min, sec, msStr, text) = match.destructured
@@ -152,7 +161,6 @@ object LyricsManager {
 
         try {
             val targetLang = getCurrentAppLanguage()
-
             val chunkedLines = lines.chunked(15)
             val translatedLines = mutableListOf<String>()
 
@@ -162,18 +170,21 @@ object LyricsManager {
 
                 val url = URL("https://lingva.ml/api/v1/auto/$targetLang/$encodedQuery")
                 val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "GET"
-                conn.setRequestProperty("User-Agent", "Pargelium-FOSS-Player")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
+                try {
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("User-Agent", "Pargelium-FOSS-Player")
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
 
-                if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().readText()
-                    val json = JSONObject(response)
-                    val translatedText = json.optString("translation", "").replace("+", " ")
-                    translatedLines.addAll(translatedText.split(" || ", " | | ", "||"))
-                } else {
-                    translatedLines.addAll(List(chunk.size) { "" })
+                    if (conn.responseCode == 200) {
+                        val response = conn.inputStream.bufferedReader().use { it.readText() }
+                        val translatedText = JSONObject(response).optString("translation", "").replace("+", " ")
+                        translatedLines.addAll(translatedText.split(" || ", " | | ", "||"))
+                    } else {
+                        translatedLines.addAll(List(chunk.size) { "" })
+                    }
+                } finally {
+                    conn.disconnect()
                 }
             }
 
@@ -197,24 +208,41 @@ object LyricsManager {
 
     private fun findLocalLrcFile(context: Context, uri: Uri): String? {
         var realPath: String? = null
+
         if (uri.scheme == "content") {
             try {
                 val projection = arrayOf(MediaStore.Audio.Media.DATA)
                 context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                     if (cursor.moveToFirst()) {
-                        val columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                        realPath = cursor.getString(columnIndex)
+                        realPath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
                     }
                 }
             } catch (e: Exception) {}
-        } else if (uri.scheme == "file") { realPath = uri.path }
+        } else if (uri.scheme == "file") {
+            realPath = uri.path
+        }
 
-        val finalPath = realPath ?: uri.path ?: return null
+        var finalPath = realPath ?: uri.path ?: return null
+
+        try {
+            if (finalPath.startsWith("/document/raw:")) {
+                finalPath = finalPath.replaceFirst("/document/raw:", "")
+            }
+            finalPath = URLDecoder.decode(finalPath, "UTF-8")
+        } catch (e: Exception) {}
+
         try {
             val pathNoExt = finalPath.substringBeforeLast(".")
-            val lrcFile = File("$pathNoExt.lrc")
-            if (lrcFile.exists() && lrcFile.canRead() && lrcFile.length() > 0) return lrcFile.readText()
+            val possibleExtensions = listOf(".lrc", ".LRC", ".txt")
+
+            for (ext in possibleExtensions) {
+                val lrcFile = File("$pathNoExt$ext")
+                if (lrcFile.exists() && lrcFile.canRead() && lrcFile.length() > 0) {
+                    return lrcFile.readText()
+                }
+            }
         } catch (e: Exception) {}
+
         return null
     }
 
@@ -223,7 +251,13 @@ object LyricsManager {
         return try {
             retriever.setDataSource(context, uri)
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_WRITER)
-        } catch (e: Exception) { null } finally { try { retriever.release() } catch (_: Exception) {} }
+        } catch (e: Exception) {
+            null
+        } finally {
+            try {
+                retriever.release()
+            } catch (e: Exception) {}
+        }
     }
 
     private fun getCacheFile(context: Context, track: AudioTrack): File {
@@ -237,7 +271,9 @@ object LyricsManager {
         try {
             val json = gson.toJson(lines)
             getCacheFile(context, track).writeText(json)
-        } catch (e: Exception) { Log.e("LyricsManager", "Failed to save JSON cache", e) }
+        } catch (e: Exception) {
+            Log.e("LyricsManager", "Failed to save JSON cache", e)
+        }
     }
 
     private fun loadFromCache(context: Context, track: AudioTrack): List<LyricLine>? {
@@ -247,7 +283,9 @@ object LyricsManager {
                 val json = file.readText()
                 val type = object : TypeToken<List<LyricLine>>() {}.type
                 return gson.fromJson(json, type)
-            } catch (e: Exception) { Log.e("LyricsManager", "Failed to parse JSON cache", e) }
+            } catch (e: Exception) {
+                Log.e("LyricsManager", "Failed to parse JSON cache", e)
+            }
         }
         return null
     }

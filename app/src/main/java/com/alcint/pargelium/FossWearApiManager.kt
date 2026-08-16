@@ -12,9 +12,11 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import java.io.BufferedReader
 import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.InputStreamReader
+import java.io.PrintWriter
 import java.util.UUID
 
 val MY_APP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
@@ -32,152 +34,197 @@ data class PlayerStateData(
 
 class FossWearApiManager(
     private val context: Context,
-    private val scope: CoroutineScope,
+    private val externalScope: CoroutineScope,
     private val onCommandReceived: (String) -> Unit
 ) {
+    private val TAG = "FossWearApi"
+
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         manager?.adapter
     }
 
+    private val gson = Gson()
+    private var internalJob = SupervisorJob(externalScope.coroutineContext[Job])
+    private val internalScope = CoroutineScope(Dispatchers.IO + internalJob)
+
     private var serverSocket: BluetoothServerSocket? = null
     private var connectedSocket: BluetoothSocket? = null
-    private val gson = Gson()
-
-    private var outputStream: OutputStream? = null
-    private var inputStream: InputStream? = null
+    private var writer: PrintWriter? = null
+    private val sendChannel = Channel<String>(Channel.UNLIMITED)
 
     init {
+        startSendLoop()
         startServer()
+    }
+
+    private fun isApiEnabled() = PrefsManager.getFossWearEnabled()
+
+    @SuppressLint("MissingPermission")
+    private fun checkPermissions(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        }
+        return true
     }
 
     @SuppressLint("MissingPermission")
     fun startServer() {
-        // 1. Проверяем настройку в PrefsManager
-        if (!PrefsManager.getFossWearEnabled()) {
-            Log.d("FossWearApi", "Сервис отключен в настройках. Останавливаемся.")
-            release() // Убеждаемся, что всё закрыто
+        if (!isApiEnabled()) return
+        cleanupActiveConnection()
+
+        if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
+            Log.w(TAG, "Bluetooth не готов")
             return
         }
 
-        if (bluetoothAdapter == null || !bluetoothAdapter?.isEnabled!!) return
-
-        if (Build.VERSION.SDK_INT >= 31) {
-            val hasConnect = ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-            if (!hasConnect) {
-                Log.e("FossWearApi", "Нет прав BLUETOOTH_CONNECT")
-                return
-            }
+        if (!checkPermissions()) {
+            Log.e(TAG, "Нет прав BLUETOOTH_CONNECT")
+            return
         }
 
-        if (serverSocket != null) return
-
-        scope.launch(Dispatchers.IO) {
+        internalScope.launch {
             try {
                 serverSocket = bluetoothAdapter?.listenUsingRfcommWithServiceRecord("PargeliumWatchService", MY_APP_UUID)
-                Log.d("FossWearApi", "Bluetooth сервер запущен, жду подключения...")
+                Log.d(TAG, "Жду подключения на RFCOMM...")
 
                 val socket = serverSocket?.accept()
+                serverSocket?.close()
+                serverSocket = null
 
-                if (socket != null) {
+                if (socket != null && isActive) {
                     manageConnectedSocket(socket)
-                    try { serverSocket?.close() } catch (e: Exception) {}
+                } else {
+                    socket?.close()
                 }
-            } catch (e: Exception) {
-                Log.e("FossWearApi", "Ошибка сервера: ${e.message}")
+            } catch (e: IOException) {
+                if (isActive) Log.e(TAG, "Ошибка accept: ${e.message}")
             }
         }
     }
 
-    fun restart() {
-        release()
-        startServer()
-    }
-
-    private fun manageConnectedSocket(socket: BluetoothSocket) {
-        connectedSocket = socket
-        outputStream = socket.outputStream
-        inputStream = socket.inputStream
-        Log.d("FossWearApi", "Устройство подключено: ${socket.remoteDevice.name}")
-
-        scope.launch(Dispatchers.IO) {
-            val buffer = ByteArray(4096)
-            while (isActive) {
-                try {
-                    val bytes = inputStream?.read(buffer) ?: break
-                    if (bytes == -1) break
-                    val message = String(buffer, 0, bytes)
-                    handleIncomingMessage(message)
-                } catch (e: IOException) {
-                    break
+    private fun startSendLoop() {
+        internalScope.launch {
+            for (message in sendChannel) {
+                val currentWriter = writer
+                if (currentWriter != null && isActive) {
+                    try {
+                        currentWriter.println(message)
+                        if (currentWriter.checkError()) {
+                            Log.e(TAG, "Ошибка записи в PrintWriter (checkError)")
+                            handleConnectionLost()
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Ошибка отправки: ${e.message}")
+                        handleConnectionLost()
+                    }
                 }
             }
-            try { connectedSocket?.close() } catch (e: Exception) {}
-            startServer()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun manageConnectedSocket(socket: BluetoothSocket) {
+        connectedSocket = socket
+        try {
+            writer = PrintWriter(socket.outputStream, true)
+            Log.d(TAG, "Устройство подключено: ${socket.remoteDevice.name}")
+        } catch (e: IOException) {
+            Log.e(TAG, "Не удалось получить стримы сокета", e)
+            handleConnectionLost()
+            return
+        }
+
+        internalScope.launch {
+            try {
+                val reader = BufferedReader(InputStreamReader(socket.inputStream))
+                while (isActive) {
+                    val line = reader.readLine() ?: break
+                    if (line.isEmpty()) continue
+                    handleIncomingMessage(line)
+                }
+            } catch (e: IOException) {
+                Log.d(TAG, "Соединение разорвано при чтении: ${e.message}")
+            } finally {
+                handleConnectionLost()
+            }
         }
     }
 
     private fun handleIncomingMessage(json: String) {
-        try {
-            if (json.contains("type")) {
-                val packet = gson.fromJson(json, FossPacket::class.java)
-                if (packet.type == "CMD") {
-                    scope.launch(Dispatchers.Main) { onCommandReceived(packet.payload) }
+        internalScope.launch(Dispatchers.Default) {
+            try {
+                if (json.startsWith("{") && json.contains("\"type\"")) {
+                    val packet = gson.fromJson(json, FossPacket::class.java)
+                    if (packet.type == "CMD" && isActive) {
+                        withContext(Dispatchers.Main) {
+                            if (isActive) onCommandReceived(packet.payload)
+                        }
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка парсинга входящего JSON", e)
             }
-        } catch (e: Exception) { }
+        }
     }
 
     private fun sendPacket(type: String, dataObj: Any) {
-        if (!PrefsManager.getFossWearEnabled() || outputStream == null) return
+        // Проверяем статус джоба явно, так как мы не внутри корутины
+        if (!isApiEnabled() || connectedSocket == null || !internalJob.isActive) return
 
-        scope.launch(Dispatchers.IO) {
+        internalScope.launch(Dispatchers.Default) {
             try {
                 val payload = gson.toJson(dataObj)
                 val packet = FossPacket(type, payload)
                 val jsonString = gson.toJson(packet)
-                outputStream?.write(jsonString.toByteArray())
-                outputStream?.flush()
-            } catch (e: Exception) { }
+                sendChannel.send(jsonString)
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка подготовки пакета", e)
+            }
         }
     }
 
-    fun updatePlaybackState(
-        title: String,
-        artist: String,
-        isPlaying: Boolean,
-        pos: Long,
-        dur: Long,
-        color: Int
-    ) {
-        if (!PrefsManager.getFossWearEnabled()) return
+    private fun handleConnectionLost() {
+        // Проверяем статус джоба явно, так как мы не внутри корутины
+        if (!internalJob.isActive) return
+        Log.d(TAG, "Обработка потери соединения, перезапуск сервера...")
+        cleanupActiveConnection()
+        startServer()
+    }
 
+    fun updatePlaybackState(title: String, artist: String, isPlaying: Boolean, pos: Long, dur: Long, color: Int) {
         val state = PlayerStateData(title, artist, isPlaying, pos, dur, color)
         sendPacket("STATE", state)
     }
 
     fun syncTheme(mode: Int) {
-        if (!PrefsManager.getFossWearEnabled()) return
         sendPacket("THEME", mapOf("theme_mode" to mode))
     }
 
     fun syncLibrary(albums: List<AlbumModel>) {
-        if (!PrefsManager.getFossWearEnabled()) return
-
         val simpleList = albums.map {
             mapOf("id" to it.id, "title" to it.title, "count" to it.tracks.size)
         }
         sendPacket("LIBRARY", simpleList)
     }
 
+    private fun cleanupActiveConnection() {
+        try {
+            writer?.close()
+            connectedSocket?.close()
+        } catch (e: Exception) {}
+        writer = null
+        connectedSocket = null
+    }
+
     fun release() {
+        Log.d(TAG, "Релиз менеджера")
+        internalJob.cancel()
+        sendChannel.close()
         try {
             serverSocket?.close()
-            connectedSocket?.close()
-            serverSocket = null
-            connectedSocket = null
-            outputStream = null
-            inputStream = null
         } catch (e: Exception) {}
+        cleanupActiveConnection()
+        serverSocket = null
     }
 }

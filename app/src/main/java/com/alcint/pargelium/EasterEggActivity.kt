@@ -3,12 +3,13 @@ package com.alcint.pargelium
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
@@ -19,33 +20,62 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 class EasterEggActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            EasterEggScreen()
+            MaterialTheme {
+                EasterEggScreen()
+            }
         }
     }
+}
+
+class EggItem(
+    val id: Int,
+    initialAlbum: Long,
+    startX: Float,
+    startY: Float,
+    val radiusPx: Float,
+    val sizeDp: Dp
+) {
+    var albumId by mutableLongStateOf(initialAlbum)
+
+    var x by mutableFloatStateOf(startX)
+    var y by mutableFloatStateOf(startY)
+    var rotation by mutableFloatStateOf(Random.nextFloat() * 360f)
+    var isDragging by mutableStateOf(false)
+
+    var vx = (Random.nextFloat() - 0.5f) * 30f
+    var vy = (Random.nextFloat() - 0.5f) * 30f
+    var angularVelocity = (Random.nextFloat() - 0.5f) * 5f
+
+    var lastChangeTime = System.currentTimeMillis()
+    var changeInterval = Random.nextLong(15000, 30000)
 }
 
 @Composable
 fun EasterEggScreen() {
     val context = LocalContext.current
+    val density = LocalDensity.current
     var allAlbums by remember { mutableStateOf<List<Long>>(emptyList()) }
 
     LaunchedEffect(Unit) {
@@ -56,125 +86,210 @@ fun EasterEggScreen() {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF121212), Color(0xFF1E1E2E))
+                )
+            )
+    ) {
         if (allAlbums.isNotEmpty()) {
-            val itemsCount = minOf(15, allAlbums.size)
-            for (i in 0 until itemsCount) {
-                FloatingAlbumArt(allAlbums)
+            val widthPx = constraints.maxWidth.toFloat()
+            val heightPx = constraints.maxHeight.toFloat()
+
+            val items = remember {
+                val count = minOf(20, allAlbums.size)
+                List(count) { i ->
+                    val sizeDp = Random.nextInt(70, 130).dp
+                    val radiusPx = with(density) { sizeDp.toPx() / 2f }
+                    EggItem(
+                        id = i,
+                        initialAlbum = allAlbums.random(),
+                        startX = widthPx / 2f + (Random.nextFloat() - 0.5f) * 100f,
+                        startY = heightPx / 2f + (Random.nextFloat() - 0.5f) * 100f,
+                        radiusPx = radiusPx,
+                        sizeDp = sizeDp
+                    )
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                var lastTime = withFrameNanos { it }
+                while (isActive) {
+                    withFrameNanos { time ->
+                        val dt = ((time - lastTime) / 1_000_000f) / 16f
+                        lastTime = time
+                        val currentTime = System.currentTimeMillis()
+
+                        for (item in items) {
+                            if (currentTime - item.lastChangeTime > item.changeInterval) {
+                                item.albumId = allAlbums.random()
+                                item.lastChangeTime = currentTime
+                            }
+
+                            if (!item.isDragging) {
+                                item.x += item.vx * dt
+                                item.y += item.vy * dt
+                                item.rotation += item.angularVelocity * dt
+
+                                item.vx *= 0.995f
+                                item.vy *= 0.995f
+                                item.angularVelocity *= 0.99f
+
+                                if (item.x < item.radiusPx) {
+                                    item.x = item.radiusPx
+                                    item.vx = abs(item.vx) * 0.8f
+                                    item.angularVelocity += item.vy * 0.15f
+                                } else if (item.x > widthPx - item.radiusPx) {
+                                    item.x = widthPx - item.radiusPx
+                                    item.vx = -abs(item.vx) * 0.8f
+                                    item.angularVelocity -= item.vy * 0.15f
+                                }
+
+                                if (item.y < item.radiusPx) {
+                                    item.y = item.radiusPx
+                                    item.vy = abs(item.vy) * 0.8f
+                                    item.angularVelocity -= item.vx * 0.15f
+                                } else if (item.y > heightPx - item.radiusPx) {
+                                    item.y = heightPx - item.radiusPx
+                                    item.vy = -abs(item.vy) * 0.8f
+                                    item.angularVelocity += item.vx * 0.15f
+                                }
+                            }
+                        }
+
+                        for (i in items.indices) {
+                            for (j in i + 1 until items.size) {
+                                val a = items[i]
+                                val b = items[j]
+
+                                val dx = b.x - a.x
+                                val dy = b.y - a.y
+                                val dist = sqrt(dx * dx + dy * dy)
+                                val minDist = a.radiusPx + b.radiusPx
+
+                                if (dist < minDist && dist > 0.1f) {
+                                    val overlap = minDist - dist
+                                    val nx = dx / dist
+                                    val ny = dy / dist
+
+                                    val moveX = nx * overlap * 0.5f
+                                    val moveY = ny * overlap * 0.5f
+
+                                    if (!a.isDragging) { a.x -= moveX; a.y -= moveY }
+                                    if (!b.isDragging) { b.x += moveX; b.y += moveY }
+
+                                    val kx = a.vx - b.vx
+                                    val ky = a.vy - b.vy
+                                    val p = 2f * (nx * kx + ny * ky) / 2f
+
+                                    val bounceDamping = 0.85f
+
+                                    if (!a.isDragging) {
+                                        a.vx -= p * nx * bounceDamping
+                                        a.vy -= p * ny * bounceDamping
+                                        a.angularVelocity -= p * 0.05f
+                                    }
+                                    if (!b.isDragging) {
+                                        b.vx += p * nx * bounceDamping
+                                        b.vy += p * ny * bounceDamping
+                                        b.angularVelocity += p * 0.05f
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Отрисовка
+            items.forEach { item ->
+                PhysicsAlbumArt(
+                    item = item,
+                    allAlbums = allAlbums,
+                    maxX = widthPx,
+                    maxY = heightPx
+                )
             }
         }
     }
 }
 
 @Composable
-fun FloatingAlbumArt(allAlbums: List<Long>) {
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-
-    var currentAlbumId by remember { mutableStateOf(allAlbums.random()) }
-
-    val sizeDp = remember { Random.nextInt(60, 120).dp }
-    val sizePx = with(density) { sizeDp.toPx() }
-
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-
-    val maxX = screenWidthPx - sizePx
-    val maxY = screenHeightPx - sizePx
-
-    var offsetX by remember { mutableFloatStateOf(Random.nextFloat() * maxX) }
-    var offsetY by remember { mutableFloatStateOf(Random.nextFloat() * maxY) }
-    var velocityX by remember { mutableFloatStateOf((Random.nextFloat() - 0.5f) * 10f) }
-    var velocityY by remember { mutableFloatStateOf((Random.nextFloat() - 0.5f) * 10f) }
-
-    var isDragging by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        var lastFrameTime = withFrameNanos { it }
-        while (isActive) {
-            withFrameNanos { frameTime ->
-                val deltaMs = (frameTime - lastFrameTime) / 1_000_000f
-                lastFrameTime = frameTime
-                val timeScale = deltaMs / 16f
-
-                if (!isDragging) {
-                    offsetX += velocityX * timeScale
-                    offsetY += velocityY * timeScale
-
-                    if (offsetX <= 0f) {
-                        offsetX = 0f
-                        velocityX = kotlin.math.abs(velocityX) * 0.8f
-                    } else if (offsetX >= maxX) {
-                        offsetX = maxX
-                        velocityX = -kotlin.math.abs(velocityX) * 0.8f
-                    }
-
-                    if (offsetY <= 0f) {
-                        offsetY = 0f
-                        velocityY = kotlin.math.abs(velocityY) * 0.8f
-                    } else if (offsetY >= maxY) {
-                        offsetY = maxY
-                        velocityY = -kotlin.math.abs(velocityY) * 0.8f
-                    }
-
-                    velocityX *= 0.99f
-                    velocityY *= 0.99f
-
-                    if (kotlin.math.abs(velocityX) < 0.5f) velocityX += if (velocityX > 0) 0.05f else -0.05f
-                    if (kotlin.math.abs(velocityY) < 0.5f) velocityY += if (velocityY > 0) 0.05f else -0.05f
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            delay(Random.nextLong(15000, 30000))
-            currentAlbumId = allAlbums.random()
-        }
-    }
-
+fun PhysicsAlbumArt(
+    item: EggItem,
+    allAlbums: List<Long>,
+    maxX: Float,
+    maxY: Float
+) {
     val painter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(LocalContext.current)
-            .data(AudioRepository.getAlbumArtUri(currentAlbumId))
+            .data(AudioRepository.getAlbumArtUri(item.albumId))
             .crossfade(true)
             .build()
     )
 
-    val shape = RoundedCornerShape(12.dp)
     val velocityTracker = remember { VelocityTracker() }
+
+    val scale by animateFloatAsState(
+        targetValue = if (item.isDragging) 1.2f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "dragScale"
+    )
+
+    val shadow by animateFloatAsState(
+        targetValue = if (item.isDragging) 24f else 8f,
+        label = "dragShadow"
+    )
 
     Box(
         modifier = Modifier
             .graphicsLayer {
-                translationX = offsetX
-                translationY = offsetY
+                translationX = item.x - item.radiusPx
+                translationY = item.y - item.radiusPx
+                rotationZ = item.rotation
+                scaleX = scale
+                scaleY = scale
             }
-            .size(sizeDp)
-            .shadow(8.dp, shape)
-            .clip(shape)
+            .size(item.sizeDp)
+            .shadow(shadow.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.primaryContainer)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = {
+                        item.albumId = allAlbums.random()
+                        item.vx += (Random.nextFloat() - 0.5f) * 60f
+                        item.vy += (Random.nextFloat() - 0.5f) * 60f
+                        item.angularVelocity += (Random.nextFloat() - 0.5f) * 30f
+                        item.lastChangeTime = System.currentTimeMillis()
+                    }
+                )
+            }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
-                        isDragging = true
+                        item.isDragging = true
                         velocityTracker.resetTracking()
                     },
                     onDragEnd = {
-                        isDragging = false
+                        item.isDragging = false
                         val velocity = velocityTracker.calculateVelocity()
-                        velocityX = (velocity.x / 60f).coerceIn(-60f, 60f)
-                        velocityY = (velocity.y / 60f).coerceIn(-60f, 60f)
+                        item.vx = (velocity.x / 40f).coerceIn(-100f, 100f)
+                        item.vy = (velocity.y / 40f).coerceIn(-100f, 100f)
+                        item.angularVelocity = (item.vx + item.vy) * 0.1f
                     },
                     onDragCancel = {
-                        isDragging = false
+                        item.isDragging = false
                     }
                 ) { change, dragAmount ->
                     change.consume()
                     velocityTracker.addPosition(change.uptimeMillis, change.position)
 
-                    offsetX = (offsetX + dragAmount.x).coerceIn(0f, maxX)
-                    offsetY = (offsetY + dragAmount.y).coerceIn(0f, maxY)
+                    item.x = (item.x + dragAmount.x).coerceIn(item.radiusPx, maxX - item.radiusPx)
+                    item.y = (item.y + dragAmount.y).coerceIn(item.radiusPx, maxY - item.radiusPx)
                 }
             }
     ) {
@@ -185,12 +300,8 @@ fun FloatingAlbumArt(allAlbums: List<Long>) {
                 tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(sizeDp / 2)
+                    .size(item.sizeDp / 2)
             )
-            LaunchedEffect(currentAlbumId) {
-                delay(2000)
-                currentAlbumId = allAlbums.random()
-            }
         } else {
             Image(
                 painter = painter,

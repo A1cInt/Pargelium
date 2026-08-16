@@ -20,25 +20,20 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // 1. ИНИЦИАЛИЗАЦИЯ
         PrefsManager.init(this)
 
         PlaylistDatabase.init(this)
 
-        // Применяем флаг безопасности
         setSecureMode(PrefsManager.getSecureMode())
 
-        // 2. Настройка окон (Edge-to-Edge)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        // Делаем иконки белыми (так как фон темный)
         insetsController.isAppearanceLightStatusBars = false
         insetsController.isAppearanceLightNavigationBars = false
 
-        // 3. Запуск сервиса
         val intent = Intent(this, PlaybackService::class.java)
         startService(intent)
 
