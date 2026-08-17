@@ -14,11 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
-/**
- * Не вызывает рекомпозиций при анимации, поэтому не расходует батарею.
- * * @param maxAngle Максимальный угол отклонения в градусах
- * @param minScale Насколько элемент уменьшится при нажатии
- */
 fun Modifier.tiltOnTouch(
     maxAngle: Float = 8f,
     minScale: Float = 0.95f
@@ -39,35 +34,27 @@ fun Modifier.tiltOnTouch(
         }
         .pointerInput(Unit) {
             awaitEachGesture {
-                // Ждем нажатия. requireUnconsumed = false, чтобы клик дошел и до .clickable
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Main)
 
-                fun updateTilt(position: Offset) {
+                fun calculateTargets(position: Offset): Pair<Float, Float> {
                     val width = size.width.toFloat()
                     val height = size.height.toFloat()
 
                     val x = position.x.coerceIn(0f, width)
                     val y = position.y.coerceIn(0f, height)
 
-                    // Нормализуем координаты от -1 до 1 относительно центра
                     val nx = (x - width / 2f) / (width / 2f)
                     val ny = (y - height / 2f) / (height / 2f)
 
-                    // Анимируем. rotationX зависит от Y, rotationY зависит от X
-                    coroutineScope.launch {
-                        tiltX.animateTo(-ny * maxAngle, spring(dampingRatio = 0.6f, stiffness = 400f))
-                    }
-                    coroutineScope.launch {
-                        tiltY.animateTo(nx * maxAngle, spring(dampingRatio = 0.6f, stiffness = 400f))
-                    }
+                    return Pair(-ny * maxAngle, nx * maxAngle)
                 }
 
-                updateTilt(down.position)
-                coroutineScope.launch {
-                    scale.animateTo(minScale, spring(dampingRatio = 0.6f, stiffness = 400f))
-                }
+                val (initialTx, initialTy) = calculateTargets(down.position)
 
-                // Отслеживаем свайп/перемещение пальца
+                coroutineScope.launch { tiltX.animateTo(initialTx, spring(dampingRatio = 0.6f, stiffness = 400f)) }
+                coroutineScope.launch { tiltY.animateTo(initialTy, spring(dampingRatio = 0.6f, stiffness = 400f)) }
+                coroutineScope.launch { scale.animateTo(minScale, spring(dampingRatio = 0.6f, stiffness = 400f)) }
+
                 var isTracking = true
                 while (isTracking) {
                     val event = awaitPointerEvent(pass = PointerEventPass.Main)
@@ -76,11 +63,14 @@ fun Modifier.tiltOnTouch(
                     if (change == null || !change.pressed) {
                         isTracking = false
                     } else {
-                        updateTilt(change.position)
+                        val (tx, ty) = calculateTargets(change.position)
+                        coroutineScope.launch {
+                            tiltX.snapTo(tx)
+                            tiltY.snapTo(ty)
+                        }
                     }
                 }
 
-                // Возвращаем в исходное положение с эффектом пружины, когда палец отпущен
                 coroutineScope.launch { tiltX.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 300f)) }
                 coroutineScope.launch { tiltY.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 300f)) }
                 coroutineScope.launch { scale.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 300f)) }
