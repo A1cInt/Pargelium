@@ -51,6 +51,8 @@
     <string name="lang_fi">Suomi</string>
     <string name="lang_kk">Қазақ</string>
     <string name="lang_ga">Gaeilge</string>
+    <string name="lang_id">Bahasa Indonesia</string>
+    <string name="lang_tl">Tagalog</string>
 
     <string name="settings_privacy">Конфиденциальность</string>
     <string name="privacy_secure">Приватный режим</string>

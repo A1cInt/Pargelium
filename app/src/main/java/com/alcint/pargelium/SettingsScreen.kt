@@ -95,7 +95,9 @@ fun SettingsScreen(
             "el" to context.getString(R.string.lang_el),
             "fi" to context.getString(R.string.lang_fi),
             "kk" to context.getString(R.string.lang_kk),
-            "ga" to context.getString(R.string.lang_ga)
+            "ga" to context.getString(R.string.lang_ga),
+            "id" to context.getString(R.string.lang_id),
+            "tl" to context.getString(R.string.lang_tl)
         )
     }
 
