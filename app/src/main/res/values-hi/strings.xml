@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">संगीत नहीं मिला</string>
 
@@ -227,7 +227,38 @@
     <string name="contact_pm">निजी संदेश</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">मेरा चैनल</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">भाषा चुनें</string>
+
+    <string name="settings_track_info">ट्रैक की जानकारी</string>
+    <string name="settings_track_info_desc">बिटरेट, सैंपल रेट और प्रारूप (जैसे FLAC) दिखाएं</string>
+
+    <string name="adv_dev_mode">डेवलपर मोड</string>
+    <string name="adv_dev_mode_desc">प्लेयर के आंतरिक नियंत्रणों तक पहुंच प्रदान करें</string>
+    <string name="adv_module_control">मॉड्यूल प्रबंधन</string>
+    <string name="adv_module_control_desc">ऐप घटकों को सक्षम या अक्षम करें</string>
+
+    <string name="about_version">ऐप संस्करण</string>
+    <string name="about_version_desc">Pargelium 1.1\nप्लेयर जो बस अपना काम करता है।</string>
+
+    <string name="adv_warning_title">चेतावनी</string>
+    <string name="adv_warning_text">ये सेटिंग्स एडवांस्ड कस्टमाइजेशन के लिए हैं। सिस्टम घटकों (स्ट्रीमिंग, विज़ुअलाइज़ेशन, इक्वलाइज़र) को अक्षम करने से ऐप में अप्रत्याशित व्यवहार या अस्थिरता हो सकती है।\n\nक्या आप वाकई जारी रखना चाहते हैं?</string>
+    <string name="action_understand">मैं समझ गया</string>
+    <string name="action_back">वापस</string>
+
+    <string name="update_auto_check">स्वचालित अपडेट जांच</string>
+    <string name="update_auto_check_desc">स्टार्टअप पर GitHub पर नए संस्करणों की जांच करें</string>
+    <string name="update_check_now">अभी अपडेट की जांच करें</string>
+    <string name="checking_updates">अपडेट की जांच की जा रही है...</string>
+    <string name="no_updates_found">आपके पास नवीनतम संस्करण स्थापित है</string>
+    <string name="update_check_failed">अपडेट की जांच करने में विफल</string>
+    <string name="update_available">अपडेट %1$s उपलब्ध है</string>
+    <string name="update_available_desc">Pargelium का नया संस्करण डाउनलोड और इंस्टॉल करें।</string>
+    <string name="action_download">डाउनलोड करें</string>
+    <string name="action_skip">छोड़ें</string>
+    <string name="downloading_update">अपडेट डाउनलोड हो रहा है...</string>
+    <string name="install_failed">इंस्टॉलेशन शुरू करने में विफल</string>
+
+    <string name="action_play">चलाएं</string>
 
 </resources>

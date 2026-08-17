@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Níor aimsíodh ceol</string>
 
@@ -227,7 +227,38 @@
     <string name="contact_pm">Teachtaireacht phríobháideach</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Mo chainéal</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Roghnaigh teanga</string>
+
+    <string name="settings_track_info">Eolas faoin rian</string>
+    <string name="settings_track_info_desc">Taispeáin giotánráta, ráta samplála, agus formáid (m.sh. FLAC)</string>
+
+    <string name="adv_dev_mode">Mód forbróra</string>
+    <string name="adv_dev_mode_desc">Tabhair rochtain ar scoránaigh inmheánacha an sheinnteora</string>
+    <string name="adv_module_control">Bainistíocht modúl</string>
+    <string name="adv_module_control_desc">Cumasaigh nó díchumasaigh comhpháirteanna an aip</string>
+
+    <string name="about_version">Leagan an aip</string>
+    <string name="about_version_desc">Pargelium 1.1\nAn seinnteoir a dhéanann a chuid oibre go simplí.</string>
+
+    <string name="adv_warning_title">Rabhadh</string>
+    <string name="adv_warning_text">Tá na socruithe seo ceaptha le haghaidh saincheaptha doimhin. D\'fhéadfadh iompar gan choinne nó éagobhsaíocht san aip tarlú má dhíchumasaítear comhpháirteanna córais (sruthú, amharcléiriú, cothromóir).\n\nAn bhfuil tú cinnte gur mhaith leat leanúint ar aghaidh?</string>
+    <string name="action_understand">Tuigim</string>
+    <string name="action_back">Ar ais</string>
+
+    <string name="update_auto_check">Seiceáil uathoibríoch le haghaidh nuashonruithe</string>
+    <string name="update_auto_check_desc">Seiceáil le haghaidh leaganacha nua ar GitHub ag am tosaithe</string>
+    <string name="update_check_now">Seiceáil le haghaidh nuashonruithe anois</string>
+    <string name="checking_updates">Ag seiceáil le haghaidh nuashonruithe...</string>
+    <string name="no_updates_found">Tá an leagan is déanaí suiteáilte agat</string>
+    <string name="update_check_failed">Theip ar sheiceáil le haghaidh nuashonruithe</string>
+    <string name="update_available">Nuashonrú %1$s ar fáil</string>
+    <string name="update_available_desc">Íoslódáil agus shuiteáil an leagan nua de Pargelium.</string>
+    <string name="action_download">Íoslódáil</string>
+    <string name="action_skip">Scipeáil</string>
+    <string name="downloading_update">Ag íoslódáil nuashonraithe...</string>
+    <string name="install_failed">Theip ar thosú na suiteála</string>
+
+    <string name="action_play">Seinn</string>
 
 </resources>

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Música no encontrada</string>
 
@@ -226,12 +226,43 @@
     <string name="contact_pm">Mensajes privados</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Mi canal</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Elige el idioma</string>
 
     <string name="lang_es">Español</string>
     <string name="lang_it">Italiano</string>
     <string name="lang_ja">日本語</string>
     <string name="lang_pl">Polski</string>
+
+    <string name="settings_track_info">Información de la pista</string>
+    <string name="settings_track_info_desc">Mostrar tasa de bits, frecuencia de muestreo y formato (p. ej., FLAC)</string>
+
+    <string name="adv_dev_mode">Modo desarrollador</string>
+    <string name="adv_dev_mode_desc">Conceder acceso a los interruptores internos del reproductor</string>
+    <string name="adv_module_control">Gestión de módulos</string>
+    <string name="adv_module_control_desc">Activar o desactivar componentes de la aplicación</string>
+
+    <string name="about_version">Versión de la aplicación</string>
+    <string name="about_version_desc">Pargelium 1.1\nEl reproductor que simplemente hace su trabajo.</string>
+
+    <string name="adv_warning_title">Advertencia</string>
+    <string name="adv_warning_text">Esta configuración está destinada a una personalización avanzada. Desactivar componentes del sistema (transmisión, visualización, ecualizador) puede provocar un comportamiento inesperado o inestabilidad en la aplicación.\n\n¿Estás seguro de que deseas continuar?</string>
+    <string name="action_understand">Lo entiendo</string>
+    <string name="action_back">Atrás</string>
+
+    <string name="update_auto_check">Búsqueda automática de actualizaciones</string>
+    <string name="update_auto_check_desc">Buscar nuevas versiones en GitHub al iniciar</string>
+    <string name="update_check_now">Buscar actualizaciones ahora</string>
+    <string name="checking_updates">Buscando actualizaciones...</string>
+    <string name="no_updates_found">Tienes instalada la última versión</string>
+    <string name="update_check_failed">Error al buscar actualizaciones</string>
+    <string name="update_available">Actualización %1$s disponible</string>
+    <string name="update_available_desc">Descarga e instala la nueva versión de Pargelium.</string>
+    <string name="action_download">Descargar</string>
+    <string name="action_skip">Omitir</string>
+    <string name="downloading_update">Descargando actualización...</string>
+    <string name="install_failed">Error al iniciar la instalación</string>
+
+    <string name="action_play">Reproducir</string>
 
 </resources>

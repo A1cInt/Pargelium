@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Musik hittades inte</string>
 
@@ -231,7 +231,38 @@
     <string name="contact_pm">Privat meddelande</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Min kanal</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Välj språk</string>
+
+    <string name="settings_track_info">Låtinformation</string>
+    <string name="settings_track_info_desc">Visa bithastighet, samplingsfrekvens och format (t.ex. FLAC)</string>
+
+    <string name="adv_dev_mode">Utvecklarläge</string>
+    <string name="adv_dev_mode_desc">Ge åtkomst till spelarens interna reglage</string>
+    <string name="adv_module_control">Modulhantering</string>
+    <string name="adv_module_control_desc">Aktivera eller inaktivera appkomponenter</string>
+
+    <string name="about_version">Appversion</string>
+    <string name="about_version_desc">Pargelium 1.1\nSpelaren som helt enkelt gör sitt jobb.</string>
+
+    <string name="adv_warning_title">Varning</string>
+    <string name="adv_warning_text">Dessa inställningar är avsedda för djupgående anpassning. Att inaktivera systemkomponenter (strömning, visualisering, equalizer) kan leda till oväntat beteende eller instabilitet i appen.\n\nÄr du säker på att du vill fortsätta?</string>
+    <string name="action_understand">Jag förstår</string>
+    <string name="action_back">Tillbaka</string>
+
+    <string name="update_auto_check">Automatisk uppdateringskontroll</string>
+    <string name="update_auto_check_desc">Sök efter nya versioner på GitHub vid uppstart</string>
+    <string name="update_check_now">Sök efter uppdateringar nu</string>
+    <string name="checking_updates">Söker efter uppdateringar...</string>
+    <string name="no_updates_found">Du har den senaste versionen installerad</string>
+    <string name="update_check_failed">Det gick inte att söka efter uppdateringar</string>
+    <string name="update_available">Uppdatering %1$s tillgänglig</string>
+    <string name="update_available_desc">Ladda ner och installera den nya versionen av Pargelium.</string>
+    <string name="action_download">Ladda ner</string>
+    <string name="action_skip">Hoppa över</string>
+    <string name="downloading_update">Laddar ner uppdatering...</string>
+    <string name="install_failed">Det gick inte att starta installationen</string>
+
+    <string name="action_play">Spela upp</string>
 
 </resources>

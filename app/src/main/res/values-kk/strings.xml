@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Музыка табылмады</string>
 
@@ -227,7 +227,38 @@
     <string name="contact_pm">Жеке хабарлама</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Менің арнам</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Тілді таңдаңыз</string>
+
+    <string name="settings_track_info">Трек туралы ақпарат</string>
+    <string name="settings_track_info_desc">Битрейтті, дискреттеу жиілігін және пішімді (мысалы, FLAC) көрсету</string>
+
+    <string name="adv_dev_mode">Әзірлеуші режимі</string>
+    <string name="adv_dev_mode_desc">Плеердің ішкі ауыстырып-қосқыштарына рұқсат беру</string>
+    <string name="adv_module_control">Модульдерді басқару</string>
+    <string name="adv_module_control_desc">Қолданба компоненттерін қосу және өшіру</string>
+
+    <string name="about_version">Қолданба нұсқасы</string>
+    <string name="about_version_desc">Pargelium 1.1\nӨз жұмысын мінсіз орындайтын плеер.</string>
+
+    <string name="adv_warning_title">Ескерту</string>
+    <string name="adv_warning_text">Бұл параметрлер терең теңшеуге арналған. Жүйелік компоненттерді (стриминг, визуализация, эквалайзер) өшіру қолданбаның күтпеген әрекетіне немесе тұрақсыздығына әкелуі мүмкін.\n\nЖалғастырғыңыз келетініне сенімдісіз бе?</string>
+    <string name="action_understand">Түсіндім</string>
+    <string name="action_back">Артқа</string>
+
+    <string name="update_auto_check">Жаңартуларды автоматты түрде тексеру</string>
+    <string name="update_auto_check_desc">Іске қосылғанда GitHub-та жаңа нұсқалардың бар-жоғын тексеру</string>
+    <string name="update_check_now">Жаңартуларды қазір тексеру</string>
+    <string name="checking_updates">Жаңартулар тексерілуде...</string>
+    <string name="no_updates_found">Сізде ең соңғы нұсқа орнатылған</string>
+    <string name="update_check_failed">Жаңартуларды тексеру мүмкін болмады</string>
+    <string name="update_available">%1$s жаңартуы қолжетімді</string>
+    <string name="update_available_desc">Pargelium-нің жаңа нұсқасын жүктеп алып, орнатыңыз.</string>
+    <string name="action_download">Жүктеу</string>
+    <string name="action_skip">Өткізіп жіберу</string>
+    <string name="downloading_update">Жаңарту жүктелуде...</string>
+    <string name="install_failed">Орнатуды бастау қатесі</string>
+
+    <string name="action_play">Ойнату</string>
 
 </resources>

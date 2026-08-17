@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Tónlist fannst ekki</string>
 
@@ -227,7 +227,38 @@
     <string name="contact_pm">Einkaskilaboð</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Rásin mín</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Veldu tungumál</string>
+
+    <string name="settings_track_info">Lagaupplýsingar</string>
+    <string name="settings_track_info_desc">Sýna bitahraða, úrtakstíðni og snið (t.d. FLAC)</string>
+
+    <string name="adv_dev_mode">Hönnuðarstilling</string>
+    <string name="adv_dev_mode_desc">Veita aðgang að innri rofum spilarans</string>
+    <string name="adv_module_control">Einingastýring</string>
+    <string name="adv_module_control_desc">Virkja eða aftengja hluta forritsins</string>
+
+    <string name="about_version">Útgáfa forrits</string>
+    <string name="about_version_desc">Pargelium 1.1\nSpilarinn sem gerir einfaldlega það sem hann á að gera.</string>
+
+    <string name="adv_warning_title">Aðvörun</string>
+    <string name="adv_warning_text">Þessar stillingar eru ætlaðar fyrir djúpa sérsniðningu. Ef kerfishlutar eru aftengdir (straumspilun, myndgerving, tónjafnari) getur það leitt til óvæntrar hegðunar eða óstöðugleika forritsins.\n\nErtu viss um að þú viljir halda áfram?</string>
+    <string name="action_understand">Ég skil</string>
+    <string name="action_back">Til baka</string>
+
+    <string name="update_auto_check">Sjálfvirk leit að uppfærslum</string>
+    <string name="update_auto_check_desc">Athuga með nýjar útgáfur á GitHub við ræsingu</string>
+    <string name="update_check_now">Athuga með uppfærslur núna</string>
+    <string name="checking_updates">Að athuga með uppfærslur...</string>
+    <string name="no_updates_found">Þú ert með nýjustu útgáfuna uppsetta</string>
+    <string name="update_check_failed">Tókst ekki að athuga með uppfærslur</string>
+    <string name="update_available">Uppfærsla %1$s í boði</string>
+    <string name="update_available_desc">Sæktu og settu upp nýja útgáfu af Pargelium.</string>
+    <string name="action_download">Sækja</string>
+    <string name="action_skip">Sleppa</string>
+    <string name="downloading_update">Sækir uppfærslu...</string>
+    <string name="install_failed">Tókst ekki að hefja uppsetningu</string>
+
+    <string name="action_play">Spila</string>
 
 </resources>

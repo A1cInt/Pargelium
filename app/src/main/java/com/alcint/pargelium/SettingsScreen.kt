@@ -408,7 +408,7 @@ fun SettingsScreen(
                                     IconContainer(painter = painterResource(id = R.drawable.ic_social), color = MaterialTheme.colorScheme.tertiary)
                                 },
                                 modifier = Modifier.clickable {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/comalcint"))
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/AlcReleases"))
                                     context.startActivity(intent)
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)

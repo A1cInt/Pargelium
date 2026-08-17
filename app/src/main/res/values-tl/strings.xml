@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Walang nahanap na musika</string>
 
@@ -231,7 +231,7 @@
     <string name="contact_pm">Pribadong Mensahe</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Aking channel</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Pumili ng wika</string>
 
     <string name="settings_playback">Pag-playback</string>
@@ -247,7 +247,7 @@
     <string name="adv_module_control_desc">I-enable o i-disable ang mga component ng app</string>
 
     <string name="about_version">Bersyon ng app</string>
-    <string name="about_version_desc">Pargelium 1.0.0\nAng player na ginagawa lang ang trabaho nito.</string>
+    <string name="about_version_desc">Pargelium 1.1\nAng player na ginagawa lang ang trabaho nito.</string>
 
     <string name="adv_warning_title">Babala</string>
     <string name="adv_warning_text">Ang mga setting na ito ay para sa malalim na pag-customize. Ang pag-disable sa mga system component (streaming, visualization, equalizer) ay maaaring magdulot ng hindi inaasahang pag-uugali o kawalang-tatag sa app.\n\nSigurado ka bang gusto mong magpatuloy?</string>

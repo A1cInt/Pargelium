@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Musik tidak ditemukan</string>
 
@@ -234,7 +234,7 @@
     <string name="contact_pm">Pesan Pribadi</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Saluran saya</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Pilih bahasa</string>
 
     <string name="settings_playback">Pemutaran</string>
@@ -250,7 +250,7 @@
     <string name="adv_module_control_desc">Aktifkan atau nonaktifkan komponen aplikasi</string>
 
     <string name="about_version">Versi aplikasi</string>
-    <string name="about_version_desc">Pargelium 1.0.0\nPemutar musik yang bekerja sesuai fungsinya.</string>
+    <string name="about_version_desc">Pargelium 1.1\nPemutar musik yang bekerja sesuai fungsinya.</string>
 
     <string name="adv_warning_title">Peringatan</string>
     <string name="adv_warning_text">Pengaturan ini ditujukan untuk kustomisasi mendalam. Menonaktifkan komponen sistem (streaming, visualisasi, ekualiser) dapat menyebabkan perilaku aplikasi yang tidak terduga atau ketidakstabilan.\n\nApakah Anda yakin ingin melanjutkan?</string>

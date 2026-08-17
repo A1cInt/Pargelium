@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Δεν βρέθηκε μουσική</string>
 
@@ -227,7 +227,38 @@
     <string name="contact_pm">Προσωπικό μήνυμα</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Το κανάλι μου</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Επιλέξτε γλώσσα</string>
+
+    <string name="settings_track_info">Πληροφορίες κομματιού</string>
+    <string name="settings_track_info_desc">Εμφάνιση bitrate, ρυθμού δειγματοληψίας και μορφής (π.χ. FLAC)</string>
+
+    <string name="adv_dev_mode">Functionality προγραμματιστή</string>
+    <string name="adv_dev_mode_desc">Παραχώρηση πρόσβασης σε εσωτερικούς διακόπτες του αναπαραγωγέα</string>
+    <string name="adv_module_control">Διαχείριση ενοτήτων</string>
+    <string name="adv_module_control_desc">Ενεργοποίηση ή απενεργοποίηση στοιχείων της εφαρμογής</string>
+
+    <string name="about_version">Έκδοση εφαρμογής</string>
+    <string name="about_version_desc">Pargelium 1.1\nΟ αναπαραγωγέας που απλά κάνει τη δουλειά του.</string>
+
+    <string name="adv_warning_title">Προειδοποίηση</string>
+    <string name="adv_warning_text">Αυτές οι ρυθμίσεις προορίζονται για προηγμένη προσαρμογή. Η απενεργοποίηση στοιχείων συστήματος (streaming, οπτικοποίηση, ισοσταθμιστής) ενδέχεται να οδηγήσει σε μη αναμενόμενη συμπεριφορά ή αστάθεια της εφαρμογής.\n\nΕίστε βέβαιοι ότι θέλετε να συνεχίσετε;</string>
+    <string name="action_understand">Κατάλαβα</string>
+    <string name="action_back">Πίσω</string>
+
+    <string name="update_auto_check">Αυτόματος έλεγχος ενημερώσεων</string>
+    <string name="update_auto_check_desc">Έλεγχος για νέες εκδόσεις στο GitHub κατά την εκκίνηση</string>
+    <string name="update_check_now">Έλεγχος για ενημερώσεις τώρα</string>
+    <string name="checking_updates">Έλεγχος για ενημερώσεις...</string>
+    <string name="no_updates_found">Έχετε εγκατεστημένη την τελευταία έκδοση</string>
+    <string name="update_check_failed">Αποτυχία ελέγχου ενημερώσεων</string>
+    <string name="update_available">Διαθέσιμη ενημέρωση %1$s</string>
+    <string name="update_available_desc">Κατεβάστε και εγκαταστήστε τη νέα έκδοση του Pargelium.</string>
+    <string name="action_download">Λήψη</string>
+    <string name="action_skip">Παράκαμψη</string>
+    <string name="downloading_update">Λήψη ενημέρωσης...</string>
+    <string name="install_failed">Αποτυχία έναρξης της εγκατάστασης</string>
+
+    <string name="action_play">Αναπαραγωγή</string>
 
 </resources>

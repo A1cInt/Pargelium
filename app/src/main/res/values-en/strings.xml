@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Music not found</string>
 
@@ -225,7 +225,7 @@
     <string name="contact_pm">Private messages</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">My channel</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Choose language</string>
 
     <string name="lang_es">Español</string>
@@ -246,7 +246,7 @@
     <string name="adv_module_control_desc">Enable or disable app components</string>
 
     <string name="about_version">App version</string>
-    <string name="about_version_desc">Pargelium 1.0.0\nThe player that simply does its job.</string>
+    <string name="about_version_desc">Pargelium 1.1\nThe player that simply does its job.</string>
 
     <string name="adv_warning_title">Warning</string>
     <string name="adv_warning_text">These settings are intended for deep customization. Disabling system components (streaming, visualization, equalizer) may lead to unexpected app behavior or instability.\n\nAre you sure you want to continue?</string>

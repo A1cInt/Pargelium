@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">音楽が見つかりません</string>
 
@@ -224,12 +224,43 @@
     <string name="contact_pm">プライベートメッセージ</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">私のチャンネル</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">言語を選択</string>
 
     <string name="lang_es">Español</string>
     <string name="lang_it">Italiano</string>
     <string name="lang_ja">日本語</string>
     <string name="lang_pl">Polski</string>
+
+    <string name="settings_track_info">トラック情報</string>
+    <string name="settings_track_info_desc">ビットレート、サンプリング周波数、フォーマット（FLACなど）を表示</string>
+
+    <string name="adv_dev_mode">開発者モード</string>
+    <string name="adv_dev_mode_desc">プレーヤーの内部設定トグルへのアクセスを許可</string>
+    <string name="adv_module_control">モジュール管理</string>
+    <string name="adv_module_control_desc">アプリコンポーネントの有効化・無効化</string>
+
+    <string name="about_version">アプリのバージョン</string>
+    <string name="about_version_desc">Pargelium 1.1\nシンプルに必要な機能を果たすプレーヤー。</string>
+
+    <string name="adv_warning_title">警告</string>
+    <string name="adv_warning_text">これらの設定は高度なカスタマイズ用です。システムコンポーネント（ストリーミング、ビジュアル、イコライザーなど）を無効にすると、アプリの動作が不安定になったり、予期しない不具合が発生したりする可能性があります。\n\n続行してもよろしいですか？</string>
+    <string name="action_understand">理解しました</string>
+    <string name="action_back">戻る</string>
+
+    <string name="update_auto_check">更新の自動確認</string>
+    <string name="update_auto_check_desc">起動時にGitHubで新しいバージョンを確認する</string>
+    <string name="update_check_now">今すぐ更新を確認</string>
+    <string name="checking_updates">更新を確認中...</string>
+    <string name="no_updates_found">最新バージョンがインストールされています</string>
+    <string name="update_check_failed">更新の確認に失敗しました</string>
+    <string name="update_available">アップデート %1$s が利用可能です</string>
+    <string name="update_available_desc">Pargeliumの最新バージョンをダウンロードしてインストールしてください。</string>
+    <string name="action_download">ダウンロード</string>
+    <string name="action_skip">スキップ</string>
+    <string name="downloading_update">アップデートをダウンロード中...</string>
+    <string name="install_failed">インストールの開始に失敗しました</string>
+
+    <string name="action_play">再生</string>
 
 </resources>

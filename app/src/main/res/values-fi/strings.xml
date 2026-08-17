@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pargelium Music</string>
+    <string name="app_name">Pargelium</string>
 
     <string name="music_not_found">Musiikkia ei löytynyt</string>
 
@@ -227,7 +227,38 @@
     <string name="contact_pm">Yksityisviesti</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
     <string name="contact_channel">Kanavani</string>
-    <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Valitse kieli</string>
+
+    <string name="settings_track_info">Kappaleen tiedot</string>
+    <string name="settings_track_info_desc">Näytä bittinopeus, näytteenottotaajuus ja muoto (esim. FLAC)</string>
+
+    <string name="adv_dev_mode">Kehittäjätila</string>
+    <string name="adv_dev_mode_desc">Anna pääsy soittimen sisäisiin kytkimiin</string>
+    <string name="adv_module_control">Moduulien hallinta</string>
+    <string name="adv_module_control_desc">Ota sovelluksen osia käyttöön tai poista käytöstä</string>
+
+    <string name="about_version">Sovelluksen versio</string>
+    <string name="about_version_desc">Pargelium 1.1\nSoitin, joka yksinkertaisesti tekee tehtävänsä.</string>
+
+    <string name="adv_warning_title">Varoitus</string>
+    <string name="adv_warning_text">Nämä asetukset on tarkoitettu edistyneeseen mukauttamiseen. Järjestelmän osien (suoratoisto, visualisointi, taajuuskorjain) poistaminen käytöstä voi johtaa sovelluksen epävakauteen tai odottamattomaan toimintaan.\n\nHaluatko varmasti jatkaa?</string>
+    <string name="action_understand">Ymmärrän</string>
+    <string name="action_back">Takaisin</string>
+
+    <string name="update_auto_check">Automaattinen päivitysten tarkistus</string>
+    <string name="update_auto_check_desc">Tarkista uudet versiot GitHubista käynnistyksen yhteydessä</string>
+    <string name="update_check_now">Tarkista päivitykset nyt</string>
+    <string name="checking_updates">Tarkistetaan päivityksiä...</string>
+    <string name="no_updates_found">Sinulla on uusin versio asennettuna</string>
+    <string name="update_check_failed">Päivitysten tarkistus epäonnistui</string>
+    <string name="update_available">Päivitys %1$s saatavilla</string>
+    <string name="update_available_desc">Lataa ja asenna Pargeliumin uusi versio.</string>
+    <string name="action_download">Lataa</string>
+    <string name="action_skip">Ohita</string>
+    <string name="downloading_update">Ladataan päivitystä...</string>
+    <string name="install_failed">Asennuksen aloitus epäonnistui</string>
+
+    <string name="action_play">Toista</string>
 
 </resources>
