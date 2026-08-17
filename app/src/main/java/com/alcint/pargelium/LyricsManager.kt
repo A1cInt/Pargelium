@@ -11,17 +11,17 @@ import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
+import retrofit2.http.Url
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 data class LyricLine(
     val timeMs: Long,
@@ -34,25 +34,69 @@ data class LrcLibResponse(
     @SerializedName("plainLyrics") val plainLyrics: String?
 )
 
-interface LrcLibApi {
-    @GET("get")
-    suspend fun getLyrics(
+data class OvhResponse(
+    val lyrics: String?
+)
+
+data class LingvaResponse(
+    val translation: String?
+)
+
+data class MxResponse(
+    val message: MxMessage?
+)
+
+data class MxMessage(
+    val body: MxBody?
+)
+
+data class MxBody(
+    val lyrics: MxLyrics?
+)
+
+data class MxLyrics(
+    val lyrics_body: String?
+)
+
+interface LyricsNetworkApi {
+    @GET("https://lrclib.net/api/get")
+    suspend fun getLrcLib(
         @Query("artist_name") artist: String,
         @Query("track_name") track: String,
         @Query("album_name") album: String?,
         @Query("duration") duration: Int
     ): LrcLibResponse
+
+    @GET("https://api.musixmatch.com/ws/1.1/matcher.lyrics.get")
+    suspend fun getMusixmatch(
+        @Query("q_artist") artist: String,
+        @Query("q_track") track: String,
+        @Query("apikey") apiKey: String = ""
+    ): MxResponse
+
+    @GET
+    suspend fun getOvh(@Url url: String): OvhResponse
+
+    @GET
+    suspend fun translateLingva(@Url url: String): LingvaResponse
 }
 
 object LyricsManager {
+
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .build()
+
     private val api = Retrofit.Builder()
-        .baseUrl("https://lrclib.net/api/")
+        .baseUrl("http://localhost/")
+        .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
-        .create(LrcLibApi::class.java)
+        .create(LyricsNetworkApi::class.java)
 
     private val gson = Gson()
-    private val lrcRegex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
+    private val lrcRegex = Regex("\\[(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?](.*)")
 
     private fun getCurrentAppLanguage(): String {
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -88,39 +132,46 @@ object LyricsManager {
                 }
             }
 
+            val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
+            if (!validMetadata) return@withContext emptyList()
+
             var rawLyrics: String? = null
+
             try {
-                if (track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)) {
-                    val response = api.getLyrics(track.artist, track.title, track.album.takeIf { it.isNotBlank() }, (track.duration / 1000).toInt())
-                    rawLyrics = response.syncedLyrics ?: response.plainLyrics
-                }
+                val response = api.getLrcLib(track.artist, track.title, track.album.takeIf { it.isNotBlank() }, (track.duration / 1000).toInt())
+                rawLyrics = response.syncedLyrics ?: response.plainLyrics
             } catch (e: Exception) {
                 Log.e("LyricsManager", "LRCLIB error: ${e.message}")
             }
 
-            if (rawLyrics.isNullOrBlank() && track.artist.isNotBlank() && track.title.isNotBlank()) {
+            if (rawLyrics.isNullOrBlank()) {
                 try {
-                    val ovhUrl = URL("https://api.lyrics.ovh/v1/${URLEncoder.encode(track.artist, "UTF-8").replace("+", "%20")}/${URLEncoder.encode(track.title, "UTF-8").replace("+", "%20")}")
-                    val conn = ovhUrl.openConnection() as HttpURLConnection
-                    try {
-                        conn.requestMethod = "GET"
-                        conn.connectTimeout = 4000
-                        if (conn.responseCode == 200) {
-                            val jsonText = conn.inputStream.bufferedReader().use { it.readText() }
-                            rawLyrics = JSONObject(jsonText).optString("lyrics", "")
-                        }
-                    } finally {
-                        conn.disconnect()
-                    }
+                    val response = api.getMusixmatch(track.artist, track.title)
+                    rawLyrics = response.message?.body?.lyrics?.lyrics_body
                 } catch (e: Exception) {
-                    Log.e("LyricsManager", "OVH fallback error: ${e.message}")
+                    Log.e("LyricsManager", "Musixmatch error: ${e.message}")
+                }
+            }
+
+            if (rawLyrics.isNullOrBlank()) {
+                try {
+                    val encodedArtist = URLEncoder.encode(track.artist, "UTF-8").replace("+", "%20")
+                    val encodedTitle = URLEncoder.encode(track.title, "UTF-8").replace("+", "%20")
+                    val ovhUrl = "https://api.lyrics.ovh/v1/$encodedArtist/$encodedTitle"
+
+                    val response = api.getOvh(ovhUrl)
+                    rawLyrics = response.lyrics
+                } catch (e: Exception) {
+                    Log.e("LyricsManager", "OVH error: ${e.message}")
                 }
             }
 
             if (!rawLyrics.isNullOrBlank()) {
                 val parsed = parseLrcOrPlain(rawLyrics, track.duration)
-                saveToCache(context, track, parsed)
-                return@withContext parsed
+                if (parsed.isNotEmpty()) {
+                    saveToCache(context, track, parsed)
+                    return@withContext parsed
+                }
             }
 
             return@withContext emptyList()
@@ -136,8 +187,12 @@ object LyricsManager {
             val match = lrcRegex.find(line)
             if (match != null) {
                 isSynced = true
-                val (min, sec, msStr, text) = match.destructured
-                val ms = if (msStr.length == 2) msStr.toLong() * 10 else msStr.toLong()
+                val min = match.groupValues[1]
+                val sec = match.groupValues[2]
+                val msStr = match.groupValues[3]
+                val text = match.groupValues[4]
+
+                val ms = if (msStr.isEmpty()) 0L else if (msStr.length == 2) msStr.toLong() * 10 else msStr.toLong()
                 val timestamp = (min.toLong() * 60 * 1000) + (sec.toLong() * 1000) + ms
                 lines.add(LyricLine(timestamp, text.trim()))
             }
@@ -167,24 +222,14 @@ object LyricsManager {
             for (chunk in chunkedLines) {
                 val originalText = chunk.joinToString(" || ") { it.text }
                 val encodedQuery = URLEncoder.encode(originalText, "UTF-8").replace("+", "%20")
+                val url = "https://lingva.ml/api/v1/auto/$targetLang/$encodedQuery"
 
-                val url = URL("https://lingva.ml/api/v1/auto/$targetLang/$encodedQuery")
-                val conn = url.openConnection() as HttpURLConnection
                 try {
-                    conn.requestMethod = "GET"
-                    conn.setRequestProperty("User-Agent", "Pargelium-FOSS-Player")
-                    conn.connectTimeout = 8000
-                    conn.readTimeout = 8000
-
-                    if (conn.responseCode == 200) {
-                        val response = conn.inputStream.bufferedReader().use { it.readText() }
-                        val translatedText = JSONObject(response).optString("translation", "").replace("+", " ")
-                        translatedLines.addAll(translatedText.split(" || ", " | | ", "||"))
-                    } else {
-                        translatedLines.addAll(List(chunk.size) { "" })
-                    }
-                } finally {
-                    conn.disconnect()
+                    val response = api.translateLingva(url)
+                    val translatedText = response.translation?.replace("+", " ") ?: ""
+                    translatedLines.addAll(translatedText.split(" || ", " | | ", "||"))
+                } catch (e: Exception) {
+                    translatedLines.addAll(List(chunk.size) { "" })
                 }
             }
 
