@@ -237,4 +237,24 @@
     <string name="contact_channel_desc">Telegram: t.me/comalcint</string>
     <string name="choose_language">Выберите язык</string>
 
+    <string name="settings_playback">Воспроизведение</string>
+    <string name="settings_advanced">Продвинутые настройки</string>
+    <string name="settings_about">О приложении</string>
+
+    <string name="settings_track_info">Данные о треке</string>
+    <string name="settings_track_info_desc">Показывать битрейт, частоту дискретизации и формат (например, FLAC)</string>
+
+    <string name="adv_dev_mode">Режим разработчика</string>
+    <string name="adv_dev_mode_desc">Открытие доступа к системным переключателям плеера</string>
+    <string name="adv_module_control">Управление модулями</string>
+    <string name="adv_module_control_desc">Включение и отключение компонентов приложения</string>
+
+    <string name="about_version">Версия приложения</string>
+    <string name="about_version_desc">Pargelium 1.0.0\nПлеер, который делает то, что должен.</string>
+
+    <string name="adv_warning_title">Внимание</string>
+    <string name="adv_warning_text">Эти настройки предназначены для глубокой кастомизации. Отключение системных компонентов (стриминг, визуализация, эквалайзер) может привести к неожиданному поведению приложения или его нестабильности.\n\nВы уверены, что хотите продолжить?</string>
+    <string name="action_understand">Я понимаю</string>
+    <string name="action_back">Назад</string>
+
 </resources>

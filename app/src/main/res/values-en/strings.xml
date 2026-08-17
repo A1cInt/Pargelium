@@ -233,4 +233,24 @@
     <string name="lang_ja">日本語</string>
     <string name="lang_pl">Polski</string>
 
+    <string name="settings_playback">Playback</string>
+    <string name="settings_advanced">Advanced settings</string>
+    <string name="settings_about">About app</string>
+
+    <string name="settings_track_info">Track info</string>
+    <string name="settings_track_info_desc">Show bitrate, sample rate, and format (e.g., FLAC)</string>
+
+    <string name="adv_dev_mode">Developer mode</string>
+    <string name="adv_dev_mode_desc">Grant access to internal player toggles</string>
+    <string name="adv_module_control">Module management</string>
+    <string name="adv_module_control_desc">Enable or disable app components</string>
+
+    <string name="about_version">App version</string>
+    <string name="about_version_desc">Pargelium 1.0.0\nThe player that simply does its job.</string>
+
+    <string name="adv_warning_title">Warning</string>
+    <string name="adv_warning_text">These settings are intended for deep customization. Disabling system components (streaming, visualization, equalizer) may lead to unexpected app behavior or instability.\n\nAre you sure you want to continue?</string>
+    <string name="action_understand">I understand</string>
+    <string name="action_back">Back</string>
+
 </resources>

@@ -4,6 +4,7 @@ package com.alcint.pargelium
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.compose.animation.*
@@ -22,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SettingsSuggest
@@ -44,6 +47,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+enum class SettingsRoute {
+    MAIN, APPEARANCE, PLAYBACK, INTEGRATION, DATA, CONTACT, ADVANCED, ABOUT
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -55,6 +62,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    var currentRoute by remember { mutableStateOf(SettingsRoute.MAIN) }
 
     var isSecureEnabled by remember { mutableStateOf(PrefsManager.getSecureMode()) }
     var isFossWearEnabled by remember { mutableStateOf(PrefsManager.getFossWearEnabled()) }
@@ -92,358 +101,390 @@ fun SettingsScreen(
 
     val currentLanguageName = supportedLanguages.find { it.first == currentLanguageCode }?.second ?: stringResource(R.string.lang_ru)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
-    ) {
-        Row(
+    val themes = remember {
+        listOf(
+            Triple(0, context.getString(R.string.theme_auto), R.drawable.ic_auto_theme),
+            Triple(1, context.getString(R.string.theme_light), R.drawable.ic_light_theme),
+            Triple(2, context.getString(R.string.theme_dark), R.drawable.ic_dark_theme),
+            Triple(3, context.getString(R.string.theme_amoled), R.drawable.ic_amoled_theme),
+            Triple(4, context.getString(R.string.theme_opal), R.drawable.ic_opal_theme),
+            Triple(5, context.getString(R.string.theme_pargelia), R.drawable.ic_pargelia_theme)
+        )
+    }
+
+    BackHandler(enabled = currentRoute != SettingsRoute.MAIN) {
+        currentRoute = SettingsRoute.MAIN
+    }
+
+    AnimatedContent(
+        targetState = currentRoute,
+        transitionSpec = {
+            if (targetState != SettingsRoute.MAIN && initialState == SettingsRoute.MAIN) {
+                (slideInHorizontally { width -> width } + fadeIn()).togetherWith(slideOutHorizontally { width -> -width / 3 } + fadeOut())
+            } else {
+                (slideInHorizontally { width -> -width / 3 } + fadeIn()).togetherWith(slideOutHorizontally { width -> width } + fadeOut())
+            }
+        },
+        label = "settings_navigation"
+    ) { route ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.SettingsSuggest, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Spacer(modifier = Modifier.width(20.dp))
-            Text(
-                text = stringResource(R.string.settings_title),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-
-        Text(
-            text = stringResource(R.string.settings_appearance),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
-        )
-
-        val themes = remember {
-            listOf(
-                Triple(0, context.getString(R.string.theme_auto), R.drawable.ic_auto_theme),
-                Triple(1, context.getString(R.string.theme_light), R.drawable.ic_light_theme),
-                Triple(2, context.getString(R.string.theme_dark), R.drawable.ic_dark_theme),
-                Triple(3, context.getString(R.string.theme_amoled), R.drawable.ic_amoled_theme),
-                Triple(4, context.getString(R.string.theme_opal), R.drawable.ic_opal_theme),
-                Triple(5, context.getString(R.string.theme_pargelia), R.drawable.ic_pargelia_theme)
-            )
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-        ) {
-            items(themes) { theme ->
-                ThemeCard(
-                    title = theme.second,
-                    iconRes = theme.third,
-                    isSelected = currentThemeMode == theme.first,
-                    onClick = {
-                        if (currentThemeMode != theme.first) {
-                            onThemeChanged(theme.first)
-                        }
+            if (route == SettingsRoute.MAIN) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.SettingsSuggest, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
-                )
-            }
-        }
-
-        SettingsGroup {
-            ListItem(
-                headlineContent = { Text("Данные о треке", fontWeight = FontWeight.Bold) },
-                supportingContent = { Text("Показывать битрейт, частоту дискретизации и формат (например, FLAC)") },
-                leadingContent = {
-                    IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.secondary)
-                },
-                trailingContent = {
-                    Switch(checked = isTrackInfoBarEnabled, onCheckedChange = null)
-                },
-                modifier = Modifier.toggleable(
-                    value = isTrackInfoBarEnabled,
-                    onValueChange = { newValue ->
-                        isTrackInfoBarEnabled = newValue
-                        PrefsManager.saveShowTrackInfoBar(newValue)
+                    Spacer(modifier = Modifier.width(20.dp))
+                    Text(
+                        text = stringResource(R.string.settings_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { currentRoute = SettingsRoute.MAIN }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = MaterialTheme.colorScheme.onBackground)
                     }
-                ),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_language), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(currentLanguageName) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_worldwide), color = MaterialTheme.colorScheme.tertiary)
-                },
-                modifier = Modifier.clickable { showLanguageSheet = true },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.privacy_secure), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.privacy_secure_desc)) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_mobile_def), color = MaterialTheme.colorScheme.secondary)
-                },
-                trailingContent = {
-                    Switch(checked = isSecureEnabled, onCheckedChange = null)
-                },
-                modifier = Modifier.toggleable(
-                    value = isSecureEnabled,
-                    onValueChange = { newValue ->
-                        isSecureEnabled = newValue
-                        PrefsManager.saveSecureMode(newValue)
-                        onSecureChanged(newValue)
-                    }
-                ),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
-
-        Text(
-            text = "Воспроизведение",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
-        )
-        ContinuousMixSettingsCard(context = context)
-
-        Text(
-            text = stringResource(R.string.settings_integration),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
-        )
-        SettingsGroup {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.integration_auto_detect), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.integration_auto_detect_desc)) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_earphones), color = MaterialTheme.colorScheme.primary)
-                },
-                trailingContent = {
-                    Switch(checked = isAutoDetectHeadphonesEnabled, onCheckedChange = null)
-                },
-                modifier = Modifier.toggleable(
-                    value = isAutoDetectHeadphonesEnabled,
-                    onValueChange = { newValue ->
-                        isAutoDetectHeadphonesEnabled = newValue
-                        PrefsManager.saveAutoDetectHeadphones(newValue)
-                    }
-                ),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.integration_wear_api), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.integration_wear_api_desc)) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_watch_api), color = MaterialTheme.colorScheme.primary)
-                },
-                trailingContent = {
-                    Switch(checked = isFossWearEnabled, onCheckedChange = null)
-                },
-                modifier = Modifier.toggleable(
-                    value = isFossWearEnabled,
-                    onValueChange = { newValue ->
-                        isFossWearEnabled = newValue
-                        PrefsManager.saveFossWearEnabled(newValue)
-                        onFossWearChanged(newValue)
-                    }
-                ),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
-
-        Text(
-            text = stringResource(R.string.settings_data),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
-        )
-        SettingsGroup {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.data_clear_cache), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.data_clear_cache_desc)) },
-                leadingContent = {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp)) {
-                        if (isClearingCache) {
-                            Box(modifier = Modifier.scale(0.5f)) {
-                                MorphingPillIndicator()
-                            }
-                        } else {
-                            IconContainer(painter = painterResource(id = R.drawable.ic_text_delete), color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                },
-                modifier = Modifier.clickable(enabled = !isClearingCache) {
-                    scope.launch {
-                        isClearingCache = true
-                        delay(800)
-                        val count = LyricsManager.clearCache(context)
-                        isClearingCache = false
-                        Toast.makeText(context, context.getString(R.string.msg_cache_cleared, count), Toast.LENGTH_SHORT).show()
-                    }
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.data_reset_autoeq), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.data_reset_autoeq_desc)) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_sound_mop), color = MaterialTheme.colorScheme.error)
-                },
-                modifier = Modifier.clickable {
-                    PrefsManager.saveCurrentAutoEqProfile(null)
-                    PrefsManager.saveAutoEqEnabled(false)
-                    Toast.makeText(context, context.getString(R.string.msg_autoeq_reset), Toast.LENGTH_SHORT).show()
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
-
-        Text(
-            text = stringResource(R.string.settings_contact),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
-        )
-        SettingsGroup {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.contact_pm), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.contact_pm_desc)) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_magic_handshake), color = MaterialTheme.colorScheme.primary)
-                },
-                modifier = Modifier.clickable {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/alcint"))
-                    context.startActivity(intent)
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.contact_channel), fontWeight = FontWeight.Bold) },
-                supportingContent = { Text(stringResource(R.string.contact_channel_desc)) },
-                leadingContent = {
-                    IconContainer(painter = painterResource(id = R.drawable.ic_social), color = MaterialTheme.colorScheme.tertiary)
-                },
-                modifier = Modifier.clickable {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/comalcint"))
-                    context.startActivity(intent)
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
-
-        Text(
-            text = "Продвинутые настройки",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.error,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
-        )
-        SettingsGroup {
-            ListItem(
-                headlineContent = { Text("Режим разработчика", fontWeight = FontWeight.Bold) },
-                supportingContent = { Text("Открытие доступа к системным переключателям плеера") },
-                leadingContent = {
-                    IconContainer(Icons.Default.SettingsSuggest, color = MaterialTheme.colorScheme.error)
-                },
-                trailingContent = {
-                    Switch(checked = isAdvancedSettingsEnabled, onCheckedChange = null)
-                },
-                modifier = Modifier.toggleable(
-                    value = isAdvancedSettingsEnabled,
-                    onValueChange = { newValue ->
-                        if (newValue) {
-                            showAdvancedWarningDialog = true
-                        } else {
-                            isAdvancedSettingsEnabled = false
-                            PrefsManager.saveAdvancedSettingsEnabled(false)
-                        }
-                    }
-                ),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-
-            AnimatedVisibility(visible = isAdvancedSettingsEnabled) {
-                Column {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ListItem(
-                        headlineContent = { Text("Управление модулями", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
-                        supportingContent = { Text("Включение и отключение компонентов приложения") },
-                        modifier = Modifier.clickable { onNavigateToAdvanced() },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = when (route) {
+                            SettingsRoute.APPEARANCE -> stringResource(R.string.settings_appearance)
+                            SettingsRoute.PLAYBACK -> stringResource(R.string.settings_playback)
+                            SettingsRoute.INTEGRATION -> stringResource(R.string.settings_integration)
+                            SettingsRoute.DATA -> stringResource(R.string.settings_data)
+                            SettingsRoute.CONTACT -> stringResource(R.string.settings_contact)
+                            SettingsRoute.ADVANCED -> stringResource(R.string.settings_advanced)
+                            SettingsRoute.ABOUT -> stringResource(R.string.settings_about)
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
-        }
 
-        Text(
-            text = "О приложении",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 8.dp)
-        )
-
-        var easterEggClickCount by remember { mutableStateOf(0) }
-        var lastClickTime by remember { mutableStateOf(0L) }
-
-        SettingsGroup {
-            ListItem(
-                headlineContent = { Text("Версия приложения", fontWeight = FontWeight.Bold) },
-                supportingContent = { Text("Pargelium 1.0.0\nПлеер, который делает то, что должен.") },
-                leadingContent = {
-                    IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.primary)
-                },
-                modifier = Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastClickTime < 400) {
-                        easterEggClickCount++
-                        if (easterEggClickCount >= 5) {
-                            easterEggClickCount = 0
-                            context.startActivity(Intent(context, EasterEggActivity::class.java))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                when (route) {
+                    SettingsRoute.MAIN -> {
+                        SettingsGroup {
+                            SettingsMenuEntry(title = stringResource(R.string.settings_appearance), icon = painterResource(R.drawable.ic_dark_theme), tint = MaterialTheme.colorScheme.primary) { currentRoute = SettingsRoute.APPEARANCE }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsMenuEntry(title = stringResource(R.string.settings_playback), icon = painterResource(R.drawable.ic_action_key), tint = MaterialTheme.colorScheme.secondary) { currentRoute = SettingsRoute.PLAYBACK }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsMenuEntry(title = stringResource(R.string.settings_integration), icon = painterResource(R.drawable.ic_watch_api), tint = MaterialTheme.colorScheme.tertiary) { currentRoute = SettingsRoute.INTEGRATION }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsMenuEntry(title = stringResource(R.string.settings_data), icon = painterResource(R.drawable.ic_text_delete), tint = MaterialTheme.colorScheme.error) { currentRoute = SettingsRoute.DATA }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsMenuEntry(title = stringResource(R.string.settings_contact), icon = painterResource(R.drawable.ic_social), tint = MaterialTheme.colorScheme.primary) { currentRoute = SettingsRoute.CONTACT }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsMenuEntry(title = stringResource(R.string.settings_advanced), icon = Icons.Default.SettingsSuggest, tint = MaterialTheme.colorScheme.error) { currentRoute = SettingsRoute.ADVANCED }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SettingsMenuEntry(title = stringResource(R.string.settings_about), icon = Icons.Default.Info, tint = MaterialTheme.colorScheme.secondary) { currentRoute = SettingsRoute.ABOUT }
                         }
-                    } else {
-                        easterEggClickCount = 1
                     }
-                    lastClickTime = currentTime
-                },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
-        }
 
-        Spacer(modifier = Modifier.height(280.dp))
+                    SettingsRoute.APPEARANCE -> {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp)
+                        ) {
+                            items(themes) { theme ->
+                                ThemeCard(
+                                    title = theme.second,
+                                    iconRes = theme.third,
+                                    isSelected = currentThemeMode == theme.first,
+                                    onClick = {
+                                        if (currentThemeMode != theme.first) {
+                                            onThemeChanged(theme.first)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.settings_track_info), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.settings_track_info_desc)) },
+                                leadingContent = {
+                                    IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.secondary)
+                                },
+                                trailingContent = {
+                                    Switch(checked = isTrackInfoBarEnabled, onCheckedChange = null)
+                                },
+                                modifier = Modifier.toggleable(
+                                    value = isTrackInfoBarEnabled,
+                                    onValueChange = { newValue ->
+                                        isTrackInfoBarEnabled = newValue
+                                        PrefsManager.saveShowTrackInfoBar(newValue)
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.settings_language), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(currentLanguageName) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_worldwide), color = MaterialTheme.colorScheme.tertiary)
+                                },
+                                modifier = Modifier.clickable { showLanguageSheet = true },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+
+                    SettingsRoute.PLAYBACK -> {
+                        ContinuousMixSettingsCard(context = context)
+                    }
+
+                    SettingsRoute.INTEGRATION -> {
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.integration_auto_detect), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.integration_auto_detect_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_earphones), color = MaterialTheme.colorScheme.primary)
+                                },
+                                trailingContent = {
+                                    Switch(checked = isAutoDetectHeadphonesEnabled, onCheckedChange = null)
+                                },
+                                modifier = Modifier.toggleable(
+                                    value = isAutoDetectHeadphonesEnabled,
+                                    onValueChange = { newValue ->
+                                        isAutoDetectHeadphonesEnabled = newValue
+                                        PrefsManager.saveAutoDetectHeadphones(newValue)
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.integration_wear_api), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.integration_wear_api_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_watch_api), color = MaterialTheme.colorScheme.primary)
+                                },
+                                trailingContent = {
+                                    Switch(checked = isFossWearEnabled, onCheckedChange = null)
+                                },
+                                modifier = Modifier.toggleable(
+                                    value = isFossWearEnabled,
+                                    onValueChange = { newValue ->
+                                        isFossWearEnabled = newValue
+                                        PrefsManager.saveFossWearEnabled(newValue)
+                                        onFossWearChanged(newValue)
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.privacy_secure), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.privacy_secure_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_mobile_def), color = MaterialTheme.colorScheme.secondary)
+                                },
+                                trailingContent = {
+                                    Switch(checked = isSecureEnabled, onCheckedChange = null)
+                                },
+                                modifier = Modifier.toggleable(
+                                    value = isSecureEnabled,
+                                    onValueChange = { newValue ->
+                                        isSecureEnabled = newValue
+                                        PrefsManager.saveSecureMode(newValue)
+                                        onSecureChanged(newValue)
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+
+                    SettingsRoute.DATA -> {
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.data_clear_cache), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.data_clear_cache_desc)) },
+                                leadingContent = {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp)) {
+                                        if (isClearingCache) {
+                                            Box(modifier = Modifier.scale(0.5f)) {
+                                                MorphingPillIndicator()
+                                            }
+                                        } else {
+                                            IconContainer(painter = painterResource(id = R.drawable.ic_text_delete), color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.clickable(enabled = !isClearingCache) {
+                                    scope.launch {
+                                        isClearingCache = true
+                                        delay(800)
+                                        val count = LyricsManager.clearCache(context)
+                                        isClearingCache = false
+                                        Toast.makeText(context, context.getString(R.string.msg_cache_cleared, count), Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.data_reset_autoeq), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.data_reset_autoeq_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_sound_mop), color = MaterialTheme.colorScheme.error)
+                                },
+                                modifier = Modifier.clickable {
+                                    PrefsManager.saveCurrentAutoEqProfile(null)
+                                    PrefsManager.saveAutoEqEnabled(false)
+                                    Toast.makeText(context, context.getString(R.string.msg_autoeq_reset), Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+
+                    SettingsRoute.CONTACT -> {
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_pm), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_pm_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_magic_handshake), color = MaterialTheme.colorScheme.primary)
+                                },
+                                modifier = Modifier.clickable {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/alcint"))
+                                    context.startActivity(intent)
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_channel), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_channel_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_social), color = MaterialTheme.colorScheme.tertiary)
+                                },
+                                modifier = Modifier.clickable {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/comalcint"))
+                                    context.startActivity(intent)
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+
+                    SettingsRoute.ADVANCED -> {
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.adv_dev_mode), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.adv_dev_mode_desc)) },
+                                leadingContent = {
+                                    IconContainer(Icons.Default.SettingsSuggest, color = MaterialTheme.colorScheme.error)
+                                },
+                                trailingContent = {
+                                    Switch(checked = isAdvancedSettingsEnabled, onCheckedChange = null)
+                                },
+                                modifier = Modifier.toggleable(
+                                    value = isAdvancedSettingsEnabled,
+                                    onValueChange = { newValue ->
+                                        if (newValue) {
+                                            showAdvancedWarningDialog = true
+                                        } else {
+                                            isAdvancedSettingsEnabled = false
+                                            PrefsManager.saveAdvancedSettingsEnabled(false)
+                                        }
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            AnimatedVisibility(visible = isAdvancedSettingsEnabled) {
+                                Column {
+                                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                    ListItem(
+                                        headlineContent = { Text(stringResource(R.string.adv_module_control), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+                                        supportingContent = { Text(stringResource(R.string.adv_module_control_desc)) },
+                                        modifier = Modifier.clickable { onNavigateToAdvanced() },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsRoute.ABOUT -> {
+                        var easterEggClickCount by remember { mutableStateOf(0) }
+                        var lastClickTime by remember { mutableStateOf(0L) }
+
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.about_version), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.about_version_desc)) },
+                                leadingContent = {
+                                    IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.primary)
+                                },
+                                modifier = Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    val currentTime = System.currentTimeMillis()
+                                    if (currentTime - lastClickTime < 400) {
+                                        easterEggClickCount++
+                                        if (easterEggClickCount >= 5) {
+                                            easterEggClickCount = 0
+                                            context.startActivity(Intent(context, EasterEggActivity::class.java))
+                                        }
+                                    } else {
+                                        easterEggClickCount = 1
+                                    }
+                                    lastClickTime = currentTime
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(280.dp))
+            }
+        }
     }
 
     if (showLanguageSheet) {
@@ -490,8 +531,8 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showAdvancedWarningDialog = false },
             icon = { Icon(Icons.Default.SettingsSuggest, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Внимание") },
-            text = { Text("Эти настройки предназначены для глубокой кастомизации. Отключение системных компонентов (стриминг, визуализация, эквалайзер) может привести к неожиданному поведению приложения или его нестабильности.\n\nВы уверены, что хотите продолжить?") },
+            title = { Text(stringResource(R.string.adv_warning_title)) },
+            text = { Text(stringResource(R.string.adv_warning_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -500,16 +541,52 @@ fun SettingsScreen(
                         showAdvancedWarningDialog = false
                     }
                 ) {
-                    Text("Я понимаю", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_understand), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAdvancedWarningDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
     }
+}
+
+@Composable
+private fun SettingsMenuEntry(
+    title: String,
+    icon: Painter,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(title, fontWeight = FontWeight.Bold) },
+        leadingContent = { IconContainer(painter = icon, color = tint) },
+        trailingContent = {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        modifier = Modifier.clickable { onClick() },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
+}
+
+@Composable
+private fun SettingsMenuEntry(
+    title: String,
+    icon: ImageVector,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(title, fontWeight = FontWeight.Bold) },
+        leadingContent = { IconContainer(icon = icon, color = tint) },
+        trailingContent = {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        modifier = Modifier.clickable { onClick() },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 @Composable
