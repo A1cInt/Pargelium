@@ -1,6 +1,7 @@
 package com.alcint.pargelium
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -30,10 +30,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -41,6 +44,11 @@ import kotlin.random.Random
 class EasterEggActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
+        window.setBackgroundDrawableResource(android.R.color.transparent)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContent {
             MaterialTheme {
                 EasterEggScreen()
@@ -79,8 +87,11 @@ fun EasterEggScreen() {
     var allAlbums by remember { mutableStateOf<List<Long>>(emptyList()) }
 
     LaunchedEffect(Unit) {
-        val tracks = AudioRepository.getAudioTracks(context)
-        val uniqueAlbums = tracks.map { it.albumId }.distinct()
+        val uniqueAlbums = withContext(Dispatchers.IO) {
+            AudioRepository.getAudioTracks(context)
+                .map { it.albumId }
+                .distinct()
+        }
         if (uniqueAlbums.isNotEmpty()) {
             allAlbums = uniqueAlbums
         }
@@ -89,11 +100,7 @@ fun EasterEggScreen() {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF121212), Color(0xFF1E1E2E))
-                )
-            )
+            .background(Color.Black.copy(alpha = 0.4f))
     ) {
         if (allAlbums.isNotEmpty()) {
             val widthPx = constraints.maxWidth.toFloat()
@@ -119,8 +126,10 @@ fun EasterEggScreen() {
                 var lastTime = withFrameNanos { it }
                 while (isActive) {
                     withFrameNanos { time ->
-                        val dt = ((time - lastTime) / 1_000_000f) / 16f
+                        val rawDt = ((time - lastTime) / 1_000_000f) / 16f
+                        val dt = rawDt.coerceAtMost(3f)
                         lastTime = time
+
                         val currentTime = System.currentTimeMillis()
 
                         for (item in items) {
@@ -204,7 +213,6 @@ fun EasterEggScreen() {
                 }
             }
 
-            // Отрисовка
             items.forEach { item ->
                 PhysicsAlbumArt(
                     item = item,
