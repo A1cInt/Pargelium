@@ -129,7 +129,7 @@ fun ProfileScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(380.dp)
+                        .height(280.dp)
                         .graphicsLayer {
                             if (listState.firstVisibleItemIndex == 0) {
                                 translationY = listState.firstVisibleItemScrollOffset * 0.4f
@@ -151,16 +151,15 @@ fun ProfileScreen(
                                 .clickable { bannerPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Image, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(64.dp))
+                            Icon(Icons.Default.Image, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                         }
                     }
 
                     Box(
                         modifier = Modifier.fillMaxSize().background(
                             Brush.verticalGradient(
-                                0.0f to Color.Black.copy(alpha = 0.4f),
-                                0.3f to Color.Transparent,
-                                0.6f to MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
+                                0.0f to Color.Black.copy(alpha = 0.3f),
+                                0.5f to Color.Transparent,
                                 1.0f to MaterialTheme.colorScheme.background
                             )
                         )
@@ -169,76 +168,67 @@ fun ProfileScreen(
             }
 
             item {
-                Card(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .offset(y = (-80).dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f))
+                        .offset(y = (-40).dp)
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                    ) {
+                        if (avatarUri != null) {
+                            AsyncImage(model = ImageRequest.Builder(context).data(avatarUri).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        } else {
+                            Icon(Icons.Default.Person, null, modifier = Modifier.align(Alignment.Center).size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (isEditingName) {
+                        OutlinedTextField(
+                            value = nameInput,
+                            onValueChange = { nameInput = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(0.8f),
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    PrefsManager.saveUserName(nameInput)
+                                    userName = nameInput
+                                    isEditingName = false
+                                }) { Icon(Icons.Default.Check, null) }
+                            }
+                        )
+                    } else {
+                        Text(
+                            text = userName,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { isEditingName = true }
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(percent = 50))
+                            .clickable { showRanksSheet = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(90.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable { avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-                        ) {
-                            if (avatarUri != null) {
-                                AsyncImage(model = ImageRequest.Builder(context).data(avatarUri).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            } else {
-                                Icon(Icons.Default.Person, null, modifier = Modifier.align(Alignment.Center).size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(20.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            if (isEditingName) {
-                                OutlinedTextField(
-                                    value = nameInput,
-                                    onValueChange = { nameInput = it },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    trailingIcon = {
-                                        IconButton(onClick = {
-                                            PrefsManager.saveUserName(nameInput)
-                                            userName = nameInput
-                                            isEditingName = false
-                                        }) { Icon(Icons.Default.Check, null) }
-                                    }
-                                )
-                            } else {
-                                Text(
-                                    text = userName,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.clickable { isEditingName = true }
-                                )
-                            }
-
-                            Spacer(Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(percent = 50))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                    .clickable { showRanksSheet = true }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.WorkspacePremium, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(userRank, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                        Icon(Icons.Default.WorkspacePremium, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(userRank, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -247,88 +237,64 @@ fun ProfileScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .offset(y = (-60).dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Card(
-                        modifier = Modifier.weight(1f).aspectRatio(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
-                    ) {
-                        Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                            Box(modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.GraphicEq, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(24.dp))
-                            }
-                            Column {
-                                Text(totalPlays.toString(), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                                Text(stringResource(id = R.string.plays_count_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
-                            }
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(totalPlays.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text(stringResource(id = R.string.plays_count_label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
-                    Card(
-                        modifier = Modifier.weight(1f).aspectRatio(1f).clickable { onArtistClick(topArtistName) },
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { onArtistClick(topArtistName) }
                     ) {
-                        Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                            Box(modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(24.dp))
-                            }
-                            Column {
-                                Text(topArtistName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                                Text(stringResource(id = R.string.favorite_artist_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f))
-                            }
-                        }
+                        Text(topArtistName, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text(stringResource(id = R.string.favorite_artist_label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             if (topArtists.isNotEmpty()) {
                 item {
                     Text(
                         text = stringResource(id = R.string.top_10_artists),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(start = 24.dp, bottom = 16.dp).offset(y = (-30).dp)
+                        modifier = Modifier.padding(start = 24.dp, bottom = 16.dp)
                     )
 
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.offset(y = (-30).dp)
+                        contentPadding = PaddingValues(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(topArtists) { artistEntry ->
                             val artistMeta = PrefsManager.getArtistMetadata(artistEntry.key)
-                            Card(
-                                modifier = Modifier.width(140.dp).aspectRatio(0.8f).clickable { onArtistClick(artistEntry.key) },
-                                shape = RoundedCornerShape(20.dp)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.width(100.dp).clickable { onArtistClick(artistEntry.key) }
                             ) {
-                                Box(modifier = Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
                                     if (artistMeta.avatarUri != null) {
                                         AsyncImage(model = artistMeta.avatarUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                     } else {
-                                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Person, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                                        }
-                                    }
-                                    Box(
-                                        modifier = Modifier.fillMaxSize().background(
-                                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))
-                                        )
-                                    )
-                                    Column(
-                                        modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)
-                                    ) {
-                                        Text(artistEntry.key, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White)
-                                        Text(pluralStringResource(id = R.plurals.plays_times, count = artistEntry.value, artistEntry.value), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                                        Icon(Icons.Default.Person, null, modifier = Modifier.align(Alignment.Center).size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(artistEntry.key, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground)
+                                Text(pluralStringResource(id = R.plurals.plays_times, count = artistEntry.value, artistEntry.value), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
 
@@ -336,58 +302,55 @@ fun ProfileScreen(
                 item {
                     Text(
                         text = stringResource(id = R.string.your_music_dna),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 16.dp)
+                        modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
                     )
                 }
                 itemsIndexed(topTracksDetails) { index, pair ->
                     val track = pair.first
                     val plays = pair.second
 
-                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = "${index + 1}",
-                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.03f),
-                            modifier = Modifier.align(Alignment.CenterStart).offset(x = (-8).dp)
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(28.dp)
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context).data(AudioRepository.getAlbumArtUri(track.albumId)).build(),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                        Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(AudioRepository.getAlbumArtUri(track.albumId)).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
 
-                            Spacer(Modifier.width(16.dp))
+                        Spacer(Modifier.width(16.dp))
 
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(track.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground)
-                                Text(
-                                    text = track.artist,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.clickable { onArtistClick(track.artist) }
-                                )
-                            }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(track.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground)
+                            Text(
+                                text = track.artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.clickable { onArtistClick(track.artist) }
+                            )
+                        }
 
-                            Spacer(Modifier.width(16.dp))
+                        Spacer(Modifier.width(16.dp))
 
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(plays.toString(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
-                                Text(stringResource(id = R.string.plays_count_label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(plays.toString(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
