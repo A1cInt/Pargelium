@@ -185,7 +185,7 @@ fun LyricsView(
 
             if (itemInfo != null) {
                 val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-                val targetY = (viewportHeight * 0.35f).toInt()
+                val targetY = (viewportHeight * 0.15f).toInt()
                 val itemCenter = itemInfo.offset + (itemInfo.size / 2)
                 val scrollDistance = itemCenter - targetY
 
@@ -482,6 +482,8 @@ fun FullPlayerScreen(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
+
+    val showTrackInfoBar = PrefsManager.getShowTrackInfoBar()
 
     val isRadio = duration <= 0
     var showLyrics by remember { mutableStateOf(false) }
@@ -823,7 +825,9 @@ fun FullPlayerScreen(
                         }
 
                         Spacer(Modifier.weight(1f))
-                        Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(0.9f)) } }
+                        if (showTrackInfoBar) {
+                            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(0.9f)) } }
+                        }
                         Spacer(Modifier.height(16.dp))
                     }
                 }
@@ -1034,57 +1038,11 @@ fun FullPlayerScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp).align(Alignment.CenterHorizontally)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f)) } }
+                        if (showTrackInfoBar) {
+                            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp).align(Alignment.CenterHorizontally)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f)) } }
+                        }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        contentColor = Color.White
-                    ) {
-                        val navColors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = iconTint,
-                            selectedTextColor = iconTint,
-                            indicatorColor = iconTint.copy(alpha = 0.2f),
-                            unselectedIconColor = Color.White.copy(alpha = 0.6f),
-                            unselectedTextColor = Color.White.copy(alpha = 0.6f)
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 0,
-                            onClick = { onTabSelected(0) },
-                            icon = { Icon(painterResource(id = R.drawable.ic_action_key), null) },
-                            label = { Text(stringResource(R.string.nav_library)) },
-                            colors = navColors
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 1,
-                            onClick = { onTabSelected(1) },
-                            icon = { Icon(painterResource(id = R.drawable.ic_satellite_alt), null) },
-                            label = { Text(stringResource(R.string.nav_radio)) },
-                            colors = navColors
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 2,
-                            onClick = { onTabSelected(2) },
-                            icon = { Icon(painterResource(id = R.drawable.ic_package_2), null) },
-                            label = { Text(stringResource(id = R.string.nav_playlists)) },
-                            colors = navColors
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 3,
-                            onClick = { onTabSelected(3) },
-                            icon = { Icon(painterResource(id = R.drawable.ic_instant_mix), null) },
-                            label = { Text(stringResource(R.string.nav_eq)) },
-                            colors = navColors
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 4,
-                            onClick = { onTabSelected(4) },
-                            icon = { Icon(painterResource(id = R.drawable.ic_settings_heart), null) },
-                            label = { Text(stringResource(R.string.nav_settings)) },
-                            colors = navColors
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }

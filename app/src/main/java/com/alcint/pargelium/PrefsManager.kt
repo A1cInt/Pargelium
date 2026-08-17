@@ -26,9 +26,6 @@ object PrefsManager {
         PlaylistDatabase.init(context)
     }
 
-    // ==========================================
-    // Исполнители
-    // ==========================================
     fun saveArtistMetadata(artistName: String, meta: ArtistMetadata) {
         val safeName = artistName.replace(Regex("[^A-Za-z0-9]"), "_")
         prefs.edit().putString("artist_meta_$safeName", gson.toJson(meta)).apply()
@@ -43,10 +40,6 @@ object PrefsManager {
             ArtistMetadata()
         }
     }
-
-    // ==========================================
-    // Плейлисты
-    // ==========================================
 
     fun getOldPlaylists(): List<PlaylistModel> {
         val json = prefs.getString("playlists", "[]")
@@ -63,23 +56,20 @@ object PrefsManager {
     fun getPlaylists(): List<PlaylistModel> = PlaylistDatabase.getPlaylists()
     fun savePlaylist(playlist: PlaylistModel) = PlaylistDatabase.savePlaylist(playlist)
     fun deletePlaylist(playlistId: String) = PlaylistDatabase.deletePlaylist(playlistId)
-    fun addTrackToPlaylist(playlistId: String, trackId: Long) =
-        PlaylistDatabase.addTrackToPlaylist(playlistId, trackId)
 
-    fun removeTrackFromPlaylist(playlistId: String, trackId: Long) =
-        PlaylistDatabase.removeTrackFromPlaylist(playlistId, trackId)
-
+    fun addTrackToPlaylist(playlistId: String, trackId: Long) = PlaylistDatabase.addTrackToPlaylist(playlistId, trackId)
+    fun removeTrackFromPlaylist(playlistId: String, trackId: Long) = PlaylistDatabase.removeTrackFromPlaylist(playlistId, trackId)
 
     fun saveCustomCanvas(trackKey: String, uri: String?) {
-        if (uri == null) prefs.edit().remove("canvas_$trackKey").apply() else prefs.edit()
-            .putString("canvas_$trackKey", uri).apply()
+        if (uri == null) prefs.edit().remove("canvas_$trackKey").apply() else prefs.edit().putString("canvas_$trackKey", uri).apply()
     }
 
     fun getCustomCanvas(trackKey: String): String? = prefs.getString("canvas_$trackKey", null)
 
     fun getTrackBookmarks(trackKey: String): List<TrackBookmark> {
-        val json = prefs.getString("bookmarks_$trackKey", "[]");
-        val type = object : TypeToken<List<TrackBookmark>>() {}.type; return try {
+        val json = prefs.getString("bookmarks_$trackKey", "[]")
+        val type = object : TypeToken<List<TrackBookmark>>() {}.type
+        return try {
             gson.fromJson(json, type)
         } catch (e: Exception) {
             emptyList()
@@ -93,12 +83,12 @@ object PrefsManager {
     fun getLastTrackId(): Long = prefs.getLong("last_track_id", -1L)
     fun saveLastPosition(pos: Long) = prefs.edit().putLong("last_position", pos).apply()
     fun getLastPosition(): Long = prefs.getLong("last_position", 0L)
-    fun saveLastQueue(trackIds: List<Long>) =
-        prefs.edit().putString("last_queue", gson.toJson(trackIds)).apply()
+    fun saveLastQueue(trackIds: List<Long>) = prefs.edit().putString("last_queue", gson.toJson(trackIds)).apply()
 
     fun getLastQueue(): List<Long> {
-        val json = prefs.getString("last_queue", "[]");
-        val type = object : TypeToken<List<Long>>() {}.type; return try {
+        val json = prefs.getString("last_queue", "[]")
+        val type = object : TypeToken<List<Long>>() {}.type
+        return try {
             gson.fromJson(json, type)
         } catch (e: Exception) {
             emptyList()
@@ -113,17 +103,15 @@ object PrefsManager {
     fun getBannerUri(): String? = prefs.getString("user_banner", null)
 
     fun recordPlay(trackId: Long) {
-        val events = getPlayEvents().toMutableList(); events.add(
-            PlayEvent(
-                trackId,
-                System.currentTimeMillis()
-            )
-        ); prefs.edit().putString("play_events_v2", gson.toJson(events)).apply()
+        val events = getPlayEvents().toMutableList()
+        events.add(PlayEvent(trackId, System.currentTimeMillis()))
+        prefs.edit().putString("play_events_v2", gson.toJson(events)).apply()
     }
 
     fun getPlayEvents(): List<PlayEvent> {
-        val json = prefs.getString("play_events_v2", "[]");
-        val type = object : TypeToken<List<PlayEvent>>() {}.type; return try {
+        val json = prefs.getString("play_events_v2", "[]")
+        val type = object : TypeToken<List<PlayEvent>>() {}.type
+        return try {
             gson.fromJson(json, type)
         } catch (e: Exception) {
             emptyList()
@@ -131,23 +119,18 @@ object PrefsManager {
     }
 
     fun getTopTracksIds(days: Int): Map<Long, Int> {
-        val events = getPlayEvents();
-        val cutoff =
-            if (days == -1) 0L else System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L); return events.filter { it.timestamp >= cutoff }
-            .groupingBy { it.trackId }.eachCount()
+        val events = getPlayEvents()
+        val cutoff = if (days == -1) 0L else System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
+        return events.filter { it.timestamp >= cutoff }.groupingBy { it.trackId }.eachCount()
     }
-
-    // ==========================================
-    // Настройки звука и эффектов
-    // ==========================================
 
     fun saveEnabled(enabled: Boolean) = prefs.edit().putBoolean("global_enabled", enabled).apply()
     fun getEnabled(): Boolean = prefs.getBoolean("global_enabled", true)
 
     private var cachedEqGains: FloatArray? = null
     private var cachedEqGainsStr: String? = null
-    fun saveEqGains(gains: FloatArray) =
-        prefs.edit().putString("eq_gains", gains.joinToString(",")).apply()
+
+    fun saveEqGains(gains: FloatArray) = prefs.edit().putString("eq_gains", gains.joinToString(",")).apply()
 
     fun getEqGains(): FloatArray {
         val str = prefs.getString("eq_gains", "") ?: ""
@@ -163,12 +146,11 @@ object PrefsManager {
 
     private var cachedUserEqGains: FloatArray? = null
     private var cachedUserEqGainsStr: String? = null
-    fun saveUserEqEnabled(enabled: Boolean) =
-        prefs.edit().putBoolean("user_eq_enabled", enabled).apply()
 
+    fun saveUserEqEnabled(enabled: Boolean) = prefs.edit().putBoolean("user_eq_enabled", enabled).apply()
     fun getUserEqEnabled(): Boolean = prefs.getBoolean("user_eq_enabled", false)
-    fun saveUserEqGains(gains: FloatArray) =
-        prefs.edit().putString("user_eq_gains", gains.joinToString(",")).apply()
+
+    fun saveUserEqGains(gains: FloatArray) = prefs.edit().putString("user_eq_gains", gains.joinToString(",")).apply()
 
     fun getUserEqGains(): FloatArray {
         val str = prefs.getString("user_eq_gains", "") ?: ""
@@ -224,66 +206,44 @@ object PrefsManager {
     fun saveSmart(enabled: Boolean) = prefs.edit().putBoolean("smart", enabled).apply()
     fun getSmart(): Boolean = prefs.getBoolean("smart", false)
 
-    fun saveAutoEqEnabled(enabled: Boolean) =
-        prefs.edit().putBoolean("auto_eq_enabled", enabled).apply()
-
+    fun saveAutoEqEnabled(enabled: Boolean) = prefs.edit().putBoolean("auto_eq_enabled", enabled).apply()
     fun getAutoEqEnabled(): Boolean = prefs.getBoolean("auto_eq_enabled", false)
+
     fun saveCurrentAutoEqProfile(profile: AutoEqProfile?) {
-        if (profile == null) prefs.edit().remove("current_auto_eq_profile_json")
-            .apply() else prefs.edit()
-            .putString("current_auto_eq_profile_json", gson.toJson(profile)).apply()
+        if (profile == null) prefs.edit().remove("current_auto_eq_profile_json").apply() else prefs.edit().putString("current_auto_eq_profile_json", gson.toJson(profile)).apply()
     }
 
     fun getCurrentAutoEqProfile(): AutoEqProfile? {
-        val json =
-            prefs.getString("current_auto_eq_profile_json", null) ?: return null; return try {
+        val json = prefs.getString("current_auto_eq_profile_json", null) ?: return null
+        return try {
             gson.fromJson(json, AutoEqProfile::class.java)
         } catch (e: Exception) {
             null
         }
     }
 
-    fun saveAutoDetectHeadphones(enabled: Boolean) =
-        prefs.edit().putBoolean("auto_detect_headphones", enabled).apply()
-
+    fun saveAutoDetectHeadphones(enabled: Boolean) = prefs.edit().putBoolean("auto_detect_headphones", enabled).apply()
     fun getAutoDetectHeadphones(): Boolean = prefs.getBoolean("auto_detect_headphones", true)
 
     fun saveThemeMode(mode: Int) = prefs.edit().putInt("theme_mode", mode).apply()
     fun getThemeMode(): Int = prefs.getInt("theme_mode", 2)
     fun saveSecureMode(enabled: Boolean) = prefs.edit().putBoolean("secure_mode", enabled).apply()
     fun getSecureMode(): Boolean = prefs.getBoolean("secure_mode", false)
-    fun saveFossWearEnabled(enabled: Boolean) =
-        prefs.edit().putBoolean("foss_wear_enabled", enabled).apply()
-
+    fun saveFossWearEnabled(enabled: Boolean) = prefs.edit().putBoolean("foss_wear_enabled", enabled).apply()
     fun getFossWearEnabled(): Boolean = prefs.getBoolean("foss_wear_enabled", false)
 
-    // ==========================================
-    // Продвинутые настройки
-    // ==========================================
-
-    // Главный рубильник
-    fun saveAdvancedSettingsEnabled(enabled: Boolean) =
-        prefs.edit().putBoolean("advanced_settings_enabled", enabled).apply()
-
+    fun saveAdvancedSettingsEnabled(enabled: Boolean) = prefs.edit().putBoolean("advanced_settings_enabled", enabled).apply()
     fun getAdvancedSettingsEnabled(): Boolean = prefs.getBoolean("advanced_settings_enabled", false)
 
-    // Базовые функции
-    fun saveFeatureVisuals(enabled: Boolean) =
-        prefs.edit().putBoolean("adv_feature_visuals", enabled).apply()
-
+    fun saveFeatureVisuals(enabled: Boolean) = prefs.edit().putBoolean("adv_feature_visuals", enabled).apply()
     fun getFeatureVisuals(): Boolean = prefs.getBoolean("adv_feature_visuals", true)
 
-    fun saveFeatureStreaming(enabled: Boolean) =
-        prefs.edit().putBoolean("adv_feature_streaming", enabled).apply()
-
+    fun saveFeatureStreaming(enabled: Boolean) = prefs.edit().putBoolean("adv_feature_streaming", enabled).apply()
     fun getFeatureStreaming(): Boolean = prefs.getBoolean("adv_feature_streaming", true)
 
-    fun saveFeatureEqualizer(enabled: Boolean) =
-        prefs.edit().putBoolean("adv_feature_equalizer", enabled).apply()
-
+    fun saveFeatureEqualizer(enabled: Boolean) = prefs.edit().putBoolean("adv_feature_equalizer", enabled).apply()
     fun getFeatureEqualizer(): Boolean = prefs.getBoolean("adv_feature_equalizer", true)
 
-    // Модуль плейлистов
     fun saveFeaturePlaylists(enabled: Boolean) = prefs.edit().putBoolean("adv_feature_playlists", enabled).apply()
     fun getFeaturePlaylists(): Boolean = prefs.getBoolean("adv_feature_playlists", true)
 
@@ -298,4 +258,7 @@ object PrefsManager {
 
     fun savePlaylistAnimations(enabled: Boolean) = prefs.edit().putBoolean("adv_playlist_animations", enabled).apply()
     fun getPlaylistAnimations(): Boolean = prefs.getBoolean("adv_playlist_animations", true)
+
+    fun saveShowTrackInfoBar(enabled: Boolean) = prefs.edit().putBoolean("show_track_info_bar", enabled).apply()
+    fun getShowTrackInfoBar(): Boolean = prefs.getBoolean("show_track_info_bar", true)
 }

@@ -59,6 +59,7 @@ fun SettingsScreen(
     var isSecureEnabled by remember { mutableStateOf(PrefsManager.getSecureMode()) }
     var isFossWearEnabled by remember { mutableStateOf(PrefsManager.getFossWearEnabled()) }
     var isAutoDetectHeadphonesEnabled by remember { mutableStateOf(PrefsManager.getAutoDetectHeadphones()) }
+    var isTrackInfoBarEnabled by remember { mutableStateOf(PrefsManager.getShowTrackInfoBar()) }
 
     var isClearingCache by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -69,23 +70,25 @@ fun SettingsScreen(
     val currentLocales = AppCompatDelegate.getApplicationLocales()
     val currentLanguageCode = if (!currentLocales.isEmpty) currentLocales[0]?.language else Locale.getDefault().language
 
-    val supportedLanguages = listOf(
-        "ru" to stringResource(R.string.lang_ru),
-        "en" to stringResource(R.string.lang_en),
-        "es" to stringResource(R.string.lang_es),
-        "it" to stringResource(R.string.lang_it),
-        "ja" to stringResource(R.string.lang_ja),
-        "pl" to stringResource(R.string.lang_pl),
-        "sv" to stringResource(R.string.lang_sv),
-        "de" to stringResource(R.string.lang_de),
-        "is" to stringResource(R.string.lang_is),
-        "hi" to stringResource(R.string.lang_hi),
-        "fr" to stringResource(R.string.lang_fr),
-        "el" to stringResource(R.string.lang_el),
-        "fi" to stringResource(R.string.lang_fi),
-        "kk" to stringResource(R.string.lang_kk),
-        "ga" to stringResource(R.string.lang_ga)
-    )
+    val supportedLanguages = remember(currentLanguageCode) {
+        listOf(
+            "ru" to context.getString(R.string.lang_ru),
+            "en" to context.getString(R.string.lang_en),
+            "es" to context.getString(R.string.lang_es),
+            "it" to context.getString(R.string.lang_it),
+            "ja" to context.getString(R.string.lang_ja),
+            "pl" to context.getString(R.string.lang_pl),
+            "sv" to context.getString(R.string.lang_sv),
+            "de" to context.getString(R.string.lang_de),
+            "is" to context.getString(R.string.lang_is),
+            "hi" to context.getString(R.string.lang_hi),
+            "fr" to context.getString(R.string.lang_fr),
+            "el" to context.getString(R.string.lang_el),
+            "fi" to context.getString(R.string.lang_fi),
+            "kk" to context.getString(R.string.lang_kk),
+            "ga" to context.getString(R.string.lang_ga)
+        )
+    }
 
     val currentLanguageName = supportedLanguages.find { it.first == currentLanguageCode }?.second ?: stringResource(R.string.lang_ru)
 
@@ -118,7 +121,6 @@ fun SettingsScreen(
             )
         }
 
-        // Внешка
         Text(
             text = stringResource(R.string.settings_appearance),
             style = MaterialTheme.typography.titleSmall,
@@ -127,14 +129,16 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
         )
 
-        val themes = listOf(
-            Triple(0, stringResource(R.string.theme_auto), R.drawable.ic_auto_theme),
-            Triple(1, stringResource(R.string.theme_light), R.drawable.ic_light_theme),
-            Triple(2, stringResource(R.string.theme_dark), R.drawable.ic_dark_theme),
-            Triple(3, stringResource(R.string.theme_amoled), R.drawable.ic_amoled_theme),
-            Triple(4, stringResource(R.string.theme_opal), R.drawable.ic_opal_theme),
-            Triple(5, stringResource(R.string.theme_pargelia), R.drawable.ic_pargelia_theme)
-        )
+        val themes = remember {
+            listOf(
+                Triple(0, context.getString(R.string.theme_auto), R.drawable.ic_auto_theme),
+                Triple(1, context.getString(R.string.theme_light), R.drawable.ic_light_theme),
+                Triple(2, context.getString(R.string.theme_dark), R.drawable.ic_dark_theme),
+                Triple(3, context.getString(R.string.theme_amoled), R.drawable.ic_amoled_theme),
+                Triple(4, context.getString(R.string.theme_opal), R.drawable.ic_opal_theme),
+                Triple(5, context.getString(R.string.theme_pargelia), R.drawable.ic_pargelia_theme)
+            )
+        }
 
         LazyRow(
             contentPadding = PaddingValues(horizontal = 24.dp),
@@ -155,8 +159,28 @@ fun SettingsScreen(
             }
         }
 
-        // Основные настройки
         SettingsGroup {
+            ListItem(
+                headlineContent = { Text("Данные о треке", fontWeight = FontWeight.Bold) },
+                supportingContent = { Text("Показывать битрейт, частоту дискретизации и формат (например, FLAC)") },
+                leadingContent = {
+                    IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.secondary)
+                },
+                trailingContent = {
+                    Switch(checked = isTrackInfoBarEnabled, onCheckedChange = null)
+                },
+                modifier = Modifier.toggleable(
+                    value = isTrackInfoBarEnabled,
+                    onValueChange = { newValue ->
+                        isTrackInfoBarEnabled = newValue
+                        PrefsManager.saveShowTrackInfoBar(newValue)
+                    }
+                ),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_language), fontWeight = FontWeight.Bold) },
                 supportingContent = { Text(currentLanguageName) },
@@ -190,7 +214,6 @@ fun SettingsScreen(
             )
         }
 
-        // Жалкий Continuous Mix в моём жалком исполнении, который я всё равно не смог нормально реализовать, но он есть, и его можно включить
         Text(
             text = "Воспроизведение",
             style = MaterialTheme.typography.titleSmall,
@@ -200,7 +223,6 @@ fun SettingsScreen(
         )
         ContinuousMixSettingsCard(context = context)
 
-        // Интеграции
         Text(
             text = stringResource(R.string.settings_integration),
             style = MaterialTheme.typography.titleSmall,
@@ -251,7 +273,6 @@ fun SettingsScreen(
             )
         }
 
-        // Данные
         Text(
             text = stringResource(R.string.settings_data),
             style = MaterialTheme.typography.titleSmall,
@@ -303,7 +324,6 @@ fun SettingsScreen(
             )
         }
 
-        // Связь со мной
         Text(
             text = stringResource(R.string.settings_contact),
             style = MaterialTheme.typography.titleSmall,
@@ -341,7 +361,6 @@ fun SettingsScreen(
             )
         }
 
-        // Продвинутые настройки
         Text(
             text = "Продвинутые настройки",
             style = MaterialTheme.typography.titleSmall,
@@ -386,7 +405,6 @@ fun SettingsScreen(
             }
         }
 
-        // О приложении (Пасхалка)
         Text(
             text = "О приложении",
             style = MaterialTheme.typography.titleSmall,

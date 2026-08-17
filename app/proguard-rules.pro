@@ -6,13 +6,21 @@
 }
 -keep class com.alcint.pargelium.CustomAudioProcessor { *; }
 
--keepattributes Signature, Exceptions, *Annotation*
+-keepattributes Signature, Exceptions, *Annotation*, EnclosingMethod, InnerClasses
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken { *; }
+-keep class com.google.gson.** { *; }
+
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+
 -keep class com.alcint.pargelium.PlaylistModel { *; }
 -keep class com.alcint.pargelium.AudioTrack { *; }
 -keep class com.alcint.pargelium.LyricLine { *; }
+-keep class com.alcint.pargelium.AlbumModel { *; }
+-keep class com.alcint.pargelium.ArtistModel { *; }
+
 -dontwarn retrofit2.**
 -keep class retrofit2.** { *; }
 
