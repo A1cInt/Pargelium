@@ -520,8 +520,14 @@ fun FullPlayerScreen(
 
     LaunchedEffect(currentQueueIndex) {
         if (currentQueueIndex != -1 && currentQueueIndex != pagerState.currentPage) {
-            if ((currentQueueIndex - pagerState.currentPage).absoluteValue > 2) pagerState.scrollToPage(currentQueueIndex)
-            else pagerState.animateScrollToPage(currentQueueIndex)
+            if ((currentQueueIndex - pagerState.currentPage).absoluteValue > 2) {
+                pagerState.scrollToPage(currentQueueIndex)
+            } else {
+                pagerState.animateScrollToPage(
+                    page = currentQueueIndex,
+                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                )
+            }
         }
     }
 
@@ -688,8 +694,9 @@ fun FullPlayerScreen(
 
         val trackInfoTransitionSpec: AnimatedContentTransitionScope<AudioTrack>.() -> ContentTransform = remember {
             {
-                (fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 0.9f, animationSpec = tween(400)))
-                    .togetherWith(fadeOut(animationSpec = tween(400)) + scaleOut(targetScale = 0.9f, animationSpec = tween(400)))
+                (fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 0.95f, animationSpec = tween(400)))
+                    .togetherWith(fadeOut(animationSpec = tween(400)) + scaleOut(targetScale = 0.95f, animationSpec = tween(400)))
+                    .using(SizeTransform(clip = false))
             }
         }
 
