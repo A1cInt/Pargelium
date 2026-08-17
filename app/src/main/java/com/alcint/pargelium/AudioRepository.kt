@@ -14,12 +14,22 @@ import java.util.concurrent.atomic.AtomicInteger
 
 object AudioRepository {
 
+    private var cachedTracks: List<AudioTrack>? = null
+    private var cachedAlbums: List<AlbumModel>? = null
+
+    fun clearCache() {
+        cachedTracks = null
+        cachedAlbums = null
+    }
+
     fun getAlbumArtUri(albumId: Long): Uri {
         return ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
     }
 
     fun processAlbums(tracks: List<AudioTrack>): List<AlbumModel> {
-        return tracks.groupBy { it.albumId }.map { (_, albumTracks) ->
+        if (cachedAlbums != null) return cachedAlbums!!
+
+        val albums = tracks.groupBy { it.albumId }.map { (_, albumTracks) ->
             val first = albumTracks.first()
             val sortedTracks = albumTracks.sortedWith(
                 compareBy<AudioTrack> { it.discNumber }.thenBy { it.trackNumber }
@@ -39,6 +49,9 @@ object AudioRepository {
 
             AlbumModel(first.albumId, first.album, mainArtist, sortedTracks)
         }.sortedBy { it.title }
+
+        cachedAlbums = albums
+        return albums
     }
 
     fun findCanvasForTrack(context: Context, trackUri: Uri): Uri? {
@@ -210,7 +223,11 @@ object AudioRepository {
         }
     }
 
-    fun getAudioTracks(context: Context): List<AudioTrack> {
+    fun getAudioTracks(context: Context, forceReload: Boolean = false): List<AudioTrack> {
+        if (!forceReload && cachedTracks != null) {
+            return cachedTracks!!
+        }
+
         val tracks = mutableListOf<AudioTrack>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -268,6 +285,10 @@ object AudioRepository {
                 }
             }
         } catch (e: Exception) { }
+
+        cachedTracks = tracks
+        cachedAlbums = null
+
         return tracks
     }
 }

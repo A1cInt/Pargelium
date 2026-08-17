@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alcint.pargelium
 
 import android.Manifest
@@ -35,9 +36,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -288,6 +291,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var allTracks by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
     var allAlbums by remember { mutableStateOf<List<AlbumModel>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
     var selectedAlbum by remember { mutableStateOf<AlbumModel?>(null) }
     var selectedArtist by remember { mutableStateOf<ArtistModel?>(null) }
@@ -446,24 +450,25 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
     fun loadTracks(forceScan: Boolean = false) {
         scope.launch {
-            isLoading = true
+            if (forceScan) isRefreshing = true else isLoading = true
             if (forceScan) withContext(Dispatchers.IO) {
                 val lock = java.util.concurrent.CountDownLatch(1)
                 AudioRepository.forceScan(context) { lock.countDown() }
                 lock.await()
             }
-            val loadedTracks = withContext(Dispatchers.IO) { AudioRepository.getAudioTracks(context) }
+            val loadedTracks = withContext(Dispatchers.IO) { AudioRepository.getAudioTracks(context, forceScan) }
             val loadedAlbums = withContext(Dispatchers.Default) { AudioRepository.processAlbums(loadedTracks) }
             allTracks = loadedTracks
             allAlbums = loadedAlbums
             isLoading = false
+            isRefreshing = false
         }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         val readGranted = permissions[Manifest.permission.READ_MEDIA_AUDIO] == true || permissions[Manifest.permission.READ_EXTERNAL_STORAGE] == true
         hasPermission = readGranted
-        if (readGranted) loadTracks(true)
+        if (readGranted) loadTracks(false)
     }
 
     LaunchedEffect(Unit) {
@@ -734,136 +739,142 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                 }
                                             }
                                             0 -> {
-                                                Column(modifier = Modifier.fillMaxSize()) {
-                                                    Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+                                                PullToRefreshBox(
+                                                    isRefreshing = isRefreshing,
+                                                    onRefresh = { loadTracks(true) },
+                                                    modifier = Modifier.fillMaxSize()
+                                                ) {
+                                                    Column(modifier = Modifier.fillMaxSize()) {
+                                                        Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
-                                                    AnimatedContent(
-                                                        targetState = isSearchActive,
-                                                        transitionSpec = {
-                                                            fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using SizeTransform(clip = false)
-                                                        },
-                                                        label = "SearchHeaderAnimation"
-                                                    ) { active ->
-                                                        if (active) {
-                                                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                                IconButton(onClick = remember {{ isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }}) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) }
-                                                                OutlinedTextField(
-                                                                    value = searchQuery, onValueChange = { searchQuery = it }, placeholder = { Text(stringResource(id = R.string.search_hint)) }, modifier = Modifier.weight(1f).height(56.dp), singleLine = true, shape = RoundedCornerShape(24.dp),
-                                                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
-                                                                    trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = remember {{ searchQuery = "" }}) { Icon(Icons.Default.Close, null) } },
-                                                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
-                                                                )
-                                                            }
-                                                        } else {
-                                                            Column {
+                                                        AnimatedContent(
+                                                            targetState = isSearchActive,
+                                                            transitionSpec = {
+                                                                fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using SizeTransform(clip = false)
+                                                            },
+                                                            label = "SearchHeaderAnimation"
+                                                        ) { active ->
+                                                            if (active) {
                                                                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                                    Row(
-                                                                        modifier = Modifier
-                                                                            .weight(1f)
-                                                                            .clip(RoundedCornerShape(32.dp))
-                                                                            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { currentScreen = 5 }
-                                                                            .padding(end = 8.dp),
-                                                                        verticalAlignment = Alignment.CenterVertically
-                                                                    ) {
-                                                                        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                                                            if (avatarUri != null) AsyncImage(model = ImageRequest.Builder(context).data(avatarUri).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                                                            else Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                                        }
-                                                                        Spacer(Modifier.width(12.dp))
-                                                                        Text(text = userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                                    }
-                                                                    IconButton(onClick = remember {{ isSearchActive = true }}) { Icon(Icons.Default.Search, "Search", tint = MaterialTheme.colorScheme.onBackground) }
+                                                                    IconButton(onClick = remember {{ isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }}) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) }
+                                                                    OutlinedTextField(
+                                                                        value = searchQuery, onValueChange = { searchQuery = it }, placeholder = { Text(stringResource(id = R.string.search_hint)) }, modifier = Modifier.weight(1f).height(56.dp), singleLine = true, shape = RoundedCornerShape(24.dp),
+                                                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
+                                                                        trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = remember {{ searchQuery = "" }}) { Icon(Icons.Default.Close, null) } },
+                                                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                                                                    )
                                                                 }
-                                                                TabRow(selectedTabIndex = libraryTab, containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary, divider = {}) {
-                                                                    Tab(selected = libraryTab == 0, onClick = remember {{ libraryTab = 0 }}) {
-                                                                        Text(stringResource(id = R.string.tab_albums), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                                                            } else {
+                                                                Column {
+                                                                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                                        Row(
+                                                                            modifier = Modifier
+                                                                                .weight(1f)
+                                                                                .clip(RoundedCornerShape(32.dp))
+                                                                                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { currentScreen = 5 }
+                                                                                .padding(end = 8.dp),
+                                                                            verticalAlignment = Alignment.CenterVertically
+                                                                        ) {
+                                                                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                                                                if (avatarUri != null) AsyncImage(model = ImageRequest.Builder(context).data(avatarUri).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                                                else Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                                            }
+                                                                            Spacer(Modifier.width(12.dp))
+                                                                            Text(text = userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                                        }
+                                                                        IconButton(onClick = remember {{ isSearchActive = true }}) { Icon(Icons.Default.Search, "Search", tint = MaterialTheme.colorScheme.onBackground) }
                                                                     }
-                                                                    Tab(selected = libraryTab == 1, onClick = remember {{ libraryTab = 1 }}) {
-                                                                        Text(stringResource(id = R.string.tab_artists), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                                                                    TabRow(selectedTabIndex = libraryTab, containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary, divider = {}) {
+                                                                        Tab(selected = libraryTab == 0, onClick = remember {{ libraryTab = 0 }}) {
+                                                                            Text(stringResource(id = R.string.tab_albums), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                                                                        }
+                                                                        Tab(selected = libraryTab == 1, onClick = remember {{ libraryTab = 1 }}) {
+                                                                            Text(stringResource(id = R.string.tab_artists), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                                                                        }
                                                                     }
                                                                 }
                                                             }
                                                         }
-                                                    }
 
-                                                    if (isSearchActive && searchQuery.isNotEmpty()) {
-                                                        if (filteredAlbums.isEmpty() && filteredTracks.isEmpty() && filteredArtists.isEmpty() && !isLoading) {
-                                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.search_no_results)) }
-                                                        } else {
-                                                            LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 240.dp)) {
-                                                                if (filteredArtists.isNotEmpty()) {
-                                                                    item { Text(stringResource(id = R.string.tab_artists), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
-                                                                    item {
-                                                                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                                            items(filteredArtists, key = { it.name }) { artist -> Box(modifier = Modifier.width(160.dp)) { ArtistCard(artist) { selectedArtist = artist; isSearchActive = false } } }
-                                                                        }
-                                                                    }
-                                                                }
-                                                                if (filteredAlbums.isNotEmpty()) {
-                                                                    item { Text(stringResource(id = R.string.tab_albums), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
-                                                                    item {
-                                                                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                                            items(filteredAlbums, key = { it.id }) { alb -> Box(modifier = Modifier.width(160.dp)) { AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } } }
-                                                                        }
-                                                                    }
-                                                                }
-                                                                if (filteredTracks.isNotEmpty()) {
-                                                                    item { Text(stringResource(id = R.string.tab_tracks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
-                                                                    items(filteredTracks, key = { it.id }) { track -> TrackRow(track = track, isPlaying = isPlaying, isCurrentTrack = currentTrack?.id == track.id, albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }, onClick = { playTrack(track, filteredTracks) }, onPlayNext = { playNext(track) }, onAddToQueue = { addToQueue(track) }, onAddToPlaylist = { trackAddingToPlaylist = track; showAddToPlaylistSheet = true }, onShare = { trackToShare = track }) }
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        if (libraryTab == 0) {
-                                                            if (filteredAlbums.isEmpty() && !isLoading) {
-                                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.music_not_found)) }
+                                                        if (isSearchActive && searchQuery.isNotEmpty()) {
+                                                            if (filteredAlbums.isEmpty() && filteredTracks.isEmpty() && filteredArtists.isEmpty() && !isLoading) {
+                                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.search_no_results)) }
                                                             } else {
-                                                                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                                                    LazyVerticalGrid(
-                                                                        columns = GridCells.Adaptive(minSize = 160.dp),
-                                                                        state = albumGridState,
-                                                                        contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
-                                                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                                        modifier = Modifier.fillMaxSize()
-                                                                    ) {
-                                                                        gridItems(filteredAlbums, key = { it.id }) { alb -> AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } }
-                                                                    }
-
-                                                                    if (filteredAlbums.isNotEmpty()) {
-                                                                        Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
-                                                                            FastScrollThumb(
-                                                                                itemCount = filteredAlbums.size,
-                                                                                state = albumGridState,
-                                                                                getLetter = { index -> filteredAlbums.getOrNull(index)?.title?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
-                                                                            )
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            if (filteredArtists.isEmpty() && !isLoading) {
-                                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.no_artists)) }
-                                                            } else {
-                                                                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                                                    LazyVerticalGrid(
-                                                                        columns = GridCells.Adaptive(minSize = 160.dp),
-                                                                        state = artistGridState,
-                                                                        contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
-                                                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                                        modifier = Modifier.fillMaxSize()
-                                                                    ) {
-                                                                        gridItems(filteredArtists, key = { it.name }) { artist -> ArtistCard(artist) { selectedArtist = artist } }
-                                                                    }
-
+                                                                LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 240.dp)) {
                                                                     if (filteredArtists.isNotEmpty()) {
-                                                                        Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
-                                                                            FastScrollThumb(
-                                                                                itemCount = filteredArtists.size,
-                                                                                state = artistGridState,
-                                                                                getLetter = { index -> filteredArtists.getOrNull(index)?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
-                                                                            )
+                                                                        item { Text(stringResource(id = R.string.tab_artists), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                                                                        item {
+                                                                            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                                                items(filteredArtists, key = { it.name }) { artist -> Box(modifier = Modifier.width(160.dp)) { ArtistCard(artist) { selectedArtist = artist; isSearchActive = false } } }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    if (filteredAlbums.isNotEmpty()) {
+                                                                        item { Text(stringResource(id = R.string.tab_albums), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                                                                        item {
+                                                                            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                                                items(filteredAlbums, key = { it.id }) { alb -> Box(modifier = Modifier.width(160.dp)) { AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } } }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    if (filteredTracks.isNotEmpty()) {
+                                                                        item { Text(stringResource(id = R.string.tab_tracks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                                                                        items(filteredTracks, key = { it.id }) { track -> TrackRow(track = track, isPlaying = isPlaying, isCurrentTrack = currentTrack?.id == track.id, albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }, onClick = { playTrack(track, filteredTracks) }, onPlayNext = { playNext(track) }, onAddToQueue = { addToQueue(track) }, onAddToPlaylist = { trackAddingToPlaylist = track; showAddToPlaylistSheet = true }, onShare = { trackToShare = track }) }
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if (libraryTab == 0) {
+                                                                if (filteredAlbums.isEmpty() && !isLoading) {
+                                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.music_not_found)) }
+                                                                } else {
+                                                                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                                                        LazyVerticalGrid(
+                                                                            columns = GridCells.Adaptive(minSize = 160.dp),
+                                                                            state = albumGridState,
+                                                                            contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
+                                                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                                            modifier = Modifier.fillMaxSize()
+                                                                        ) {
+                                                                            gridItems(filteredAlbums, key = { it.id }) { alb -> AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } }
+                                                                        }
+
+                                                                        if (filteredAlbums.isNotEmpty()) {
+                                                                            Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
+                                                                                FastScrollThumb(
+                                                                                    itemCount = filteredAlbums.size,
+                                                                                    state = albumGridState,
+                                                                                    getLetter = { index -> filteredAlbums.getOrNull(index)?.title?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
+                                                                                )
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                if (filteredArtists.isEmpty() && !isLoading) {
+                                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.no_artists)) }
+                                                                } else {
+                                                                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                                                        LazyVerticalGrid(
+                                                                            columns = GridCells.Adaptive(minSize = 160.dp),
+                                                                            state = artistGridState,
+                                                                            contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
+                                                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                                            modifier = Modifier.fillMaxSize()
+                                                                        ) {
+                                                                            gridItems(filteredArtists, key = { it.name }) { artist -> ArtistCard(artist) { selectedArtist = artist } }
+                                                                        }
+
+                                                                        if (filteredArtists.isNotEmpty()) {
+                                                                            Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
+                                                                                FastScrollThumb(
+                                                                                    itemCount = filteredArtists.size,
+                                                                                    state = artistGridState,
+                                                                                    getLetter = { index -> filteredArtists.getOrNull(index)?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
+                                                                                )
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
