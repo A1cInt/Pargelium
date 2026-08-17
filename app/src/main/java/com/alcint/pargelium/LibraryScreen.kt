@@ -141,12 +141,9 @@ fun FastScrollThumb(
     getLetter: (Int) -> String
 ) {
     if (itemCount <= 0) return
-    val firstVisible by remember { derivedStateOf { state.firstVisibleItemIndex } }
-    val safeVisibleIndex = firstVisible.coerceIn(0, (itemCount - 1).coerceAtLeast(0))
-    val currentLetter = getLetter(safeVisibleIndex)
 
     var isDragging by remember { mutableStateOf(false) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
 
     val isScrolling by remember { derivedStateOf { state.isScrollInProgress } }
@@ -164,6 +161,13 @@ fun FastScrollThumb(
         label = "thumbWidth"
     )
 
+    val currentLetter by remember {
+        derivedStateOf {
+            val safeVisibleIndex = state.firstVisibleItemIndex.coerceIn(0, (itemCount - 1).coerceAtLeast(0))
+            getLetter(safeVisibleIndex)
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxHeight()
@@ -172,7 +176,7 @@ fun FastScrollThumb(
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     isDragging = true
-                    offsetY = down.position.y
+                    dragOffsetY = down.position.y
 
                     fun scrollToExact(y: Float) {
                         val fraction = (y / size.height).coerceIn(0f, 1f)
@@ -185,15 +189,15 @@ fun FastScrollThumb(
                         scope.launch { state.scrollToItem(index, offset) }
                     }
 
-                    scrollToExact(offsetY)
+                    scrollToExact(dragOffsetY)
 
                     do {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull()
                         if (change != null && change.pressed) {
                             change.consume()
-                            offsetY = change.position.y
-                            scrollToExact(offsetY)
+                            dragOffsetY = change.position.y
+                            scrollToExact(dragOffsetY)
                         }
                     } while (event.changes.any { it.pressed })
                     isDragging = false
@@ -203,26 +207,11 @@ fun FastScrollThumb(
         val trackHeight = constraints.maxHeight.toFloat()
         val thumbHeightPx = with(LocalDensity.current) { 40.dp.toPx() }
 
-        val currentFraction = if (itemCount > 1) {
-            val firstItem = state.layoutInfo.visibleItemsInfo.firstOrNull()
-            val offsetFraction = if (firstItem != null && firstItem.size.height > 0) {
-                -firstItem.offset.y.toFloat() / firstItem.size.height
-            } else 0f
-            (firstVisible + offsetFraction).coerceIn(0f, itemCount - 1f) / (itemCount - 1)
-        } else 0f
-
-        val targetThumbY = (currentFraction * (trackHeight - thumbHeightPx)).coerceIn(0f, trackHeight - thumbHeightPx)
-        val thumbY by animateFloatAsState(
-            targetValue = targetThumbY,
-            animationSpec = if (isDragging) snap() else tween(50, easing = LinearOutSlowInEasing),
-            label = "thumbY"
-        )
-
         androidx.compose.animation.AnimatedVisibility(
             visible = isDragging,
             enter = fadeIn(tween(200)) + scaleIn(tween(200)),
             exit = fadeOut(tween(200)) + scaleOut(tween(200)),
-            modifier = Modifier.align(Alignment.TopEnd).offset { IntOffset(-80, offsetY.toInt() - 70) }
+            modifier = Modifier.align(Alignment.TopEnd).offset { IntOffset(-80, dragOffsetY.toInt() - 70) }
         ) {
             Box(
                 modifier = Modifier
@@ -245,7 +234,19 @@ fun FastScrollThumb(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = 4.dp)
-                    .offset { IntOffset(0, thumbY.toInt()) }
+                    .offset {
+                        val targetThumbY = if (isDragging) {
+                            dragOffsetY.coerceIn(0f, trackHeight - thumbHeightPx)
+                        } else {
+                            val firstItem = state.layoutInfo.visibleItemsInfo.firstOrNull()
+                            val offsetFraction = if (firstItem != null && firstItem.size.height > 0) {
+                                -firstItem.offset.y.toFloat() / firstItem.size.height
+                            } else 0f
+                            val currentFraction = (state.firstVisibleItemIndex + offsetFraction).coerceIn(0f, itemCount - 1f) / (itemCount - 1).coerceAtLeast(1)
+                            (currentFraction * (trackHeight - thumbHeightPx)).coerceIn(0f, trackHeight - thumbHeightPx)
+                        }
+                        IntOffset(0, targetThumbY.toInt())
+                    }
                     .width(thumbWidth)
                     .height(40.dp)
                     .graphicsLayer { alpha = thumbAlpha }
@@ -591,8 +592,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
     val filteredAlbums by remember(allAlbums, searchQuery) {
         derivedStateOf {
-            val list = if (searchQuery.isEmpty()) allAlbums else allAlbums.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
-            list.sortedBy { it.title.trim().lowercase() }
+            if (searchQuery.isEmpty()) allAlbums
+            else allAlbums.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }.sortedBy { it.title.trim().lowercase() }
         }
     }
 
@@ -611,8 +612,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
     val filteredArtists by remember(allArtists, searchQuery) {
         derivedStateOf {
-            val list = if (searchQuery.isEmpty()) allArtists else allArtists.filter { it.name.contains(searchQuery, ignoreCase = true) }
-            list.sortedBy { it.name.trim().lowercase() }
+            if (searchQuery.isEmpty()) allArtists
+            else allArtists.filter { it.name.contains(searchQuery, ignoreCase = true) }.sortedBy { it.name.trim().lowercase() }
         }
     }
 
