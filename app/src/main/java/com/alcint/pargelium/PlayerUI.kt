@@ -85,11 +85,12 @@ import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import ir.mahozad.multiplatform.wavyslider.material3.WavySlider
 import androidx.compose.ui.res.painterResource
 
 @Composable
-fun AuroraBackground(seedColor: Color, modifier: Modifier = Modifier) {
+fun AuroraBackground(seedColor: Color, isPlaying: Boolean, modifier: Modifier = Modifier) {
     val baseBackground = MaterialTheme.colorScheme.background
     val defaultColor = MaterialTheme.colorScheme.primary
     val effectiveSeed = if (seedColor == Color.Unspecified || seedColor == Color.Transparent) defaultColor else seedColor
@@ -98,8 +99,20 @@ fun AuroraBackground(seedColor: Color, modifier: Modifier = Modifier) {
     val animatedColor by animateColorAsState(targetValue = targetColor, animationSpec = tween(1500), label = "color")
 
     val infiniteTransition = rememberInfiniteTransition(label = "aurora")
-    val offset1 by infiniteTransition.animateFloat(initialValue = 0f, targetValue = 6.28f, animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing), RepeatMode.Restart), label = "blob1")
-    val slowScale by infiniteTransition.animateFloat(initialValue = 0.9f, targetValue = 1.1f, animationSpec = infiniteRepeatable(tween(8000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "slowScale")
+
+    val animationDuration = if (isPlaying) 15000 else 45000
+    val offset1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.28f,
+        animationSpec = infiniteRepeatable(tween(animationDuration, easing = LinearEasing), RepeatMode.Restart),
+        label = "blob1"
+    )
+    val slowScale by infiniteTransition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "slowScale"
+    )
 
     val color1 = animatedColor.copy(alpha = 0.6f)
     val color2 = animatedColor.copy(alpha = 0.4f)
@@ -107,11 +120,36 @@ fun AuroraBackground(seedColor: Color, modifier: Modifier = Modifier) {
 
     val smoothedLoudnessState = remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isAppResumed by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            isAppResumed = event == Lifecycle.Event.ON_RESUME
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(isPlaying, isAppResumed) {
+        if (!isPlaying || !isAppResumed) {
+            var currentLoudness = smoothedLoudnessState.floatValue
+            while (currentLoudness > 0.01f && isActive) {
+                currentLoudness *= 0.9f
+                smoothedLoudnessState.floatValue = currentLoudness
+                delay(32)
+            }
+            smoothedLoudnessState.floatValue = 0f
+            return@LaunchedEffect
+        }
+
         var fast = 0f
         var slow = 0f
         var visualLoudness = 0f
-        while (true) {
+
+        while (isActive) {
             withFrameNanos {
                 val target = globalAudioLoudness
                 val safeTarget = if (target.isNaN() || target.isInfinite()) 0f else target
@@ -128,6 +166,7 @@ fun AuroraBackground(seedColor: Color, modifier: Modifier = Modifier) {
 
                 smoothedLoudnessState.floatValue = visualLoudness
             }
+            delay(16)
         }
     }
 
@@ -552,7 +591,15 @@ fun FullPlayerScreen(
         }
     }
 
-    LaunchedEffect(track, canvasUri) {
+    val seedColorCache = remember { mutableMapOf<String, Color>() }
+
+    LaunchedEffect(track, canvasUri, seedColor) {
+        val cacheKey = canvasUri?.toString() ?: track.id.toString()
+        if (seedColorCache.containsKey(cacheKey)) {
+            dynamicSeedColor = seedColorCache[cacheKey]!!
+            return@LaunchedEffect
+        }
+
         val saavnTrack = SaavnApi.trackCache[track.id]
         val imageUrl: Any? = canvasUri
             ?: saavnTrack?.coverUrl?.takeIf { it.isNotEmpty() }
@@ -592,13 +639,16 @@ fun FullPlayerScreen(
                             android.graphics.Color.colorToHSV(avgColor.toArgb(), hsv)
                             hsv[1] = (hsv[1] * 1.5f).coerceIn(0.4f, 1f)
                             hsv[2] = (hsv[2] * 1.5f).coerceIn(0.5f, 1f)
-                            dynamicSeedColor = Color(android.graphics.Color.HSVToColor(hsv))
+                            val newColor = Color(android.graphics.Color.HSVToColor(hsv))
+                            dynamicSeedColor = newColor
+                            seedColorCache[cacheKey] = newColor
                         }
                     }
                 } catch (_: Exception) {}
             }
         } else {
             dynamicSeedColor = seedColor
+            seedColorCache[cacheKey] = seedColor
         }
     }
 
@@ -674,7 +724,7 @@ fun FullPlayerScreen(
                     }
                 }
             } else {
-                AuroraBackground(seedColor = dynamicSeedColor, modifier = bgModifier)
+                AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
             }
         }
 
