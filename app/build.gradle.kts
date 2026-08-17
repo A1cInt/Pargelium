@@ -12,8 +12,8 @@ android {
         applicationId = "com.alcint.pargelium"
         minSdk = 31
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.1"
         ndkVersion = "30.0.15729638"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

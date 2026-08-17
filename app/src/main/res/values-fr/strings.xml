@@ -231,19 +231,19 @@
     <string name="choose_language">Choisissez la langue</string>
 
     <string name="settings_track_info">Infos sur el morceau</string>
-    <string name="settings_track_info_desc">Afficher le débit, le taux d'échantillonnage et le format (ex. FLAC)</string>
+    <string name="settings_track_info_desc">Afficher le débit, le taux d\'échantillonnage et le format (ex. FLAC)</string>
 
     <string name="adv_dev_mode">Mode développeur</string>
-    <string name="adv_dev_mode_desc">Autoriser l'accès aux commandes internes du lecteur</string>
+    <string name="adv_dev_mode_desc">Autoriser l\'accès aux commandes internes du lecteur</string>
     <string name="adv_module_control">Gestion des modules</string>
-    <string name="adv_module_control_desc">Activer ou désactiver les composants de l'application</string>
+    <string name="adv_module_control_desc">Activer ou désactiver les composants de l\'application</string>
 
-    <string name="about_version">Version de l'application</string>
-    <string name="about_version_desc">Pargelium 1.1\nLe lecteur qui fait simplement ce qu'on lui demande.</string>
+    <string name="about_version">Version de l\'application</string>
+    <string name="about_version_desc">Pargelium 1.1\nLe lecteur qui fait simplement ce qu\'on lui demande.</string>
 
     <string name="adv_warning_title">Avertissement</string>
-    <string name="adv_warning_text">Ces paramètres sont destinés à une personnalisation avancée. La désactivation de composants système (streaming, visualisation, égaliseur) peut entraîner un comportement inattendu ou de l'instabilité.\n\nVoulez-vous vraiment continuer ?</string>
-    <string name="action_understand">J'ai compris</string>
+    <string name="adv_warning_text">Ces paramètres sont destinés à une personnalisation avancée. La désactivation de composants système (streaming, visualisation, égaliseur) peut entraîner un comportement inattendu ou de l\'instabilité.\n\nVoulez-vous vraiment continuer ?</string>
+    <string name="action_understand">J\'ai compris</string>
     <string name="action_back">Retour</string>
 
     <string name="update_auto_check">Vérification automatique des mises à jour</string>
@@ -257,7 +257,7 @@
     <string name="action_download">Télécharger</string>
     <string name="action_skip">Ignorer</string>
     <string name="downloading_update">Téléchargement de la mise à jour...</string>
-    <string name="install_failed">Échec du lancement de l'installation</string>
+    <string name="install_failed">Échec du lancement de l\'installation</string>
 
     <string name="action_play">Lire</string>
 

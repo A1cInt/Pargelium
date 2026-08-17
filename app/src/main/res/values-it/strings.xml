@@ -238,30 +238,30 @@
     <string name="settings_track_info_desc">Mostra bitrate, frequenza di campionamento e formato (es. FLAC)</string>
 
     <string name="adv_dev_mode">Modalità sviluppatore</string>
-    <string name="adv_dev_mode_desc">Consente l'accesso ai comandi interni del lettore</string>
+    <string name="adv_dev_mode_desc">Consente l\'accesso ai comandi interni del lettore</string>
     <string name="adv_module_control">Gestione moduli</string>
-    <string name="adv_module_control_desc">Attiva o disattiva i componenti dell'app</string>
+    <string name="adv_module_control_desc">Attiva o disattiva i componenti dell\'app</string>
 
-    <string name="about_version">Versione dell'app</string>
+    <string name="about_version">Versione dell\'app</string>
     <string name="about_version_desc">Pargelium 1.1\nIl lettore che fa semplicemente il suo dovere.</string>
 
     <string name="adv_warning_title">Attenzione</string>
-    <string name="adv_warning_text">Queste impostazioni sono destinate a una personalizzazione avanzata. La disattivazione dei componenti di sistema (streaming, visualizzazione, equalizzatore) potrebbe causare comportamenti imprevisti o instabilità dell'app.\n\nSei sicuro di voler continuare?</string>
+    <string name="adv_warning_text">Queste impostazioni sono destinate a una personalizzazione avanzata. La disattivazione dei componenti di sistema (streaming, visualizzazione, equalizzatore) potrebbe causare comportamenti imprevisti o instabilità dell\'app.\n\nSei sicuro di voler continuare?</string>
     <string name="action_understand">Ho capito</string>
     <string name="action_back">Indietro</string>
 
     <string name="update_auto_check">Controllo automatico aggiornamenti</string>
-    <string name="update_auto_check_desc">Controlla la presenza di nuove versioni su GitHub all'avvio</string>
+    <string name="update_auto_check_desc">Controlla la presenza di nuove versioni su GitHub all\'avvio</string>
     <string name="update_check_now">Controlla aggiornamenti ora</string>
     <string name="checking_updates">Ricerca aggiornamenti in corso...</string>
-    <string name="no_updates_found">Hai già installato l'ultima versione</string>
+    <string name="no_updates_found">Hai già installato l\'ultima versione</string>
     <string name="update_check_failed">Impossibile controllare gli aggiornamenti</string>
     <string name="update_available">Aggiornamento %1$s disponibile</string>
     <string name="update_available_desc">Scarica e installa la nuova versione di Pargelium.</string>
     <string name="action_download">Scarica</string>
     <string name="action_skip">Ignora</string>
-    <string name="downloading_update">Download dell'aggiornamento in corso...</string>
-    <string name="install_failed">Impossibile avviare l'installazione</string>
+    <string name="downloading_update">Download dell\'aggiornamento in corso...</string>
+    <string name="install_failed">Impossibile avviare l\'installazione</string>
 
     <string name="action_play">Riproduci</string>
 
