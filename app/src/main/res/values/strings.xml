@@ -259,4 +259,16 @@
     <string name="action_understand">Я понимаю</string>
     <string name="action_back">Назад</string>
 
+    <string name="update_auto_check">Автоматическая проверка обновлений</string>
+    <string name="update_auto_check_desc">Проверять наличие новых версий на GitHub при запуске</string>
+    <string name="update_check_now">Проверить обновления сейчас</string>
+    <string name="checking_updates">Проверка обновлений...</string>
+    <string name="no_updates_found">У вас установлена последняя версия</string>
+    <string name="update_check_failed">Не удалось проверить обновления</string>
+    <string name="update_available">Доступно обновление %1$s</string>
+    <string name="update_available_desc">Скачайте и установите новую версию Pargelium.</string>
+    <string name="action_download">Скачать</string>
+    <string name="action_skip">Пропустить</string>
+    <string name="downloading_update">Скачивание обновления...</string>
+    <string name="install_failed">Ошибка запуска установки</string>
 </resources>

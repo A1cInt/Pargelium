@@ -28,6 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SettingsSuggest
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,6 +71,7 @@ fun SettingsScreen(
     var isFossWearEnabled by remember { mutableStateOf(PrefsManager.getFossWearEnabled()) }
     var isAutoDetectHeadphonesEnabled by remember { mutableStateOf(PrefsManager.getAutoDetectHeadphones()) }
     var isTrackInfoBarEnabled by remember { mutableStateOf(PrefsManager.getShowTrackInfoBar()) }
+    var isAutoUpdateEnabled by remember { mutableStateOf(PrefsManager.getAutoUpdateEnabled()) }
 
     var isClearingCache by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -478,6 +481,40 @@ fun SettingsScreen(
                                         easterEggClickCount = 1
                                     }
                                     lastClickTime = currentTime
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.update_auto_check), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.update_auto_check_desc)) },
+                                leadingContent = {
+                                    IconContainer(icon = Icons.Default.Sync, color = MaterialTheme.colorScheme.secondary)
+                                },
+                                trailingContent = {
+                                    Switch(checked = isAutoUpdateEnabled, onCheckedChange = null)
+                                },
+                                modifier = Modifier.toggleable(
+                                    value = isAutoUpdateEnabled,
+                                    onValueChange = { newValue ->
+                                        isAutoUpdateEnabled = newValue
+                                        PrefsManager.saveAutoUpdateEnabled(newValue)
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.update_check_now), fontWeight = FontWeight.Bold) },
+                                leadingContent = {
+                                    IconContainer(icon = Icons.Default.SystemUpdate, color = MaterialTheme.colorScheme.tertiary)
+                                },
+                                modifier = Modifier.clickable {
+                                    UpdateManager.checkForUpdates(context, isManual = true)
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )

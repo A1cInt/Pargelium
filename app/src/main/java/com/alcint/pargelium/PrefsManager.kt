@@ -261,4 +261,13 @@ object PrefsManager {
 
     fun saveShowTrackInfoBar(enabled: Boolean) = prefs.edit().putBoolean("show_track_info_bar", enabled).apply()
     fun getShowTrackInfoBar(): Boolean = prefs.getBoolean("show_track_info_bar", true)
+
+    fun saveAutoUpdateEnabled(enabled: Boolean) = prefs.edit().putBoolean("auto_update_enabled", enabled).apply()
+    fun getAutoUpdateEnabled(): Boolean = prefs.getBoolean("auto_update_enabled", true)
+
+    fun saveLastUpdateCheckTime(timeMs: Long) = prefs.edit().putLong("last_update_check_time", timeMs).apply()
+    fun getLastUpdateCheckTime(): Long = prefs.getLong("last_update_check_time", 0L)
+
+    fun saveSkippedVersion(version: String) = prefs.edit().putString("skipped_update_version", version).apply()
+    fun getSkippedVersion(): String? = prefs.getString("skipped_update_version", null)
 }

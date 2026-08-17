@@ -21,7 +21,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         PrefsManager.init(this)
-
         PlaylistDatabase.init(this)
 
         setSecureMode(PrefsManager.getSecureMode())
@@ -36,6 +35,8 @@ class MainActivity : AppCompatActivity() {
 
         val intent = Intent(this, PlaybackService::class.java)
         startService(intent)
+
+        UpdateManager.checkForUpdates(this, isManual = false)
 
         setContent {
             Surface(

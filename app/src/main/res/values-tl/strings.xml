@@ -254,4 +254,17 @@
     <string name="action_understand">Naiintindihan ko</string>
     <string name="action_back">Bumalik</string>
 
+    <string name="update_auto_check">Awtomatikong pag-check ng update</string>
+    <string name="update_auto_check_desc">Suriin ang mga bagong bersyon sa GitHub sa pag-start</string>
+    <string name="update_check_now">Mag-check ng update ngayon</string>
+    <string name="checking_updates">Nagmamasid ng mga update...</string>
+    <string name="no_updates_found">Nakalagay na sa iyo ang pinakabagong bersyon</string>
+    <string name="update_check_failed">Bigo sa pag-check ng mga update</string>
+    <string name="update_available">May available na update na %1$s</string>
+    <string name="update_available_desc">I-download at i-install ang bagong bersyon ng Pargelium.</string>
+    <string name="action_download">I-download</string>
+    <string name="action_skip">Laktawan</string>
+    <string name="downloading_update">Inii-download ang update...</string>
+    <string name="install_failed">Bigo sa pagpasimula ng pag-install</string>
+
 </resources>

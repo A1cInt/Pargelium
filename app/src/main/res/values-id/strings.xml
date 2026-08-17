@@ -257,4 +257,17 @@
     <string name="action_understand">Saya mengerti</string>
     <string name="action_back">Kembali</string>
 
+    <string name="update_auto_check">Pemeriksaan pembaruan otomatis</string>
+    <string name="update_auto_check_desc">Periksa versi baru di GitHub saat aplikasi dibuka</string>
+    <string name="update_check_now">Periksa pembaruan sekarang</string>
+    <string name="checking_updates">Memeriksa pembaruan...</string>
+    <string name="no_updates_found">Anda menggunakan versi terbaru</string>
+    <string name="update_check_failed">Gagal memeriksa pembaruan</string>
+    <string name="update_available">Pembaruan %1$s tersedia</string>
+    <string name="update_available_desc">Unduh dan pasang versi baru Pargelium.</string>
+    <string name="action_download">Unduh</string>
+    <string name="action_skip">Lewati</string>
+    <string name="downloading_update">Mengunduh pembaruan...</string>
+    <string name="install_failed">Gagal memulai pemasangan</string>
+
 </resources>
