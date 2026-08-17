@@ -266,4 +266,6 @@
     <string name="downloading_update">Downloading update...</string>
     <string name="install_failed">Failed to start installation</string>
 
+    <string name="action_play">play</string>
+
 </resources>

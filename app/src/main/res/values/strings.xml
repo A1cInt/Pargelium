@@ -271,4 +271,6 @@
     <string name="action_skip">Пропустить</string>
     <string name="downloading_update">Скачивание обновления...</string>
     <string name="install_failed">Ошибка запуска установки</string>
+
+    <string name="action_play">Играть</string>
 </resources>
