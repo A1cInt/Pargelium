@@ -2,11 +2,9 @@ package com.alcint.pargelium
 
 import android.net.Uri
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -18,6 +16,8 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 @Composable
 fun rememberDominantColor(uri: Uri?): Color {
@@ -29,6 +29,7 @@ fun rememberDominantColor(uri: Uri?): Color {
             color = Color.Unspecified
             return@LaunchedEffect
         }
+
         withContext(Dispatchers.IO) {
             val request = ImageRequest.Builder(context)
                 .data(uri)
@@ -39,39 +40,33 @@ fun rememberDominantColor(uri: Uri?): Color {
 
             val result = context.imageLoader.execute(request)
             if (result is SuccessResult) {
-                val palette = Palette.from((result.drawable).toBitmap()).generate()
+                val bitmap = result.drawable.toBitmap()
 
-                var extracted = palette.getVibrantColor(android.graphics.Color.TRANSPARENT)
-                if (extracted == android.graphics.Color.TRANSPARENT) {
-                    extracted = palette.getDominantColor(android.graphics.Color.TRANSPARENT)
-                }
-                if (extracted == android.graphics.Color.TRANSPARENT) {
-                    extracted = palette.getMutedColor(android.graphics.Color.TRANSPARENT)
+                val extractedInt = suspendCoroutine { continuation ->
+                    Palette.from(bitmap).generate { palette ->
+                        if (palette == null) {
+                            continuation.resume(android.graphics.Color.TRANSPARENT)
+                            return@generate
+                        }
+
+                        var extracted = palette.getVibrantColor(android.graphics.Color.TRANSPARENT)
+                        if (extracted == android.graphics.Color.TRANSPARENT) {
+                            extracted = palette.getDominantColor(android.graphics.Color.TRANSPARENT)
+                        }
+                        if (extracted == android.graphics.Color.TRANSPARENT) {
+                            extracted = palette.getMutedColor(android.graphics.Color.TRANSPARENT)
+                        }
+                        continuation.resume(extracted)
+                    }
                 }
 
-                color = if (extracted != android.graphics.Color.TRANSPARENT) Color(extracted) else Color.Unspecified
+                color = if (extractedInt != android.graphics.Color.TRANSPARENT) Color(extractedInt) else Color.Unspecified
             } else {
                 color = Color.Unspecified
             }
         }
     }
     return color
-}
-
-@Composable
-fun getAlbumGradient(seedColor: Color, isDark: Boolean): Brush {
-    val baseColor = if (seedColor != Color.Unspecified) seedColor else MaterialTheme.colorScheme.surface
-    val endColor = MaterialTheme.colorScheme.background
-
-    val startColor = if (seedColor != Color.Unspecified) baseColor.copy(alpha = 0.45f) else Color.Transparent
-
-    return Brush.verticalGradient(
-        colors = listOf(
-            startColor,
-            endColor.copy(alpha = 0.8f),
-            endColor
-        )
-    )
 }
 
 fun mixColors(foreground: Color, background: Color, ratio: Float): Color {
@@ -97,7 +92,6 @@ fun boostColor(color: Color, isLightMode: Boolean): Color {
 
 @Composable
 fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Boolean): ColorScheme {
-    // 0: Auto, 1: Light, 2: Dark, 3: AMOLED, 4: Opal, 5: Pargelium
     val actualMode = if (themeMode == 0) (if (isSystemDark) 2 else 1) else themeMode
 
     return remember(seedColor, actualMode) {
@@ -106,11 +100,11 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
 
         fun makePalette(base: Color, bgRatio: Float, surfRatio: Float, contRatio: Float, highRatio: Float, variantRatio: Float): List<Color> {
             return listOf(
-                mixColors(boosted, base, bgRatio),       // 0: Background
-                mixColors(boosted, base, surfRatio),     // 1: Surface
-                mixColors(boosted, base, contRatio),     // 2: Container
-                mixColors(boosted, base, highRatio),     // 3: Container High
-                mixColors(boosted, base, variantRatio)   // 4: Variant
+                mixColors(boosted, base, bgRatio),
+                mixColors(boosted, base, surfRatio),
+                mixColors(boosted, base, contRatio),
+                mixColors(boosted, base, highRatio),
+                mixColors(boosted, base, variantRatio)
             )
         }
 
@@ -122,7 +116,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
 
         when (actualMode) {
             1 -> {
-                // Светлая тема (береги глаза)
                 p = makePalette(Color(0xFFFAFAFA), 0.03f, 0.08f, 0.12f, 0.18f, 0.28f)
                 primaryColor = mixColors(boosted, Color.Black, 0.8f)
                 onPrimaryColor = Color.White
@@ -130,7 +123,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onPrimaryContainerColor = mixColors(boosted, Color.Black, 0.9f)
             }
             3 -> {
-                // AMOLED, это круто
                 p = makePalette(Color.Black, 0.00f, 0.03f, 0.08f, 0.12f, 0.18f)
                 primaryColor = mixColors(boosted, Color.White, 0.8f)
                 onPrimaryColor = Color.Black
@@ -138,7 +130,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onPrimaryContainerColor = mixColors(boosted, Color.White, 0.9f)
             }
             4 -> {
-                // Опал
                 p = makePalette(Color(0xFF101014), 0.10f, 0.14f, 0.18f, 0.24f, 0.32f)
                 primaryColor = mixColors(boosted, Color.White, 0.8f)
                 onPrimaryColor = Color.Black
@@ -146,7 +137,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onPrimaryContainerColor = mixColors(boosted, Color.White, 0.9f)
             }
             5 -> {
-                // Паргелия
                 val baseColorful = mixColors(boosted, Color.Black, 0.3f)
                 p = makePalette(baseColorful, 0.15f, 0.25f, 0.35f, 0.45f, 0.55f)
                 primaryColor = Color.White
@@ -155,7 +145,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onPrimaryContainerColor = Color.White
             }
             else -> {
-                // Тёмная тема
                 p = makePalette(Color(0xFF141414), 0.05f, 0.09f, 0.14f, 0.19f, 0.28f)
                 primaryColor = mixColors(boosted, Color.White, 0.8f)
                 onPrimaryColor = Color.Black
