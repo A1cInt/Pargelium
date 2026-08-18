@@ -867,18 +867,76 @@ fun FullPlayerScreen(
                             }
                         }
 
-                        Spacer(Modifier.height(24.dp))
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val repeatIcon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
+                                val repeatTint = if (repeatMode == Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.5f) else iconTint
 
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-                            val repeatIcon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
-                            val repeatTint = if (repeatMode == Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.5f) else iconTint
-                            IconButton(onClick = onToggleRepeat) { Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint) }
+                                Surface(
+                                    onClick = onToggleRepeat,
+                                    shape = CircleShape,
+                                    color = Color.White.copy(alpha = 0.08f),
+                                    modifier = Modifier.size(48.dp).tiltOnTouch()
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint, modifier = Modifier.size(22.dp))
+                                    }
+                                }
 
-                            IconButton(onClick = onSkipPrevious, modifier = Modifier.size(56.dp)) { Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(36.dp), tint = Color.White) }
-                            FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(72.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(36.dp)) }
-                            IconButton(onClick = onSkipNext, modifier = Modifier.size(56.dp)) { Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(36.dp), tint = Color.White) }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = onSkipPrevious,
+                                        modifier = Modifier.size(52.dp).tiltOnTouch()
+                                    ) {
+                                        Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(36.dp), tint = Color.White)
+                                    }
 
-                            IconButton(onClick = { showBookmarks = true }) { Icon(Icons.Default.Flag, null, tint = Color.White.copy(0.8f)) }
+                                    Surface(
+                                        onClick = onPlayPause,
+                                        shape = RoundedCornerShape(24.dp),
+                                        color = Color.White,
+                                        modifier = Modifier.size(64.dp).tiltOnTouch()
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                null,
+                                                modifier = Modifier.size(32.dp),
+                                                tint = Color.Black
+                                            )
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = onSkipNext,
+                                        modifier = Modifier.size(52.dp).tiltOnTouch()
+                                    ) {
+                                        Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(36.dp), tint = Color.White)
+                                    }
+                                }
+
+                                Surface(
+                                    onClick = { showBookmarks = true },
+                                    shape = CircleShape,
+                                    color = Color.White.copy(alpha = 0.08f),
+                                    modifier = Modifier.size(48.dp).tiltOnTouch()
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Flag, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
                         }
 
                         Spacer(Modifier.weight(1f))
@@ -1024,16 +1082,75 @@ fun FullPlayerScreen(
 
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             val repeatIcon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
                             val repeatTint = if (repeatMode == Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.5f) else iconTint
-                            IconButton(onClick = onToggleRepeat) { Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint) }
 
-                            IconButton(onClick = onSkipPrevious, modifier = Modifier.size(64.dp)) { Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(42.dp), tint = Color.White) }
-                            FilledIconButton(onClick = onPlayPause, modifier = Modifier.size(80.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black)) { Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, modifier = Modifier.size(40.dp)) }
-                            IconButton(onClick = onSkipNext, modifier = Modifier.size(64.dp)) { Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(42.dp), tint = Color.White) }
-                            IconButton(onClick = { showQueue = true }) { Icon(Icons.Default.QueueMusic, null, tint = Color.White) }
+                            Surface(
+                                onClick = onToggleRepeat,
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.08f),
+                                modifier = Modifier.size(56.dp).tiltOnTouch()
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint, modifier = Modifier.size(24.dp))
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                IconButton(
+                                    onClick = onSkipPrevious,
+                                    modifier = Modifier.size(64.dp).tiltOnTouch()
+                                ) {
+                                    Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(42.dp), tint = Color.White)
+                                }
+
+                                Surface(
+                                    onClick = onPlayPause,
+                                    shape = RoundedCornerShape(28.dp),
+                                    color = Color.White,
+                                    modifier = Modifier.size(80.dp).tiltOnTouch()
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            null,
+                                            modifier = Modifier.size(40.dp),
+                                            tint = Color.Black
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = onSkipNext,
+                                    modifier = Modifier.size(64.dp).tiltOnTouch()
+                                ) {
+                                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(42.dp), tint = Color.White)
+                                }
+                            }
+
+                            Surface(
+                                onClick = { showQueue = true },
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.08f),
+                                modifier = Modifier.size(56.dp).tiltOnTouch()
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
+                            }
                         }
+
                         Spacer(modifier = Modifier.height(24.dp))
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
                             if (isRadio) {
