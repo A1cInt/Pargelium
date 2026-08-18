@@ -65,7 +65,7 @@ fun RadioScreen(
 
     val tabs = listOf(
         stringResource(id = R.string.tab_online_radio),
-        "Стриминг"
+        stringResource(id = R.string.streaming)
     )
 
     LaunchedEffect(RadioState.selectedTab) {

@@ -80,10 +80,12 @@ fun SettingsScreen(
     var showAdvancedWarningDialog by remember { mutableStateOf(false) }
 
     val currentLocales = AppCompatDelegate.getApplicationLocales()
-    val currentLanguageCode = if (!currentLocales.isEmpty) currentLocales[0]?.language else Locale.getDefault().language
+    val isSystemLanguage = currentLocales.isEmpty
+    val currentLanguageCode = if (!isSystemLanguage) currentLocales[0]?.language else Locale.getDefault().language
 
-    val supportedLanguages = remember(currentLanguageCode) {
+    val supportedLanguages = remember(currentLanguageCode, isSystemLanguage) {
         listOf(
+            "auto" to context.getString(R.string.lang_system),
             "ru" to context.getString(R.string.lang_ru),
             "en" to context.getString(R.string.lang_en),
             "es" to context.getString(R.string.lang_es),
@@ -104,7 +106,11 @@ fun SettingsScreen(
         )
     }
 
-    val currentLanguageName = supportedLanguages.find { it.first == currentLanguageCode }?.second ?: stringResource(R.string.lang_ru)
+    val currentLanguageName = if (isSystemLanguage) {
+        stringResource(R.string.lang_system)
+    } else {
+        supportedLanguages.find { it.first == currentLanguageCode }?.second ?: stringResource(R.string.lang_system)
+    }
 
     val themes = remember {
         listOf(
@@ -540,7 +546,7 @@ fun SettingsScreen(
                 )
                 LazyColumn {
                     items(supportedLanguages) { (code, name) ->
-                        val isSelected = currentLanguageCode == code
+                        val isSelected = if (code == "auto") isSystemLanguage else (!isSystemLanguage && currentLanguageCode == code)
                         ListItem(
                             headlineContent = {
                                 Text(
@@ -555,7 +561,11 @@ fun SettingsScreen(
                                 }
                             },
                             modifier = Modifier.clickable {
-                                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(code))
+                                if (code == "auto") {
+                                    AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+                                } else {
+                                    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(code))
+                                }
                                 showLanguageSheet = false
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)

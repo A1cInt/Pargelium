@@ -270,4 +270,6 @@
     <string name="downloading_update">Mengunduh pembaruan...</string>
     <string name="install_failed">Gagal memulai pemasangan</string>
 
+    <string name="lang_system">Sesuai sistem</string>
+
 </resources>

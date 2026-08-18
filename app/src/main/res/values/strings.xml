@@ -1,43 +1,43 @@
 <resources>
     <string name="app_name">Pargelium</string>
 
-    <string name="music_not_found">Музыка не найдена</string>
+    <string name="music_not_found">Music not found</string>
 
-    <string name="nav_library">Библ.</string>
-    <string name="nav_radio">Радио</string>
-    <string name="nav_playlists">Плейлисты</string>
+    <string name="nav_library">Lib</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Playlists</string>
     <string name="nav_eq">EQ</string>
-    <string name="nav_settings">Настр.</string>
+    <string name="nav_settings">Settings</string>
 
-    <string name="lyrics_not_found">Текст песни не найден</string>
-    <string name="header_lyrics">ТЕКСТ ПЕСНИ</string>
-    <string name="header_live_radio">LIVE РАДИО</string>
-    <string name="header_now_playing">СЕЙЧАС ИГРАЕТ</string>
-    <string name="status_live_broadcast">ПРЯМОЙ ЭФИР</string>
-    <string name="meta_unknown">НЕИЗВЕСТНО</string>
+    <string name="lyrics_not_found">Lyrics not found</string>
+    <string name="header_lyrics">LYRICS</string>
+    <string name="header_live_radio">LIVE RADIO</string>
+    <string name="header_now_playing">NOW PLAYING</string>
+    <string name="status_live_broadcast">LIVE BROADCAST</string>
+    <string name="meta_unknown">UNKNOWN</string>
 
     <string name="radio_title">Online Radio</string>
-    <string name="radio_search_hint">Жанр, страна или название...</string>
+    <string name="radio_search_hint">Genre, country, or title...</string>
 
-    <string name="settings_title">Настройки</string>
+    <string name="settings_title">Settings</string>
 
-    <string name="settings_appearance">Внешний вид</string>
-    <string name="theme_auto">Автоматически</string>
-    <string name="theme_auto_desc">Как в системе</string>
-    <string name="theme_light">Светлая тема</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="theme_auto">Auto</string>
+    <string name="theme_auto_desc">System default</string>
+    <string name="theme_light">Light Theme</string>
     <string name="theme_light_desc">Aurora Light</string>
-    <string name="theme_dark">Тёмная тема</string>
+    <string name="theme_dark">Dark Theme</string>
     <string name="theme_dark_desc">Aurora Dark</string>
     <string name="theme_amoled">AMOLED</string>
-    <string name="theme_amoled_desc">Идеальный чёрный</string>
-    <string name="theme_opal">Чёрный Опал</string>
-    <string name="theme_opal_desc">Глубокий оттенок</string>
+    <string name="theme_amoled_desc">Pitch black</string>
+    <string name="theme_opal">Black Opal</string>
+    <string name="theme_opal_desc">Deep shade</string>
 
-    <string name="settings_language">Язык / Language</string>
+    <string name="settings_language">Language / Язык</string>
     <string name="lang_ru">Русский</string>
     <string name="lang_ru_desc">Russian</string>
     <string name="lang_en">English</string>
-    <string name="lang_en_desc">Английский</string>
+    <string name="lang_en_desc">English</string>
     <string name="lang_es">Español</string>
     <string name="lang_it">Italiano</string>
     <string name="lang_ja">日本語</string>
@@ -54,14 +54,14 @@
     <string name="lang_id">Bahasa Indonesia</string>
     <string name="lang_tl">Tagalog</string>
 
-    <string name="settings_privacy">Конфиденциальность</string>
-    <string name="privacy_secure">Приватный режим</string>
-    <string name="privacy_secure_desc">Запретить скриншоты и запись экрана</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="privacy_secure">Secure mode</string>
+    <string name="privacy_secure_desc">Prevent screenshots and screen recording</string>
 
-    <string name="settings_data">Данные</string>
-    <string name="data_clear_cache">Очистить кэш текстов</string>
-    <string name="data_clear_cache_desc">Удалить сохраненные оффлайн тексты</string>
-    <string name="msg_cache_cleared">Удалено %1$d файлов текстов</string>
+    <string name="settings_data">Data</string>
+    <string name="data_clear_cache">Clear lyrics cache</string>
+    <string name="data_clear_cache_desc">Delete saved offline lyrics</string>
+    <string name="msg_cache_cleared">Cleared %1$d lyrics files</string>
 
     <string name="eq_title">Pargelium EQ</string>
     <string name="eq_subtitle">Pro DSP Engine</string>
@@ -77,200 +77,200 @@
     <string name="effect_crossfeed">Headphone Mode</string>
     <string name="effect_crossfeed_desc">Natural sound field</string>
 
-    <string name="preset_flat">Ровный</string>
-    <string name="preset_bass_boost">Бас буст</string>
-    <string name="preset_rock">Рок</string>
-    <string name="preset_pop">Поп</string>
-    <string name="preset_vocal">Вокал</string>
+    <string name="preset_flat">Flat</string>
+    <string name="preset_bass_boost">Bass Boost</string>
+    <string name="preset_rock">Rock</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Vocal</string>
     <string name="preset_harman">Harman Target</string>
 
-    <string name="txt_disc">Диск %1$d</string>
+    <string name="txt_disc">Disc %1$d</string>
     <plurals name="tracks_count">
-        <item quantity="one">%1$d трек</item>
-        <item quantity="few">%1$d трека</item>
-        <item quantity="many">%1$d треков</item>
-        <item quantity="other">%1$d треков</item>
+        <item quantity="one">%1$d track</item>
+        <item quantity="other">%1$d tracks</item>
     </plurals>
 
-    <string name="track_bookmarks">Метки трека</string>
-    <string name="new_bookmark">Новая метка</string>
-    <string name="create_bookmark">Создать метку</string>
-    <string name="no_bookmarks_yet">Здесь пока нет меток</string>
-    <string name="action_edit">Изменить</string>
-    <string name="action_delete">Удалить</string>
-    <string name="edit_bookmark">Изменить метку</string>
-    <string name="bookmark_name">Название метки</string>
-    <string name="bookmark_time_hint">Время (ММ:СС или ЧЧ:ММ:СС)</string>
-    <string name="action_save">Сохранить</string>
-    <string name="action_cancel">Отмена</string>
-    <string name="playback_queue">Очередь воспроизведения</string>
-    <string name="action_repeat">Повтор</string>
-    <string name="choose_canvas">Выбрать Canvas (Видео/GIF)</string>
-    <string name="reset_canvas">Сбросить Canvas</string>
-    <string name="background">Фон</string>
-    <string name="bookmarks">Метки</string>
-    <string name="translation">Перевод</string>
-    <string name="action_collapse">Свернуть</string>
-    <string name="action_lyrics">Текст</string>
+    <string name="track_bookmarks">Track bookmarks</string>
+    <string name="new_bookmark">New bookmark</string>
+    <string name="create_bookmark">Create bookmark</string>
+    <string name="no_bookmarks_yet">No bookmarks yet</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="edit_bookmark">Edit bookmark</string>
+    <string name="bookmark_name">Bookmark name</string>
+    <string name="bookmark_time_hint">Time (MM:SS or HH:MM:SS)</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="playback_queue">Playback queue</string>
+    <string name="action_repeat">Repeat</string>
+    <string name="choose_canvas">Choose Canvas (Video/GIF)</string>
+    <string name="reset_canvas">Reset Canvas</string>
+    <string name="background">Background</string>
+    <string name="bookmarks">Bookmarks</string>
+    <string name="translation">Translation</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_lyrics">Lyrics</string>
 
-    <string name="unknown_artist">Неизвестный исполнитель</string>
-    <string name="artist_not_found">Исполнитель не найден в медиатеке</string>
-    <string name="play_next_msg">Слушать следующим</string>
-    <string name="added_to_queue_msg">Добавлено в очередь</string>
-    <string name="watch_settings_saved">Настройка часов сохранена</string>
-    <string name="search_hint">Поиск...</string>
-    <string name="search_no_results">Ничего не найдено</string>
-    <string name="tab_albums">Альбомы</string>
-    <string name="tab_artists">Исполнители</string>
-    <string name="tab_tracks">Треки</string>
-    <string name="no_artists">Нет исполнителей</string>
-    <string name="add_to_playlist">Добавить в плейлист</string>
-    <string name="no_playlists">Нет плейлистов.</string>
-    <string name="added_to_playlist_msg">Добавлено в %1$s</string>
-    <string name="description_label">Описание</string>
-    <string name="click_to_add_description">Нажмите, чтобы добавить описание...</string>
-    <string name="popular_tracks">Популярные треки</string>
+    <string name="unknown_artist">Unknown Artist</string>
+    <string name="artist_not_found">Artist not found in library</string>
+    <string name="play_next_msg">Play next</string>
+    <string name="added_to_queue_msg">Added to queue</string>
+    <string name="watch_settings_saved">Watch settings saved</string>
+    <string name="search_hint">Search...</string>
+    <string name="search_no_results">No results found</string>
+    <string name="tab_albums">Albums</string>
+    <string name="tab_artists">Artists</string>
+    <string name="tab_tracks">Tracks</string>
+    <string name="no_artists">No artists</string>
+    <string name="add_to_playlist">Add to playlist</string>
+    <string name="no_playlists">No playlists.</string>
+    <string name="added_to_playlist_msg">Added to %1$s</string>
+    <string name="description_label">Description</string>
+    <string name="click_to_add_description">Tap to add description...</string>
+    <string name="popular_tracks">Popular tracks</string>
 
-    <string name="profile_banner_desc">Баннер профиля</string>
-    <string name="unknown_yet">Пока неизвестно</string>
-    <string name="rank_novice">Новичок</string>
-    <string name="rank_listener">Слушатель</string>
-    <string name="rank_melomane">Меломан</string>
-    <string name="rank_audiophile">Аудиофил</string>
-    <string name="rank_music_maniac">Музыкальный маньяк</string>
-    <string name="plays_count_label">Прослушиваний</string>
-    <string name="favorite_artist_label">Любимый артист</string>
-    <string name="top_10_artists">Топ 10 исполнителей</string>
-    <string name="your_music_dna">Твоя музыкальная ДНК</string>
-    <string name="listen_music_for_stats">Слушай музыку, и здесь появится твоя статистика!</string>
-    <string name="music_ranks_title">Музыкальные звания</string>
-    <string name="tracks_left_for_rank_fmt">До звания «%1$s» осталось %2$d треков</string>
-    <string name="max_rank_achieved">Вы достигли максимального звания! Вы легенда.</string>
-    <string name="rank_unlocked">Разблокировано</string>
-    <string name="rank_required_plays_fmt">Требуется: %1$d прослушиваний</string>
+    <string name="profile_banner_desc">Profile banner</string>
+    <string name="unknown_yet">Unknown yet</string>
+    <string name="rank_novice">Novice</string>
+    <string name="rank_listener">Listener</string>
+    <string name="rank_melomane">Music Lover</string>
+    <string name="rank_audiophile">Audiophile</string>
+    <string name="rank_music_maniac">Music Maniac</string>
+    <string name="plays_count_label">Plays</string>
+    <string name="favorite_artist_label">Favorite Artist</string>
+    <string name="top_10_artists">Top 10 Artists</string>
+    <string name="your_music_dna">Your Music DNA</string>
+    <string name="listen_music_for_stats">Listen to music, and your stats will appear here!</string>
+    <string name="music_ranks_title">Music Ranks</string>
+    <string name="tracks_left_for_rank_fmt">%2$d tracks left to reach «%1$s»</string>
+    <string name="max_rank_achieved">You have reached the maximum rank! You are a legend.</string>
+    <string name="rank_unlocked">Unlocked</string>
+    <string name="rank_required_plays_fmt">Required: %1$d plays</string>
 
-    <string name="search_error_fmt">Ошибка поиска: %1$s</string>
-    <string name="tab_online_radio">Онлайн Радио</string>
+    <string name="search_error_fmt">Search error: %1$s</string>
+    <string name="tab_online_radio">Online Radio</string>
     <string name="tab_flac">FLAC</string>
     <string name="tab_jiosaavn">JioSaavn</string>
-    <string name="search_station_hint">Поиск станции...</string>
-    <string name="search_flac_hint">Поиск FLAC...</string>
-    <string name="search_saavn_hint">Поиск в JioSaavn...</string>
-    <string name="stream_error_fmt">Ошибка стрима: %1$s</string>
+    <string name="search_station_hint">Search station...</string>
+    <string name="search_flac_hint">Search FLAC...</string>
+    <string name="search_saavn_hint">Search in JioSaavn...</string>
+    <string name="stream_error_fmt">Stream error: %1$s</string>
 
     <plurals name="plays_times">
-        <item quantity="one">%1$d раз</item>
-        <item quantity="few">%1$d раза</item>
-        <item quantity="many">%1$d раз</item>
-        <item quantity="other">%1$d раз</item>
+        <item quantity="one">%1$d time</item>
+        <item quantity="other">%1$d times</item>
     </plurals>
 
-    <string name="new_playlist">Новый плейлист</string>
-    <string name="create_your_collection">Создать свою подборку</string>
-    <string name="click_to_add_banner">Нажмите, чтобы добавить баннер</string>
-    <string name="playlist_empty_msg">Плейлист пуст. Нажмите \'+\' чтобы добавить музыку.</string>
-    <string name="playlist_name_label">Название</string>
-    <string name="action_create">Создать</string>
-    <string name="add_tracks_title">Добавить треки</string>
-    <string name="search_track_hint">Поиск трека...</string>
-    <string name="cd_banner">Баннер</string>
-    <string name="cd_banner_blurred">Размытый баннер</string>
-    <string name="cd_cover">Обложка</string>
-    <string name="cd_track_cover">Обложка трека</string>
+    <string name="new_playlist">New playlist</string>
+    <string name="create_your_collection">Create your collection</string>
+    <string name="click_to_add_banner">Tap to add banner</string>
+    <string name="playlist_empty_msg">Playlist is empty. Tap \'+\' to add music.</string>
+    <string name="playlist_name_label">Name</string>
+    <string name="action_create">Create</string>
+    <string name="add_tracks_title">Add tracks</string>
+    <string name="search_track_hint">Search track...</string>
+    <string name="cd_banner">Banner</string>
+    <string name="cd_banner_blurred">Blurred banner</string>
+    <string name="cd_cover">Cover</string>
+    <string name="cd_track_cover">Track cover</string>
 
-    <string name="sound_effects_title">Звуковые эффекты</string>
-    <string name="eq_section_title">Эквализация</string>
-    <string name="click_to_select_model">Нажмите, чтобы выбрать модель</string>
-    <string name="connected_device_fmt">Подключено: %1$s</string>
-    <string name="autoeq_title">AutoEQ (База наушников)</string>
-    <string name="ten_band_eq_title">10-Полосный Эквалайзер</string>
-    <string name="ten_band_eq_desc">Ручная настройка частот</string>
-    <string name="reset_to_zero">Сбросить по нулям</string>
-    <string name="bass_management_title">Управление Басом</string>
-    <string name="deep_bass_title">Глубокий Бас</string>
-    <string name="deep_bass_desc">Плотный и чистый студийный бас без искажений и хрипов</string>
-    <string name="setting_power">Мощность</string>
-    <string name="setting_frequency">Частота</string>
-    <string name="unit_hz">Гц</string>
-    <string name="space_and_effects_title">Пространство и Эффекты</string>
-    <string name="reverb_title">Реверберация (Freeverb)</string>
-    <string name="reverb_desc">Студийное акустическое эхо зала</string>
-    <string name="setting_room_size">Размер комнаты</string>
-    <string name="setting_wall_damp">Поглощение стен</string>
-    <string name="setting_mix_level">Уровень (Mix)</string>
-    <string name="spatializer_title">3D Стерео (Spatializer)</string>
-    <string name="spatializer_desc">Расширяет сцену за пределы наушников</string>
-    <string name="setting_stereo_width">Ширина стереобазы</string>
-    <string name="haas_title">Эффект Хааса (Haas)</string>
-    <string name="haas_desc">Психоакустическое выведение звука \'из головы\'</string>
-    <string name="setting_right_delay">Задержка правого канала</string>
-    <string name="unit_ms">мс</string>
-    <string name="exciter_title">Восстановление (Exciter)</string>
-    <string name="exciter_desc">Кристаллизация высоких частот</string>
-    <string name="setting_intensity">Интенсивность</string>
-    <string name="tube_amp_title">Ламповый усилитель</string>
-    <string name="tube_amp_desc">Теплая аналоговая сатурация</string>
-    <string name="crossfeed_title">Кроссфид (Crossfeed)</string>
-    <string name="crossfeed_desc">Смешивает каналы для естественного звучания</string>
-    <string name="select_headphone_model">Выберите модель наушников</string>
+    <string name="sound_effects_title">Sound Effects</string>
+    <string name="eq_section_title">Equalization</string>
+    <string name="click_to_select_model">Tap to select model</string>
+    <string name="connected_device_fmt">Connected: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Headphone Base)</string>
+    <string name="ten_band_eq_title">10-Band Equalizer</string>
+    <string name="ten_band_eq_desc">Manual frequency tuning</string>
+    <string name="reset_to_zero">Reset to zero</string>
+    <string name="bass_management_title">Bass Management</string>
+    <string name="deep_bass_title">Deep Bass</string>
+    <string name="deep_bass_desc">Tight and clear studio bass without distortion</string>
+    <string name="setting_power">Power</string>
+    <string name="setting_frequency">Frequency</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Space and Effects</string>
+    <string name="reverb_title">Reverb (Freeverb)</string>
+    <string name="reverb_desc">Studio acoustic hall echo</string>
+    <string name="setting_room_size">Room size</string>
+    <string name="setting_wall_damp">Wall dampening</string>
+    <string name="setting_mix_level">Level (Mix)</string>
+    <string name="spatializer_title">3D Stereo (Spatializer)</string>
+    <string name="spatializer_desc">Expands the soundstage beyond headphones</string>
+    <string name="setting_stereo_width">Stereo width</string>
+    <string name="haas_title">Haas Effect</string>
+    <string name="haas_desc">Psychoacoustic out-of-head sound</string>
+    <string name="setting_right_delay">Right channel delay</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Restoration (Exciter)</string>
+    <string name="exciter_desc">High-frequency crystallization</string>
+    <string name="setting_intensity">Intensity</string>
+    <string name="tube_amp_title">Tube Amplifier</string>
+    <string name="tube_amp_desc">Warm analog saturation</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Mixes channels for natural sound</string>
+    <string name="select_headphone_model">Select headphone model</string>
 
     <string-array name="reverb_modes">
-        <item>Своя</item>
-        <item>Студия</item>
-        <item>Комната</item>
-        <item>Зал</item>
-        <item>Собор</item>
-        <item>Бездна</item>
+        <item>Custom</item>
+        <item>Studio</item>
+        <item>Room</item>
+        <item>Hall</item>
+        <item>Cathedral</item>
+        <item>Abyss</item>
     </string-array>
 
-    <string name="theme_pargelia">Паргелия</string>
-    <string name="settings_integration">Интеграция</string>
-    <string name="integration_auto_detect">Распознавать наушники</string>
-    <string name="integration_auto_detect_desc">Автоматически загружает AutoEQ профиль</string>
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integration</string>
+    <string name="integration_auto_detect">Detect headphones</string>
+    <string name="integration_auto_detect_desc">Automatically loads AutoEQ profile</string>
     <string name="integration_wear_api">Pargelium Wear API</string>
-    <string name="integration_wear_api_desc">Требует часы на WearOS</string>
-    <string name="data_reset_autoeq">Сбросить профиль AutoEQ</string>
-    <string name="data_reset_autoeq_desc">Удалить загруженный пресет частот</string>
-    <string name="msg_autoeq_reset">Настройки AutoEQ сброшены</string>
-    <string name="settings_contact">Связаться со мной</string>
-    <string name="contact_pm">Личные сообщения</string>
+    <string name="integration_wear_api_desc">Requires WearOS watch</string>
+    <string name="data_reset_autoeq">Reset AutoEQ profile</string>
+    <string name="data_reset_autoeq_desc">Remove downloaded frequency preset</string>
+    <string name="msg_autoeq_reset">AutoEQ settings reset</string>
+    <string name="settings_contact">Contact me</string>
+    <string name="contact_pm">Private Messages</string>
     <string name="contact_pm_desc">Telegram: @alcint</string>
-    <string name="contact_channel">Мой канал</string>
+    <string name="contact_channel">My channel</string>
     <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
-    <string name="choose_language">Выберите язык</string>
+    <string name="choose_language">Choose language</string>
 
-    <string name="settings_playback">Воспроизведение</string>
-    <string name="settings_advanced">Продвинутые настройки</string>
-    <string name="settings_about">О приложении</string>
+    <string name="settings_playback">Playback</string>
+    <string name="settings_advanced">Advanced Settings</string>
+    <string name="settings_about">About</string>
 
-    <string name="settings_track_info">Данные о треке</string>
-    <string name="settings_track_info_desc">Показывать битрейт, частоту дискретизации и формат (например, FLAC)</string>
+    <string name="settings_track_info">Track info</string>
+    <string name="settings_track_info_desc">Show bitrate, sample rate, and format (e.g., FLAC)</string>
 
-    <string name="adv_dev_mode">Режим разработчика</string>
-    <string name="adv_dev_mode_desc">Открытие доступа к системным переключателям плеера</string>
-    <string name="adv_module_control">Управление модулями</string>
-    <string name="adv_module_control_desc">Включение и отключение компонентов приложения</string>
+    <string name="adv_dev_mode">Developer mode</string>
+    <string name="adv_dev_mode_desc">Grant access to system player toggles</string>
+    <string name="adv_module_control">Module management</string>
+    <string name="adv_module_control_desc">Enable or disable app components</string>
 
-    <string name="about_version">Версия приложения</string>
-    <string name="about_version_desc">Pargelium 1.1\nПлеер, который делает то, что должен.</string>
+    <string name="about_version">App version</string>
+    <string name="about_version_desc">Pargelium 1.1\nThe player that does what it should.</string>
 
-    <string name="adv_warning_title">Внимание</string>
-    <string name="adv_warning_text">Эти настройки предназначены для глубокой кастомизации. Отключение системных компонентов (стриминг, визуализация, эквалайзер) может привести к неожиданному поведению приложения или его нестабильности.\n\nВы уверены, что хотите продолжить?</string>
-    <string name="action_understand">Я понимаю</string>
-    <string name="action_back">Назад</string>
+    <string name="adv_warning_title">Warning</string>
+    <string name="adv_warning_text">These settings are intended for deep customization. Disabling system components (streaming, visualization, equalizer) may lead to unexpected app behavior or instability.\n\nAre you sure you want to continue?</string>
+    <string name="action_understand">I understand</string>
+    <string name="action_back">Back</string>
 
-    <string name="update_auto_check">Автоматическая проверка обновлений</string>
-    <string name="update_auto_check_desc">Проверять наличие новых версий на GitHub при запуске</string>
-    <string name="update_check_now">Проверить обновления сейчас</string>
-    <string name="checking_updates">Проверка обновлений...</string>
-    <string name="no_updates_found">У вас установлена последняя версия</string>
-    <string name="update_check_failed">Не удалось проверить обновления</string>
-    <string name="update_available">Доступно обновление %1$s</string>
-    <string name="update_available_desc">Скачайте и установите новую версию Pargelium.</string>
-    <string name="action_download">Скачать</string>
-    <string name="action_skip">Пропустить</string>
-    <string name="downloading_update">Скачивание обновления...</string>
-    <string name="install_failed">Ошибка запуска установки</string>
+    <string name="update_auto_check">Auto update check</string>
+    <string name="update_auto_check_desc">Check for new versions on GitHub at startup</string>
+    <string name="update_check_now">Check for updates now</string>
+    <string name="checking_updates">Checking for updates...</string>
+    <string name="no_updates_found">You have the latest version</string>
+    <string name="update_check_failed">Failed to check for updates</string>
+    <string name="update_available">Update %1$s available</string>
+    <string name="update_available_desc">Download and install the new version of Pargelium.</string>
+    <string name="action_download">Download</string>
+    <string name="action_skip">Skip</string>
+    <string name="downloading_update">Downloading update...</string>
+    <string name="install_failed">Failed to launch installation</string>
 
-    <string name="action_play">Играть</string>
+    <string name="action_play">Play</string>
+
+    <string name="lang_system">System default</string>
+
+    <string name="streaming">Streaming</string>
 </resources>
