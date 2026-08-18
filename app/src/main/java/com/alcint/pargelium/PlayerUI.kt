@@ -530,6 +530,7 @@ fun FullPlayerScreen(
     var showQueue by remember { mutableStateOf(false) }
     var showBookmarks by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<List<LyricLine>>(emptyList()) }
+    var isCoverExpanded by remember { mutableStateOf(false) }
 
     val trackKey = remember(track.artist, track.title) {
         (track.artist.hashCode() xor track.title.hashCode()).toString()
@@ -689,6 +690,11 @@ fun FullPlayerScreen(
     }
 
     val blurRadius by animateDpAsState(targetValue = if (showLyrics) 25.dp else 0.dp, animationSpec = tween(600, easing = LinearOutSlowInEasing), label = "mainBlur")
+    val showFullscreenCover = isCoverExpanded || canvasUri != null
+
+    val backgroundState = remember(canvasUri, showFullscreenCover) {
+        if (canvasUri != null) "canvas" else if (showFullscreenCover) "cover" else "aurora"
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
@@ -699,36 +705,67 @@ fun FullPlayerScreen(
         }
 
         Crossfade(
-            targetState = canvasUri,
-            animationSpec = tween(1000),
+            targetState = backgroundState,
+            animationSpec = tween(800),
             label = "bg_clear",
             modifier = Modifier.fillMaxSize()
-        ) { uri ->
-            if (uri != null) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (isVideo) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            VideoBackground(videoUri = uri)
-                            if (showLyrics) {
-                                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+        ) { state ->
+            when (state) {
+                "canvas" -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (isVideo) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                VideoBackground(videoUri = canvasUri!!)
+                                if (showLyrics) {
+                                    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+                                }
                             }
+                        } else {
+                            AsyncImage(
+                                model = ImageRequest.Builder(appContext).data(canvasUri).build(),
+                                imageLoader = imageLoader,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = bgModifier
+                            )
                         }
-                    } else {
+                    }
+                }
+                "cover" -> {
+                    val saavnTrack = SaavnApi.trackCache[track.id]
+                    val artModel: Any? = when {
+                        saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
+                        track.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.albumId)
+                        else -> null
+                    }
+                    if (artModel != null) {
                         AsyncImage(
-                            model = ImageRequest.Builder(appContext).data(uri).build(),
+                            model = ImageRequest.Builder(appContext).data(artModel).build(),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = bgModifier
                         )
+                    } else {
+                        AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
                     }
                 }
-            } else {
-                AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
+                "aurora" -> {
+                    AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
+                }
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(0.0f to Color.Transparent, 0.6f to Color.Black.copy(alpha = 0.4f), 1.0f to Color.Black.copy(alpha = 0.8f))))
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0.0f to Color.Black.copy(alpha = 0.4f),
+                    0.15f to Color.Transparent,
+                    0.6f to Color.Black.copy(alpha = 0.4f),
+                    1.0f to Color.Black.copy(alpha = 0.8f)
+                )
+            )
+        )
 
         val parallaxTransitionSpec: AnimatedContentTransitionScope<Boolean>.() -> ContentTransform = remember {
             {
@@ -752,6 +789,7 @@ fun FullPlayerScreen(
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             val isLandscape = maxWidth > maxHeight || maxWidth > 600.dp
+            val coverAlpha by animateFloatAsState(targetValue = if (backgroundState != "aurora") 0f else 1f, animationSpec = tween(400), label = "coverAlpha")
 
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -764,25 +802,36 @@ fun FullPlayerScreen(
                             if (isLyricsVisible) {
                                 LyricsView(lyrics = lyrics, currentPosition = currentPosition, onLineClick = { onSeek(it) }, contentPadding = PaddingValues(vertical = 32.dp))
                             } else {
-                                if (canvasUri == null) {
-                                    Box(modifier = Modifier.aspectRatio(1f).fillMaxHeight(0.8f), contentAlignment = Alignment.Center) {
-                                        val saavnTrack = SaavnApi.trackCache[track.id]
-                                        val artModel: Any? = when {
-                                            saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-                                            track.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.albumId)
-                                            else -> null
-                                        }
-
-                                        Card(
-                                            shape = RoundedCornerShape(16.dp),
-                                            elevation = CardDefaults.cardElevation(12.dp),
-                                            modifier = Modifier.fillMaxSize()
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .fillMaxHeight(0.8f)
+                                        .aspectRatio(1f)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
                                         ) {
-                                            if (artModel != null) {
-                                                AsyncImage(model = artModel, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                            } else {
-                                                Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) { Icon(if (isRadio) Icons.Default.Radio else Icons.Rounded.GraphicEq, null, tint = Color.White.copy(0.2f), modifier = Modifier.size(80.dp)) }
-                                            }
+                                            isCoverExpanded = !isCoverExpanded
+                                        }
+                                ) {
+                                    val saavnTrack = SaavnApi.trackCache[track.id]
+                                    val artModel: Any? = when {
+                                        saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
+                                        track.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.albumId)
+                                        else -> null
+                                    }
+
+                                    Card(
+                                        shape = RoundedCornerShape(16.dp),
+                                        elevation = CardDefaults.cardElevation(if (coverAlpha > 0f) 12.dp else 0.dp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer { alpha = coverAlpha }
+                                    ) {
+                                        if (artModel != null) {
+                                            AsyncImage(model = artModel, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                        } else {
+                                            Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) { Icon(if (isRadio) Icons.Default.Radio else Icons.Rounded.GraphicEq, null, tint = Color.White.copy(0.2f), modifier = Modifier.size(80.dp)) }
                                         }
                                     }
                                 }
@@ -872,7 +921,7 @@ fun FullPlayerScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
+                                    .padding(horizontal = 24.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -886,7 +935,7 @@ fun FullPlayerScreen(
                                     modifier = Modifier.size(48.dp).tiltOnTouch()
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint, modifier = Modifier.size(22.dp))
+                                        Icon(imageVector = repeatIcon, contentDescription = null, tint = repeatTint, modifier = Modifier.size(22.dp))
                                     }
                                 }
 
@@ -903,15 +952,15 @@ fun FullPlayerScreen(
 
                                     Surface(
                                         onClick = onPlayPause,
-                                        shape = RoundedCornerShape(24.dp),
+                                        shape = RoundedCornerShape(28.dp),
                                         color = Color.White,
-                                        modifier = Modifier.size(64.dp).tiltOnTouch()
+                                        modifier = Modifier.size(76.dp).tiltOnTouch()
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                                 null,
-                                                modifier = Modifier.size(32.dp),
+                                                modifier = Modifier.size(38.dp),
                                                 tint = Color.Black
                                             )
                                         }
@@ -926,13 +975,13 @@ fun FullPlayerScreen(
                                 }
 
                                 Surface(
-                                    onClick = { showBookmarks = true },
+                                    onClick = { showQueue = true },
                                     shape = CircleShape,
                                     color = Color.White.copy(alpha = 0.08f),
                                     modifier = Modifier.size(48.dp).tiltOnTouch()
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Flag, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                                        Icon(Icons.Default.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                                     }
                                 }
                             }
@@ -941,9 +990,8 @@ fun FullPlayerScreen(
 
                         Spacer(Modifier.weight(1f))
                         if (showTrackInfoBar) {
-                            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(0.9f)) } }
+                            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp).align(Alignment.CenterHorizontally)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f)) } }
                         }
-                        Spacer(Modifier.height(16.dp))
                     }
                 }
             } else {
@@ -1015,41 +1063,54 @@ fun FullPlayerScreen(
                                 LyricsView(lyrics = lyrics, currentPosition = currentPosition, onLineClick = { onSeek(it) }, contentPadding = PaddingValues(top = 150.dp, bottom = 250.dp))
                             } else {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    if (canvasUri != null) Spacer(modifier = Modifier.weight(1f))
-                                    else {
-                                        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 48.dp), pageSpacing = 16.dp, verticalAlignment = Alignment.CenterVertically) { page ->
-                                            val itemTrack = if (playlist.isNotEmpty()) playlist.getOrNull(page) else track
-                                            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                                            val scale = 1f - (pageOffset.absoluteValue * 0.15f).coerceIn(0f, 0.3f)
-                                            val alpha = 1f - (pageOffset.absoluteValue * 0.5f).coerceIn(0f, 0.5f)
+                                    HorizontalPager(
+                                        state = pagerState,
+                                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                                        contentPadding = PaddingValues(horizontal = 48.dp),
+                                        pageSpacing = 16.dp,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) { page ->
+                                        val itemTrack = if (playlist.isNotEmpty()) playlist.getOrNull(page) else track
+                                        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                        val scale = 1f - (pageOffset.absoluteValue * 0.15f).coerceIn(0f, 0.3f)
+                                        val baseAlpha = 1f - (pageOffset.absoluteValue * 0.5f).coerceIn(0f, 0.5f)
 
-                                            Box(
-                                                contentAlignment = Alignment.Center,
-                                                modifier = Modifier.fillMaxWidth().aspectRatio(1f)
-                                            ) {
-                                                val saavnTrack = itemTrack?.let { SaavnApi.trackCache[it.id] }
-                                                val artModel: Any? = when {
-                                                    saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-                                                    itemTrack != null && itemTrack.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), itemTrack.albumId)
-                                                    else -> null
-                                                }
-
-                                                Card(
-                                                    shape = RoundedCornerShape(32.dp),
-                                                    elevation = CardDefaults.cardElevation(12.dp),
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .graphicsLayer {
-                                                            scaleX = scale
-                                                            scaleY = scale
-                                                            this.alpha = alpha
-                                                        }
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(1f)
+                                                .clickable(
+                                                    interactionSource = remember { MutableInteractionSource() },
+                                                    indication = null
                                                 ) {
-                                                    if (artModel != null) {
-                                                        AsyncImage(model = artModel, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                                    } else {
-                                                        Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) { Icon(if (isRadio) Icons.Default.Radio else Icons.Rounded.GraphicEq, null, tint = Color.White.copy(0.2f), modifier = Modifier.size(120.dp)) }
+                                                    if (pagerState.currentPage == page) {
+                                                        isCoverExpanded = !isCoverExpanded
                                                     }
+                                                }
+                                        ) {
+                                            val saavnTrack = itemTrack?.let { SaavnApi.trackCache[it.id] }
+                                            val artModel: Any? = when {
+                                                saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
+                                                itemTrack != null && itemTrack.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), itemTrack.albumId)
+                                                else -> null
+                                            }
+
+                                            Card(
+                                                shape = RoundedCornerShape(32.dp),
+                                                elevation = CardDefaults.cardElevation(if (coverAlpha > 0f) 12.dp else 0.dp),
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .graphicsLayer {
+                                                        scaleX = scale
+                                                        scaleY = scale
+                                                        this.alpha = baseAlpha * coverAlpha
+                                                    }
+                                            ) {
+                                                if (artModel != null) {
+                                                    AsyncImage(model = artModel, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                } else {
+                                                    Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) { Icon(if (isRadio) Icons.Default.Radio else Icons.Rounded.GraphicEq, null, tint = Color.White.copy(0.2f), modifier = Modifier.size(120.dp)) }
                                                 }
                                             }
                                         }
@@ -1082,7 +1143,6 @@ fun FullPlayerScreen(
 
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Spacer(modifier = Modifier.height(16.dp))
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1097,35 +1157,35 @@ fun FullPlayerScreen(
                                 onClick = onToggleRepeat,
                                 shape = CircleShape,
                                 color = Color.White.copy(alpha = 0.08f),
-                                modifier = Modifier.size(56.dp).tiltOnTouch()
+                                modifier = Modifier.size(48.dp).tiltOnTouch()
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint, modifier = Modifier.size(24.dp))
+                                    Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint, modifier = Modifier.size(22.dp))
                                 }
                             }
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 IconButton(
                                     onClick = onSkipPrevious,
-                                    modifier = Modifier.size(64.dp).tiltOnTouch()
+                                    modifier = Modifier.size(52.dp).tiltOnTouch()
                                 ) {
-                                    Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(42.dp), tint = Color.White)
+                                    Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(36.dp), tint = Color.White)
                                 }
 
                                 Surface(
                                     onClick = onPlayPause,
                                     shape = RoundedCornerShape(28.dp),
                                     color = Color.White,
-                                    modifier = Modifier.size(80.dp).tiltOnTouch()
+                                    modifier = Modifier.size(76.dp).tiltOnTouch()
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                             null,
-                                            modifier = Modifier.size(40.dp),
+                                            modifier = Modifier.size(38.dp),
                                             tint = Color.Black
                                         )
                                     }
@@ -1133,9 +1193,9 @@ fun FullPlayerScreen(
 
                                 IconButton(
                                     onClick = onSkipNext,
-                                    modifier = Modifier.size(64.dp).tiltOnTouch()
+                                    modifier = Modifier.size(52.dp).tiltOnTouch()
                                 ) {
-                                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(42.dp), tint = Color.White)
+                                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(36.dp), tint = Color.White)
                                 }
                             }
 
@@ -1143,10 +1203,10 @@ fun FullPlayerScreen(
                                 onClick = { showQueue = true },
                                 shape = CircleShape,
                                 color = Color.White.copy(alpha = 0.08f),
-                                modifier = Modifier.size(56.dp).tiltOnTouch()
+                                modifier = Modifier.size(48.dp).tiltOnTouch()
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                                 }
                             }
                         }
