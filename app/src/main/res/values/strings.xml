@@ -53,6 +53,10 @@
     <string name="lang_ga">Gaeilge</string>
     <string name="lang_id">Bahasa Indonesia</string>
     <string name="lang_tl">Tagalog</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_zh_desc">Simplified Chinese</string>
+    <string name="lang_zh_tw">繁體中文</string>
+    <string name="lang_zh_tw_desc">Traditional Chinese</string>
 
     <string name="settings_privacy">Privacy</string>
     <string name="privacy_secure">Secure mode</string>
