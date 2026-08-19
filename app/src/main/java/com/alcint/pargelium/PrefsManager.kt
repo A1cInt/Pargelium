@@ -270,4 +270,16 @@ object PrefsManager {
 
     fun saveSkippedVersion(version: String) = prefs.edit().putString("skipped_update_version", version).apply()
     fun getSkippedVersion(): String? = prefs.getString("skipped_update_version", null)
+
+    fun saveWidgetState(title: String, artist: String, isPlaying: Boolean) {
+        prefs.edit()
+            .putString("widget_title", title)
+            .putString("widget_artist", artist)
+            .putBoolean("widget_is_playing", isPlaying)
+            .apply()
+    }
+
+    fun getWidgetTitle(): String = prefs.getString("widget_title", "Pargelium") ?: "Pargelium"
+    fun getWidgetArtist(): String = prefs.getString("widget_artist", "Выберите трек") ?: "Выберите трек"
+    fun getWidgetIsPlaying(): Boolean = prefs.getBoolean("widget_is_playing", false)
 }

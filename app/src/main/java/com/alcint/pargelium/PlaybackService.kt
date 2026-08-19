@@ -1,9 +1,13 @@
 package com.alcint.pargelium
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Handler
+import androidx.core.graphics.drawable.toBitmap
+import androidx.glance.appwidget.updateAll
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -24,6 +28,8 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +40,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.io.File
+import java.io.FileOutputStream
 import java.util.ArrayList
 import kotlin.math.abs
 
@@ -188,11 +196,10 @@ class PlaybackService : MediaLibraryService() {
 
     private fun updateWearState(player: Player, force: Boolean = false) {
         val currentItem = player.currentMediaItem
-        val title = currentItem?.mediaMetadata?.title?.toString() ?: "Pargelium"
-        val artist = currentItem?.mediaMetadata?.artist?.toString() ?: "Выберите трек"
+        val title = currentItem?.mediaMetadata?.title?.toString() ?: getString(R.string.app_name)
+        val artist = currentItem?.mediaMetadata?.artist?.toString() ?: getString(R.string.unknown_artist)
         val isPlaying = player.isPlaying
         val pos = player.currentPosition
-
         val dur = if (player.duration != C.TIME_UNSET && player.duration > 0) player.duration else 1L
 
         if (!force && title == lastWearTitle && isPlaying == lastWearIsPlaying && abs(pos - lastWearPos) < 1000) return
@@ -203,8 +210,59 @@ class PlaybackService : MediaLibraryService() {
 
         wearUpdateJob?.cancel()
         wearUpdateJob = serviceScope.launch(Dispatchers.IO) {
-            delay(300)
-            fossApiManager?.updatePlaybackState(title, artist, isPlaying, pos, dur, Color.DKGRAY)
+            val coverFile = File(applicationContext.cacheDir, "widget_cover.png")
+            try {
+                val artworkData = currentItem?.mediaMetadata?.artworkData
+                if (artworkData != null) {
+                    val bitmap = BitmapFactory.decodeByteArray(artworkData, 0, artworkData.size)
+                    FileOutputStream(coverFile).use { out ->
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                } else {
+                    val trackId = currentItem?.mediaId?.toLongOrNull() ?: 0L
+                    val saavnTrack = SaavnApi.trackCache[trackId]
+                    val imageUrl: Any? = saavnTrack?.coverUrl?.takeIf { it.isNotEmpty() }
+                        ?: currentItem?.mediaMetadata?.artworkUri
+
+                    if (imageUrl != null) {
+                        val request = ImageRequest.Builder(applicationContext)
+                            .data(imageUrl)
+                            .size(300)
+                            .allowHardware(false)
+                            .build()
+
+                        val result = applicationContext.imageLoader.execute(request)
+                        val bitmap = result.drawable?.toBitmap()
+
+                        if (bitmap != null) {
+                            FileOutputStream(coverFile).use { out ->
+                                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                            }
+                        } else {
+                            coverFile.delete()
+                        }
+                    } else {
+                        coverFile.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                coverFile.delete()
+            }
+
+            PrefsManager.saveWidgetState(title, artist, isPlaying)
+
+            try {
+                PargeliumWidget().updateAll(applicationContext)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            val isWearEnabled = PrefsManager.getFossWearEnabled()
+            if (isWearEnabled) {
+                delay(250)
+                fossApiManager?.updatePlaybackState(title, artist, isPlaying, pos, dur, Color.DKGRAY)
+            }
         }
     }
 
