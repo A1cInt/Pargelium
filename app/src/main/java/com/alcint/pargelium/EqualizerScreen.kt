@@ -93,7 +93,6 @@ fun EqualizerScreen(seedColor: Color) {
 
     var bassEnabled by remember { mutableStateOf(PrefsManager.getBassEnabled()) }
     var bass by remember { mutableFloatStateOf(PrefsManager.getBass().toFloat()) }
-    var bassFreq by remember { mutableFloatStateOf(PrefsManager.getBassFreq().toFloat()) }
 
     var roomEnabled by remember { mutableStateOf(PrefsManager.getRoom()) }
     var reverbMode by remember { mutableIntStateOf(PrefsManager.getReverbMode()) }
@@ -173,8 +172,14 @@ fun EqualizerScreen(seedColor: Color) {
                     checked = bassEnabled,
                     onChecked = { bassEnabled = it; PrefsManager.saveBassEnabled(it) }
                 ) {
-                    SettingSlider(stringResource(id = R.string.setting_power), bass, 0f..100f, "%", { bass = it }, { PrefsManager.saveBass(bass.toInt()) })
-                    SettingSlider(stringResource(id = R.string.setting_frequency), bassFreq, 30f..150f, " ${stringResource(id = R.string.unit_hz)}", { bassFreq = it }, { PrefsManager.saveBassFreq(bassFreq.toInt()) })
+                    SettingSlider(
+                        name = stringResource(id = R.string.setting_power),
+                        value = bass,
+                        range = 0f..15f,
+                        unit = " dB",
+                        onValueChange = { bass = it },
+                        onValueChangeFinished = { PrefsManager.saveBass(bass.toInt()) }
+                    )
                 }
 
                 Spacer(Modifier.height(24.dp))

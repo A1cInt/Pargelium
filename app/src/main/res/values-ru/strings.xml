@@ -279,4 +279,8 @@
     <string name="lang_system">Как в системе</string>
 
     <string name="streaming">Стриминг</string>
+
+    <string name="settings_bass_boost">Динамический бас</string>
+    <string name="settings_bass_boost_desc">Умное усиление низких частот и саб-баса без перегрузки</string>
+    <string name="settings_bass_gain">Интенсивность баса</string>
 </resources>

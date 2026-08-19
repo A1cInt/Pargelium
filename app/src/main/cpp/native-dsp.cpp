@@ -89,6 +89,244 @@ struct AllpassFilter {
     }
 };
 
+static inline void fht16(float A[16]) {
+    float alpha, beta, beta2, alpha1, alpha2, y1, y2, y3;
+    alpha = A[0]; beta = A[1]; beta2 = A[2]; alpha1 = A[3];
+    alpha2 = alpha + beta; y1 = alpha - beta; y2 = beta2 + alpha1; y3 = beta2 - alpha1;
+    A[0] = alpha2 + y2; A[2] = alpha2 - y2; A[1] = y1 + y3; A[3] = y1 - y3;
+    alpha = A[4]; beta = A[5]; beta2 = A[6]; alpha1 = A[7];
+    alpha2 = alpha + beta; y1 = alpha - beta; y2 = beta2 + alpha1; y3 = beta2 - alpha1;
+    A[4] = alpha2 + y2; A[6] = alpha2 - y2; A[5] = y1 + y3; A[7] = y1 - y3;
+    alpha = A[8]; beta = A[9]; beta2 = A[10]; alpha1 = A[11];
+    alpha2 = alpha + beta; y1 = alpha - beta; y2 = beta2 + alpha1; y3 = beta2 - alpha1;
+    A[8] = alpha2 + y2; A[10] = alpha2 - y2; A[9] = y1 + y3; A[11] = y1 - y3;
+    alpha = A[12]; beta = A[13]; beta2 = A[14]; alpha1 = A[15];
+    alpha2 = alpha + beta; y1 = alpha - beta; y2 = beta2 + alpha1; y3 = beta2 - alpha1;
+    A[12] = alpha2 + y2; A[14] = alpha2 - y2; A[13] = y1 + y3; A[15] = y1 - y3;
+    alpha = A[0]; beta = A[4]; A[0] = alpha + beta; A[4] = alpha - beta;
+    alpha = A[2]; beta = A[6]; A[2] = alpha + beta; A[6] = alpha - beta;
+    alpha = A[1]; beta = 0.707106769f*(A[5] + A[7]); beta2 = 0.707106769f*(A[5] - A[7]);
+    A[1] = alpha + beta; A[5] = alpha - beta;
+    alpha = A[3]; A[3] = alpha + beta2; A[7] = alpha - beta2;
+    alpha = A[8]; beta = A[12]; A[8] = alpha + beta; A[12] = alpha - beta;
+    alpha = A[10]; beta = A[14]; A[10] = alpha + beta; A[14] = alpha - beta;
+    alpha = A[9]; beta = 0.707106769f*(A[13] + A[15]); beta2 = 0.707106769f*(A[13] - A[15]);
+    A[9] = alpha + beta; A[13] = alpha - beta;
+    alpha = A[11]; A[11] = alpha + beta2; A[15] = alpha - beta2;
+    alpha = A[0]; beta = A[8]; A[0] = alpha + beta; A[8] = alpha - beta;
+    alpha = A[4]; beta = A[12]; A[4] = alpha + beta; A[12] = alpha - beta;
+    alpha1 = A[1]; alpha2 = A[7];
+    beta = A[9] * 0.923879504f + A[15] * 0.382683426f;
+    beta2 = A[9] * 0.382683426f - A[15] * 0.923879504f;
+    A[1] = alpha1 + beta; A[9] = alpha1 - beta; A[7] = alpha2 + beta2; A[15] = alpha2 - beta2;
+    alpha1 = A[10] * 0.707106769f; alpha2 = A[14] * 0.707106769f;
+    beta = alpha1 + alpha2; beta2 = alpha1 - alpha2;
+    alpha1 = A[2]; alpha2 = A[6];
+    A[2] = alpha1 + beta; A[10] = alpha1 - beta; A[6] = alpha2 + beta2; A[14] = alpha2 - beta2;
+    alpha1 = A[3]; alpha2 = A[5];
+    beta = A[11] * 0.382683426f + A[13] * 0.923879504f;
+    beta2 = A[11] * 0.923879504f - A[13] * 0.382683426f;
+    A[3] = alpha1 + beta; A[11] = alpha1 - beta; A[5] = alpha2 + beta2; A[13] = alpha2 - beta2;
+}
+
+struct IntegerDelayLine {
+    std::vector<float> buffer;
+    int inPoint = 0;
+    int outPoint = 0;
+    int sz = 0;
+
+    void init(int allocateLen, int lag) {
+        sz = allocateLen > 2048 ? 2048 : allocateLen;
+        buffer.assign(sz, 0.0f);
+        inPoint = 0;
+        outPoint = inPoint - lag;
+        while (outPoint < 0) outPoint += sz;
+    }
+
+    inline float process(float sample) {
+        buffer[inPoint++] = sample;
+        if (inPoint == sz) inPoint = 0;
+        float lastOutput = buffer[outPoint++];
+        if (outPoint >= sz) outPoint = 0;
+        return lastOutput;
+    }
+};
+
+struct DynamicSVF {
+    float gCoeff = 1.0f, RCoeff = 1.0f, KCoeff = 0.0f;
+    float p1 = 0.0f, p2 = 0.0f, p3 = 0.0f, p4 = 0.0f;
+    float z1 = 0.0f, z2 = 0.0f;
+
+    void update(float fs, float cutoff, float q, float shelfGain) {
+        float T = 1.0f / fs;
+        float wa = (2.0f / T) * tanf((cutoff * 2.0f * PI) * T / 2.0f);
+        gCoeff = wa * T / 2.0f;
+        RCoeff = 1.0f / (2.0f * q);
+        KCoeff = shelfGain - 1.0f;
+        p1 = 2.0f * RCoeff + gCoeff;
+        p2 = 1.0f / (1.0f + (2.0f * RCoeff * gCoeff) + gCoeff * gCoeff);
+        p3 = 2.0f * RCoeff;
+        p4 = 4.0f * RCoeff;
+    }
+
+    inline void processStereo(DynamicSVF& svfR, float xL, float xR, float& yL, float& yR) {
+        float HPL = (xL - p1 * z1 - z2) * p2;
+        float BPL = HPL * gCoeff + z1;
+        float LPL = BPL * gCoeff + z2;
+        float PeakL = xL + (p3 * BPL) * KCoeff;
+        z1 = gCoeff * HPL + BPL;
+        z2 = gCoeff * BPL + LPL;
+        yL = PeakL;
+
+        float HPR = (xR - p1 * svfR.z1 - svfR.z2) * p2;
+        float BPR = HPR * gCoeff + svfR.z1;
+        float LPR = BPR * gCoeff + svfR.z2;
+        float PeakR = xR + (p3 * BPR) * KCoeff;
+        svfR.z1 = gCoeff * HPR + BPR;
+        svfR.z2 = gCoeff * BPR + LPR;
+        yR = PeakR;
+    }
+};
+
+class DBBEngine {
+public:
+    float maxGain = 0.0f;
+    float fs = 48000.0f;
+    int dsFactor = 1;
+    int dsPos = 0;
+    float dsSum = 0.0f;
+
+    float freq[9] = {0};
+    float maxSmooth = 0.0f, minusMaxSmooth = 0.0f;
+    float gainSmooth = 0.0f, minusGainSmooth = 0.0f;
+    float boostdB = 0.0f;
+    float smoothMaxFreq = 0.0f;
+
+    float delayLine[16] = {0};
+    float fftBuf[16] = {0};
+
+    IntegerDelayLine dL[2];
+    DynamicSVF svf[2];
+
+    void update(float sampleRate, float maxG) {
+        maxGain = fmaxf(0.0f, maxG);
+        fs = sampleRate;
+        dsFactor = (int)roundf(fs / 500.0f);
+        if (dsFactor < 1) dsFactor = 1;
+        float targetFs = fs / dsFactor;
+
+        for (int i = 0; i < 9; i++) {
+            freq[i] = (i * (targetFs / 16.0f) + i * (targetFs / 16.0f)) * 0.5f;
+        }
+
+        maxSmooth = 1.0f - expf(-1.0f / (0.5f / 1000.0f * fs));
+        minusMaxSmooth = 1.0f - maxSmooth;
+        gainSmooth = 1.0f - expf(-1.0f / (2.0f / 1000.0f * fs));
+        minusGainSmooth = 1.0f - gainSmooth;
+
+        dL[0].init(2048, dsFactor + (int)(2.0f * (fs / 1000.0f)));
+        dL[1].init(2048, dsFactor + (int)(2.0f * (fs / 1000.0f)));
+    }
+
+    void reset() {
+        boostdB = 0.0f;
+        smoothMaxFreq = freq[0];
+        std::fill_n(delayLine, 16, 0.0f);
+        std::fill_n(fftBuf, 16, 0.0f);
+        svf[0].z1 = svf[0].z2 = svf[1].z1 = svf[1].z2 = 0.0f;
+        std::fill(dL[0].buffer.begin(), dL[0].buffer.end(), 0.0f);
+        std::fill(dL[1].buffer.begin(), dL[1].buffer.end(), 0.0f);
+    }
+
+    inline void processSample(float& inL, float& inR) {
+        dsSum += (inL + inR) * 0.5f;
+        if (++dsPos >= dsFactor) {
+            float downsampled = dsSum / dsFactor;
+            dsSum = 0.0f;
+            dsPos = 0;
+
+            for(int j=15; j>0; --j) delayLine[j] = delayLine[j-1];
+            delayLine[0] = downsampled;
+
+            fftBuf[0] = delayLine[0]; fftBuf[8] = delayLine[1];
+            fftBuf[4] = delayLine[2]; fftBuf[12] = delayLine[3];
+            fftBuf[2] = delayLine[4]; fftBuf[10] = delayLine[5];
+            fftBuf[6] = delayLine[6]; fftBuf[14] = delayLine[7];
+            fftBuf[1] = delayLine[8]; fftBuf[9] = delayLine[9];
+            fftBuf[5] = delayLine[10]; fftBuf[13] = delayLine[11];
+            fftBuf[3] = delayLine[12]; fftBuf[11] = delayLine[13];
+            fftBuf[7] = delayLine[14]; fftBuf[15] = delayLine[15];
+
+            fht16(fftBuf);
+
+            float peak1 = fabsf(fftBuf[0]);
+            float peak2 = peak1;
+            float currentMaxFreq = freq[0];
+            float maxdB = 20.0f * log10f(peak1 + 1e-12f);
+            float mindB = maxdB;
+
+            for (int k = 1; k < 9; ++k) {
+                int symIdx = 16 - k;
+                float lR = (fftBuf[k] + fftBuf[symIdx]) * 0.5f;
+                float lI = (fftBuf[k] - fftBuf[symIdx]) * 0.5f;
+                float mag = sqrtf(lR * lR + lI * lI);
+
+                if (mag > peak1) {
+                    peak1 = mag;
+                    currentMaxFreq = freq[k];
+                    maxdB = 20.0f * log10f(mag + 1e-12f);
+                }
+                if (mag < peak2) {
+                    peak2 = mag;
+                    mindB = 20.0f * log10f(mag + 1e-12f);
+                }
+            }
+
+            float gainClamp = maxdB - mindB;
+            if (gainClamp > maxGain) gainClamp = maxGain;
+
+            boostdB = gainClamp * gainSmooth + boostdB * minusGainSmooth;
+            smoothMaxFreq = currentMaxFreq * maxSmooth + smoothMaxFreq * minusMaxSmooth;
+
+            svf[0].update(fs, smoothMaxFreq, 1.0f / (2.0f * (1.0f - 0.75f)), powf(10.0f, boostdB / 20.0f));
+        }
+
+        float dlL = dL[0].process(inL);
+        float dlR = dL[1].process(inR);
+        svf[0].processStereo(svf[1], dlL, dlR, inL, inR);
+    }
+};
+
+struct TubeEngine {
+    float dcBlockL = 0.0f, dcBlockR = 0.0f;
+    float prevL = 0.0f, prevR = 0.0f;
+
+    inline void process(float& inL, float& inR) {
+        auto triodeShape = [](float x) {
+            if (x > 0.0f) {
+                return x / (1.0f + x);
+            } else {
+                return x / (1.0f - x * 1.5f);
+            }
+        };
+
+        float yL = triodeShape(inL * 2.0f);
+        float yR = triodeShape(inR * 2.0f);
+
+        dcBlockL = yL - prevL + 0.995f * dcBlockL;
+        dcBlockR = yR - prevR + 0.995f * dcBlockR;
+        prevL = yL;
+        prevR = yR;
+
+        inL = inL * 0.5f + (dcBlockL * 0.4f);
+        inR = inR * 0.5f + (dcBlockR * 0.4f);
+    }
+
+    void reset() {
+        dcBlockL = dcBlockR = prevL = prevR = 0.0f;
+    }
+};
+
 class DspEngine {
 public:
     float autoEqFreqs[15] = {25, 40, 63, 100, 160, 250, 400, 630, 1000, 1600, 2500, 4000, 6300, 10000, 16000};
@@ -102,9 +340,10 @@ public:
     EqBand* activeEqBands[25];
     int activeEqBandsCount = 0;
 
-    EqBand bassBiquad;
+    DBBEngine dbb;
     float lastBassGain = -1.0f;
-    float lastBassFreq = -1.0f;
+
+    TubeEngine tubeSat;
 
     int lastSampleRate = -1;
     int lastReverbMode = -1;
@@ -159,7 +398,8 @@ public:
         reverbHpState = 0.0f;
         for (int i=0; i<15; ++i) autoEqBands[i].reset();
         for (int i=0; i<10; ++i) userEqBands[i].reset();
-        bassBiquad.reset();
+        dbb.reset();
+        tubeSat.reset();
         std::fill(haasBuffer.begin(), haasBuffer.end(), 0.0f);
         haasIndex = 0;
         exciteL = 0.0f; exciteR = 0.0f;
@@ -254,14 +494,12 @@ Java_com_alcint_pargelium_CustomAudioProcessor_nativeProcess(JNIEnv *env, jobjec
     bool isStereo = channels == 2;
     bool bassEnabled = settings[4] > 0.5f;
     float bassGain = settings[5];
-    float bassFreq = settings[6];
     bool doBass = bassEnabled && bassGain > 0.0f;
 
     if (doBass) {
-        if (bassGain != engine->lastBassGain || bassFreq != engine->lastBassFreq) {
+        if (bassGain != engine->lastBassGain) {
             engine->lastBassGain = bassGain;
-            engine->lastBassFreq = bassFreq;
-            engine->bassBiquad.update(bassGain * 0.15f, bassFreq, 0.707f, sampleRate);
+            engine->dbb.update((float)sampleRate, bassGain);
         }
     }
 
@@ -312,8 +550,7 @@ Java_com_alcint_pargelium_CustomAudioProcessor_nativeProcess(JNIEnv *env, jobjec
         }
 
         if (doBass) {
-            inL = engine->bassBiquad.processL(inL);
-            inR = engine->bassBiquad.processR(inR);
+            engine->dbb.processSample(inL, inR);
         }
 
         if (doHaas) {
@@ -346,10 +583,7 @@ Java_com_alcint_pargelium_CustomAudioProcessor_nativeProcess(JNIEnv *env, jobjec
         }
 
         if (tube) {
-            float absL = fabsf(inL);
-            float absR = fabsf(inR);
-            inL = (inL * 1.75f + absL * 0.25f) / (1.0f + absL) * 0.75f;
-            inR = (inR * 1.75f + absR * 0.25f) / (1.0f + absR) * 0.75f;
+            engine->tubeSat.process(inL, inR);
         }
 
         if (doRoom) {

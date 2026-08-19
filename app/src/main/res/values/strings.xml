@@ -277,4 +277,8 @@
     <string name="lang_system">System default</string>
 
     <string name="streaming">Streaming</string>
+
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Intelligent low-end and sub-bass enhancement without clipping</string>
+    <string name="settings_bass_gain">Bass intensity</string>
 </resources>
