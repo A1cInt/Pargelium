@@ -209,6 +209,8 @@ fun LyricsView(
     lyrics: List<LyricLine>,
     currentPosition: Long,
     onLineClick: (Long) -> Unit,
+    onSearchOnline: () -> Unit,
+    isSearching: Boolean,
     contentPadding: PaddingValues
 ) {
     val listState = rememberLazyListState()
@@ -242,8 +244,31 @@ fun LyricsView(
     }
 
     if (lyrics.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.lyrics_not_found), style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.5f))
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                stringResource(R.string.lyrics_not_found),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isSearching) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
+            } else {
+                OutlinedButton(
+                    onClick = onSearchOnline,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.action_search_online))
+                }
+            }
         }
     } else {
         LazyColumn(state = listState, contentPadding = contentPadding, modifier = Modifier.fillMaxSize()) {
@@ -531,6 +556,7 @@ fun FullPlayerScreen(
     var showBookmarks by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<List<LyricLine>>(emptyList()) }
     var isCoverExpanded by remember { mutableStateOf(false) }
+    var isSearchingLyricsOnline by remember { mutableStateOf(false) }
 
     val trackKey = remember(track.artist, track.title) {
         (track.artist.hashCode() xor track.title.hashCode()).toString()
@@ -800,7 +826,27 @@ fun FullPlayerScreen(
                             label = "TabletLyricsSwitch"
                         ) { isLyricsVisible ->
                             if (isLyricsVisible) {
-                                LyricsView(lyrics = lyrics, currentPosition = currentPosition, onLineClick = { onSeek(it) }, contentPadding = PaddingValues(vertical = 32.dp))
+                                LyricsView(
+                                    lyrics = lyrics,
+                                    currentPosition = currentPosition,
+                                    onLineClick = { onSeek(it) },
+                                    onSearchOnline = {
+                                        scope.launch {
+                                            isSearchingLyricsOnline = true
+                                            try {
+                                                val newLyrics = withContext(Dispatchers.IO) {
+                                                    LyricsManager.searchLyricsOnline(appContext, track)
+                                                }
+                                                if (newLyrics.isNotEmpty()) {
+                                                    lyrics = newLyrics
+                                                }
+                                            } catch (_: Exception) {}
+                                            isSearchingLyricsOnline = false
+                                        }
+                                    },
+                                    isSearching = isSearchingLyricsOnline,
+                                    contentPadding = PaddingValues(vertical = 32.dp)
+                                )
                             } else {
                                 Box(
                                     contentAlignment = Alignment.Center,
@@ -1060,7 +1106,27 @@ fun FullPlayerScreen(
                             label = "LyricsSwitch"
                         ) { isLyricsVisible ->
                             if (isLyricsVisible) {
-                                LyricsView(lyrics = lyrics, currentPosition = currentPosition, onLineClick = { onSeek(it) }, contentPadding = PaddingValues(top = 150.dp, bottom = 250.dp))
+                                LyricsView(
+                                    lyrics = lyrics,
+                                    currentPosition = currentPosition,
+                                    onLineClick = { onSeek(it) },
+                                    onSearchOnline = {
+                                        scope.launch {
+                                            isSearchingLyricsOnline = true
+                                            try {
+                                                val newLyrics = withContext(Dispatchers.IO) {
+                                                    LyricsManager.searchLyricsOnline(appContext, track)
+                                                }
+                                                if (newLyrics.isNotEmpty()) {
+                                                    lyrics = newLyrics
+                                                }
+                                            } catch (_: Exception) {}
+                                            isSearchingLyricsOnline = false
+                                        }
+                                    },
+                                    isSearching = isSearchingLyricsOnline,
+                                    contentPadding = PaddingValues(top = 150.dp, bottom = 250.dp)
+                                )
                             } else {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     HorizontalPager(

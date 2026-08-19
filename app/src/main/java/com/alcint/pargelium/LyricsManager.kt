@@ -141,6 +141,12 @@ object LyricsManager {
                 }
             }
 
+            return@withContext emptyList()
+        }
+    }
+
+    suspend fun searchLyricsOnline(context: Context, track: AudioTrack): List<LyricLine> {
+        return withContext(Dispatchers.IO) {
             val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
             if (!validMetadata) return@withContext emptyList()
 
@@ -158,18 +164,14 @@ object LyricsManager {
                     if (searchResponse.isNotEmpty()) {
                         rawLyrics = searchResponse[0].syncedLyrics ?: searchResponse[0].plainLyrics
                     }
-                } catch (ex: Exception) {
-                    Log.e("LyricsManager", "LRCLIB error: ${ex.message}")
-                }
+                } catch (ex: Exception) {}
             }
 
             if (rawLyrics.isNullOrBlank()) {
                 try {
                     val response = api.getMusixmatch(cleanArtist, cleanTitle)
                     rawLyrics = response.message?.body?.lyrics?.lyrics_body
-                } catch (e: Exception) {
-                    Log.e("LyricsManager", "Musixmatch error: ${e.message}")
-                }
+                } catch (e: Exception) {}
             }
 
             if (rawLyrics.isNullOrBlank()) {
@@ -180,9 +182,7 @@ object LyricsManager {
 
                     val response = api.getOvh(ovhUrl)
                     rawLyrics = response.lyrics
-                } catch (e: Exception) {
-                    Log.e("LyricsManager", "OVH error: ${e.message}")
-                }
+                } catch (e: Exception) {}
             }
 
             if (!rawLyrics.isNullOrBlank()) {
@@ -245,7 +245,6 @@ object LyricsManager {
                     val encodedQuery = URLEncoder.encode(originalText, "UTF-8")
                     val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetLang&dt=t&q=$encodedQuery"
 
-                    // Исправлен вызов на translateGoogle
                     val response = api.translateGoogle(url)
                     val sentences = response.asJsonArray.get(0).asJsonArray
 
@@ -258,7 +257,6 @@ object LyricsManager {
                     translatedLines.addAll(translatedChunk)
 
                 } catch (e: Exception) {
-                    Log.e("LyricsManager", "Translation chunk error", e)
                     translatedLines.addAll(List(chunk.size) { "" })
                 }
             }
@@ -275,9 +273,7 @@ object LyricsManager {
             saveToCache(context, track, finalLines)
             return@withContext finalLines
 
-        } catch (e: Exception) {
-            Log.e("LyricsManager", "Google Translation error: ${e.message}")
-        }
+        } catch (e: Exception) {}
         return@withContext lines
     }
 
@@ -346,9 +342,7 @@ object LyricsManager {
         try {
             val json = gson.toJson(lines)
             getCacheFile(context, track).writeText(json)
-        } catch (e: Exception) {
-            Log.e("LyricsManager", "Failed to save JSON cache", e)
-        }
+        } catch (e: Exception) {}
     }
 
     private fun loadFromCache(context: Context, track: AudioTrack): List<LyricLine>? {
@@ -358,9 +352,7 @@ object LyricsManager {
                 val json = file.readText()
                 val type = object : TypeToken<List<LyricLine>>() {}.type
                 return gson.fromJson(json, type)
-            } catch (e: Exception) {
-                Log.e("LyricsManager", "Failed to parse JSON cache", e)
-            }
+            } catch (e: Exception) {}
         }
         return null
     }

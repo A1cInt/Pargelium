@@ -188,7 +188,7 @@ object AudioRepository {
 
     fun forceScan(context: Context, onComplete: () -> Unit) {
         val pathsToScan = mutableListOf<String>()
-        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4")
+        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b")
 
         val folders = listOf(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
@@ -248,7 +248,7 @@ object AudioRepository {
         )
         val discColumn = "disc_number"
         val finalProjection = try { projection + discColumn } catch (e: Exception) { projection }
-        val selection = "${MediaStore.Audio.Media.DURATION} >= 15000"
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
 
         try {
             context.contentResolver.query(collection, finalProjection, selection, null, "${MediaStore.Audio.Media.TITLE} ASC")?.use { cursor ->
@@ -263,12 +263,14 @@ object AudioRepository {
                 val discColIdx = cursor.getColumnIndex(discColumn)
 
                 while (cursor.moveToNext()) {
+                    val duration = cursor.getLong(durCol)
+                    if (duration in 1..14999) continue
+
                     val id = cursor.getLong(idCol)
                     var title = cursor.getString(titleCol)
                     val artist = cursor.getString(artistCol) ?: "<Unknown>"
                     val album = cursor.getString(albumCol) ?: "<Unknown Album>"
                     val albumId = cursor.getLong(albumIdCol)
-                    val duration = cursor.getLong(durCol)
                     val displayName = cursor.getString(nameCol) ?: ""
                     val trackRaw = cursor.getInt(trackCol)
                     val trackNum = if (trackRaw >= 1000) trackRaw % 1000 else trackRaw

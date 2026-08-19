@@ -283,4 +283,6 @@
     <string name="settings_bass_boost">Динамический бас</string>
     <string name="settings_bass_boost_desc">Умное усиление низких частот и саб-баса без перегрузки</string>
     <string name="settings_bass_gain">Интенсивность баса</string>
+
+    <string name="action_search_online">Искать в сети</string>
 </resources>
