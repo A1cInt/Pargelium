@@ -250,7 +250,7 @@
     <string name="adv_module_control_desc">启用或禁用应用组件</string>
 
     <string name="about_version">应用版本</string>
-    <string name="about_version_desc">Pargelium 1.1\n做自己该做的事的播放器。</string>
+    <string name="about_version_desc">Pargelium 1.2\n做自己该做的事的播放器。</string>
 
     <string name="adv_warning_title">警告</string>
     <string name="adv_warning_text">这些设置用于深度自定义。禁用系统组件（流媒体、可视化、均衡器）可能导致应用行为异常或不稳定。\n\n你确定要继续吗？</string>

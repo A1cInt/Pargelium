@@ -247,7 +247,7 @@
     <string name="adv_module_control_desc">I-enable o i-disable ang mga component ng app</string>
 
     <string name="about_version">Bersyon ng app</string>
-    <string name="about_version_desc">Pargelium 1.1\nAng player na ginagawa lang ang trabaho nito.</string>
+    <string name="about_version_desc">Pargelium 1.2\nAng player na ginagawa lang ang trabaho nito.</string>
 
     <string name="adv_warning_title">Babala</string>
     <string name="adv_warning_text">Ang mga setting na ito ay para sa malalim na pag-customize. Ang pag-disable sa mga system component (streaming, visualization, equalizer) ay maaaring magdulot ng hindi inaasahang pag-uugali o kawalang-tatag sa app.\n\nSigurado ka bang gusto mong magpatuloy?</string>

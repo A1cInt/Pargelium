@@ -243,7 +243,7 @@
     <string name="adv_module_control_desc">Activar o desactivar componentes de la aplicación</string>
 
     <string name="about_version">Versión de la aplicación</string>
-    <string name="about_version_desc">Pargelium 1.1\nEl reproductor que simplemente hace su trabajo.</string>
+    <string name="about_version_desc">Pargelium 1.2\nEl reproductor que simplemente hace su trabajo.</string>
 
     <string name="adv_warning_title">Advertencia</string>
     <string name="adv_warning_text">Esta configuración está destinada a una personalización avanzada. Desactivar componentes del sistema (transmisión, visualización, ecualizador) puede provocar un comportamiento inesperado o inestabilidad en la aplicación.\n\n¿Estás seguro de que deseas continuar?</string>

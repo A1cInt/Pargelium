@@ -243,7 +243,7 @@
     <string name="adv_module_control_desc">App-Komponenten aktivieren oder deaktivieren</string>
 
     <string name="about_version">App-Version</string>
-    <string name="about_version_desc">Pargelium 1.1\nDer Player, der einfach tut, was er soll.</string>
+    <string name="about_version_desc">Pargelium 1.2\nDer Player, der einfach tut, was er soll.</string>
 
     <string name="adv_warning_title">Warnung</string>
     <string name="adv_warning_text">Diese Einstellungen sind für erweiterte Anpassungen gedacht. Das Deaktivieren von Systemkomponenten (Streaming, Visualisierung, Equalizer) kann zu unerwartetem Verhalten oder Instabilität der App führen.\n\nMöchten Sie wirklich fortfahren?</string>

@@ -239,7 +239,7 @@
     <string name="adv_module_control_desc">Ενεργοποίηση ή απενεργοποίηση στοιχείων της εφαρμογής</string>
 
     <string name="about_version">Έκδοση εφαρμογής</string>
-    <string name="about_version_desc">Pargelium 1.1\nΟ αναπαραγωγέας που απλά κάνει τη δουλειά του.</string>
+    <string name="about_version_desc">Pargelium 1.2\nΟ αναπαραγωγέας που απλά κάνει τη δουλειά του.</string>
 
     <string name="adv_warning_title">Προειδοποίηση</string>
     <string name="adv_warning_text">Αυτές οι ρυθμίσεις προορίζονται για προηγμένη προσαρμογή. Η απενεργοποίηση στοιχείων συστήματος (streaming, οπτικοποίηση, ισοσταθμιστής) ενδέχεται να οδηγήσει σε μη αναμενόμενη συμπεριφορά ή αστάθεια της εφαρμογής.\n\nΕίστε βέβαιοι ότι θέλετε να συνεχίσετε;</string>

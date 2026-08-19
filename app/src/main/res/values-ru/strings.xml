@@ -254,7 +254,7 @@
     <string name="adv_module_control_desc">Включение и отключение компонентов приложения</string>
 
     <string name="about_version">Версия приложения</string>
-    <string name="about_version_desc">Pargelium 1.1\nПлеер, который делает то, что должен.</string>
+    <string name="about_version_desc">Pargelium 1.2\nПлеер, который делает то, что должен.</string>
 
     <string name="adv_warning_title">Внимание</string>
     <string name="adv_warning_text">Эти настройки предназначены для глубокой кастомизации. Отключение системных компонентов (стриминг, визуализация, эквалайзер) может привести к неожиданному поведению приложения или его нестабильности.\n\nВы уверены, что хотите продолжить?</string>

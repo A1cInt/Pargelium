@@ -243,7 +243,7 @@
     <string name="adv_module_control_desc">Attiva o disattiva i componenti dell\'app</string>
 
     <string name="about_version">Versione dell\'app</string>
-    <string name="about_version_desc">Pargelium 1.1\nIl lettore che fa semplicemente il suo dovere.</string>
+    <string name="about_version_desc">Pargelium 1.2\nIl lettore che fa semplicemente il suo dovere.</string>
 
     <string name="adv_warning_title">Attenzione</string>
     <string name="adv_warning_text">Queste impostazioni sono destinate a una personalizzazione avanzata. La disattivazione dei componenti di sistema (streaming, visualizzazione, equalizzatore) potrebbe causare comportamenti imprevisti o instabilità dell\'app.\n\nSei sicuro di voler continuare?</string>

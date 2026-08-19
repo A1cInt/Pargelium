@@ -243,7 +243,7 @@
     <string name="adv_module_control_desc">Aktivera eller inaktivera appkomponenter</string>
 
     <string name="about_version">Appversion</string>
-    <string name="about_version_desc">Pargelium 1.1\nSpelaren som helt enkelt gör sitt jobb.</string>
+    <string name="about_version_desc">Pargelium 1.2\nSpelaren som helt enkelt gör sitt jobb.</string>
 
     <string name="adv_warning_title">Varning</string>
     <string name="adv_warning_text">Dessa inställningar är avsedda för djupgående anpassning. Att inaktivera systemkomponenter (strömning, visualisering, equalizer) kan leda till oväntat beteende eller instabilitet i appen.\n\nÄr du säker på att du vill fortsätta?</string>

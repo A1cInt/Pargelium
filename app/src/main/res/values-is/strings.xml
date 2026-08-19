@@ -239,7 +239,7 @@
     <string name="adv_module_control_desc">Virkja eða aftengja hluta forritsins</string>
 
     <string name="about_version">Útgáfa forrits</string>
-    <string name="about_version_desc">Pargelium 1.1\nSpilarinn sem gerir einfaldlega það sem hann á að gera.</string>
+    <string name="about_version_desc">Pargelium 1.2\nSpilarinn sem gerir einfaldlega það sem hann á að gera.</string>
 
     <string name="adv_warning_title">Aðvörun</string>
     <string name="adv_warning_text">Þessar stillingar eru ætlaðar fyrir djúpa sérsniðningu. Ef kerfishlutar eru aftengdir (straumspilun, myndgerving, tónjafnari) getur það leitt til óvæntrar hegðunar eða óstöðugleika forritsins.\n\nErtu viss um að þú viljir halda áfram?</string>

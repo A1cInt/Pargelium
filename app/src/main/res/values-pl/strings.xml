@@ -247,7 +247,7 @@
     <string name="adv_module_control_desc">Włączaj lub wyłączaj komponenty aplikacji</string>
 
     <string name="about_version">Wersja aplikacji</string>
-    <string name="about_version_desc">Pargelium 1.1\nOdtwarzacz, który po prostu robi swoje.</string>
+    <string name="about_version_desc">Pargelium 1.2\nOdtwarzacz, który po prostu robi swoje.</string>
 
     <string name="adv_warning_title">Ostrzeżenie</string>
     <string name="adv_warning_text">Te ustawienia są przeznaczone do zaawansowanej personalizacji. Wyłączenie komponentów systemowych (streaming, wizualizacja, korektor) może prowadzić do nieoczekiwanego zachowania aplikacji lub jej niestabilności.\n\nCzy na pewno chcesz kontynuować?</string>

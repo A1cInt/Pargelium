@@ -239,7 +239,7 @@
     <string name="adv_module_control_desc">Ota sovelluksen osia käyttöön tai poista käytöstä</string>
 
     <string name="about_version">Sovelluksen versio</string>
-    <string name="about_version_desc">Pargelium 1.1\nSoitin, joka yksinkertaisesti tekee tehtävänsä.</string>
+    <string name="about_version_desc">Pargelium 1.2\nSoitin, joka yksinkertaisesti tekee tehtävänsä.</string>
 
     <string name="adv_warning_title">Varoitus</string>
     <string name="adv_warning_text">Nämä asetukset on tarkoitettu edistyneeseen mukauttamiseen. Järjestelmän osien (suoratoisto, visualisointi, taajuuskorjain) poistaminen käytöstä voi johtaa sovelluksen epävakauteen tai odottamattomaan toimintaan.\n\nHaluatko varmasti jatkaa?</string>

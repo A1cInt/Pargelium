@@ -239,7 +239,7 @@
     <string name="adv_module_control_desc">Activer ou désactiver les composants de l\'application</string>
 
     <string name="about_version">Version de l\'application</string>
-    <string name="about_version_desc">Pargelium 1.1\nLe lecteur qui fait simplement ce qu\'on lui demande.</string>
+    <string name="about_version_desc">Pargelium 1.2\nLe lecteur qui fait simplement ce qu\'on lui demande.</string>
 
     <string name="adv_warning_title">Avertissement</string>
     <string name="adv_warning_text">Ces paramètres sont destinés à une personnalisation avancée. La désactivation de composants système (streaming, visualisation, égaliseur) peut entraîner un comportement inattendu ou de l\'instabilité.\n\nVoulez-vous vraiment continuer ?</string>

@@ -239,7 +239,7 @@
     <string name="adv_module_control_desc">Қолданба компоненттерін қосу және өшіру</string>
 
     <string name="about_version">Қолданба нұсқасы</string>
-    <string name="about_version_desc">Pargelium 1.1\nӨз жұмысын мінсіз орындайтын плеер.</string>
+    <string name="about_version_desc">Pargelium 1.2\nӨз жұмысын мінсіз орындайтын плеер.</string>
 
     <string name="adv_warning_title">Ескерту</string>
     <string name="adv_warning_text">Бұл параметрлер терең теңшеуге арналған. Жүйелік компоненттерді (стриминг, визуализация, эквалайзер) өшіру қолданбаның күтпеген әрекетіне немесе тұрақсыздығына әкелуі мүмкін.\n\nЖалғастырғыңыз келетініне сенімдісіз бе?</string>

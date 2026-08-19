@@ -252,7 +252,7 @@
     <string name="adv_module_control_desc">Enable or disable app components</string>
 
     <string name="about_version">App version</string>
-    <string name="about_version_desc">Pargelium 1.1\nThe player that does what it should.</string>
+    <string name="about_version_desc">Pargelium 1.2\nThe player that does what it should.</string>
 
     <string name="adv_warning_title">Warning</string>
     <string name="adv_warning_text">These settings are intended for deep customization. Disabling system components (streaming, visualization, equalizer) may lead to unexpected app behavior or instability.\n\nAre you sure you want to continue?</string>

@@ -239,7 +239,7 @@
     <string name="adv_module_control_desc">ऐप घटकों को सक्षम या अक्षम करें</string>
 
     <string name="about_version">ऐप संस्करण</string>
-    <string name="about_version_desc">Pargelium 1.1\nप्लेयर जो बस अपना काम करता है।</string>
+    <string name="about_version_desc">Pargelium 1.2\nप्लेयर जो बस अपना काम करता है।</string>
 
     <string name="adv_warning_title">चेतावनी</string>
     <string name="adv_warning_text">ये सेटिंग्स एडवांस्ड कस्टमाइजेशन के लिए हैं। सिस्टम घटकों (स्ट्रीमिंग, विज़ुअलाइज़ेशन, इक्वलाइज़र) को अक्षम करने से ऐप में अप्रत्याशित व्यवहार या अस्थिरता हो सकती है।\n\nक्या आप वाकई जारी रखना चाहते हैं?</string>

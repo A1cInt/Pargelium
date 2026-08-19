@@ -250,7 +250,7 @@
     <string name="adv_module_control_desc">Aktifkan atau nonaktifkan komponen aplikasi</string>
 
     <string name="about_version">Versi aplikasi</string>
-    <string name="about_version_desc">Pargelium 1.1\nPemutar musik yang bekerja sesuai fungsinya.</string>
+    <string name="about_version_desc">Pargelium 1.2\nPemutar musik yang bekerja sesuai fungsinya.</string>
 
     <string name="adv_warning_title">Peringatan</string>
     <string name="adv_warning_text">Pengaturan ini ditujukan untuk kustomisasi mendalam. Menonaktifkan komponen sistem (streaming, visualisasi, ekualiser) dapat menyebabkan perilaku aplikasi yang tidak terduga atau ketidakstabilan.\n\nApakah Anda yakin ingin melanjutkan?</string>

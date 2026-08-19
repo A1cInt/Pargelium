@@ -241,7 +241,7 @@
     <string name="adv_module_control_desc">アプリコンポーネントの有効化・無効化</string>
 
     <string name="about_version">アプリのバージョン</string>
-    <string name="about_version_desc">Pargelium 1.1\nシンプルに必要な機能を果たすプレーヤー。</string>
+    <string name="about_version_desc">Pargelium 1.2\nシンプルに必要な機能を果たすプレーヤー。</string>
 
     <string name="adv_warning_title">警告</string>
     <string name="adv_warning_text">これらの設定は高度なカスタマイズ用です。システムコンポーネント（ストリーミング、ビジュアル、イコライザーなど）を無効にすると、アプリの動作が不安定になったり、予期しない不具合が発生したりする可能性があります。\n\n続行してもよろしいですか？</string>
