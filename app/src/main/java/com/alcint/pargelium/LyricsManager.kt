@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.gson.Gson
+import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -38,10 +39,6 @@ data class OvhResponse(
     val lyrics: String?
 )
 
-data class LingvaResponse(
-    val translation: String?
-)
-
 data class MxResponse(
     val message: MxMessage?
 )
@@ -67,6 +64,11 @@ interface LyricsNetworkApi {
         @Query("duration") duration: Int
     ): LrcLibResponse
 
+    @GET("https://lrclib.net/api/search")
+    suspend fun searchLrcLib(
+        @Query("q") query: String
+    ): List<LrcLibResponse>
+
     @GET("https://api.musixmatch.com/ws/1.1/matcher.lyrics.get")
     suspend fun getMusixmatch(
         @Query("q_artist") artist: String,
@@ -78,7 +80,7 @@ interface LyricsNetworkApi {
     suspend fun getOvh(@Url url: String): OvhResponse
 
     @GET
-    suspend fun translateLingva(@Url url: String): LingvaResponse
+    suspend fun translateGoogle(@Url url: String): JsonElement
 }
 
 object LyricsManager {
@@ -105,6 +107,13 @@ object LyricsManager {
         } else {
             Locale.getDefault().language
         }
+    }
+
+    private fun cleanMetadata(text: String): String {
+        return text.replace(Regex("(?i)\\s*\\(?(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?\\)?"), "")
+            .replace(Regex("(?i)\\s*\\[(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?]"), "")
+            .replace(Regex("\\s*-.*?(Remaster|Edit|Mix|Version).*"), "")
+            .trim()
     }
 
     suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> {
@@ -135,18 +144,28 @@ object LyricsManager {
             val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
             if (!validMetadata) return@withContext emptyList()
 
+            val cleanArtist = cleanMetadata(track.artist)
+            val cleanTitle = cleanMetadata(track.title)
+
             var rawLyrics: String? = null
 
             try {
-                val response = api.getLrcLib(track.artist, track.title, track.album.takeIf { it.isNotBlank() }, (track.duration / 1000).toInt())
+                val response = api.getLrcLib(cleanArtist, cleanTitle, track.album.takeIf { it.isNotBlank() }, (track.duration / 1000).toInt())
                 rawLyrics = response.syncedLyrics ?: response.plainLyrics
             } catch (e: Exception) {
-                Log.e("LyricsManager", "LRCLIB error: ${e.message}")
+                try {
+                    val searchResponse = api.searchLrcLib("$cleanArtist $cleanTitle")
+                    if (searchResponse.isNotEmpty()) {
+                        rawLyrics = searchResponse[0].syncedLyrics ?: searchResponse[0].plainLyrics
+                    }
+                } catch (ex: Exception) {
+                    Log.e("LyricsManager", "LRCLIB error: ${ex.message}")
+                }
             }
 
             if (rawLyrics.isNullOrBlank()) {
                 try {
-                    val response = api.getMusixmatch(track.artist, track.title)
+                    val response = api.getMusixmatch(cleanArtist, cleanTitle)
                     rawLyrics = response.message?.body?.lyrics?.lyrics_body
                 } catch (e: Exception) {
                     Log.e("LyricsManager", "Musixmatch error: ${e.message}")
@@ -155,8 +174,8 @@ object LyricsManager {
 
             if (rawLyrics.isNullOrBlank()) {
                 try {
-                    val encodedArtist = URLEncoder.encode(track.artist, "UTF-8").replace("+", "%20")
-                    val encodedTitle = URLEncoder.encode(track.title, "UTF-8").replace("+", "%20")
+                    val encodedArtist = URLEncoder.encode(cleanArtist, "UTF-8").replace("+", "%20")
+                    val encodedTitle = URLEncoder.encode(cleanTitle, "UTF-8").replace("+", "%20")
                     val ovhUrl = "https://api.lyrics.ovh/v1/$encodedArtist/$encodedTitle"
 
                     val response = api.getOvh(ovhUrl)
@@ -216,19 +235,30 @@ object LyricsManager {
 
         try {
             val targetLang = getCurrentAppLanguage()
-            val chunkedLines = lines.chunked(15)
+            val chunkedLines = lines.chunked(25)
             val translatedLines = mutableListOf<String>()
 
             for (chunk in chunkedLines) {
-                val originalText = chunk.joinToString(" || ") { it.text }
-                val encodedQuery = URLEncoder.encode(originalText, "UTF-8").replace("+", "%20")
-                val url = "https://lingva.ml/api/v1/auto/$targetLang/$encodedQuery"
+                val originalText = chunk.joinToString("\n") { it.text }
 
                 try {
-                    val response = api.translateLingva(url)
-                    val translatedText = response.translation?.replace("+", " ") ?: ""
-                    translatedLines.addAll(translatedText.split(" || ", " | | ", "||"))
+                    val encodedQuery = URLEncoder.encode(originalText, "UTF-8")
+                    val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetLang&dt=t&q=$encodedQuery"
+
+                    // Исправлен вызов на translateGoogle
+                    val response = api.translateGoogle(url)
+                    val sentences = response.asJsonArray.get(0).asJsonArray
+
+                    val translatedTextBuilder = StringBuilder()
+                    for (i in 0 until sentences.size()) {
+                        translatedTextBuilder.append(sentences.get(i).asJsonArray.get(0).asString)
+                    }
+
+                    val translatedChunk = translatedTextBuilder.toString().split("\n")
+                    translatedLines.addAll(translatedChunk)
+
                 } catch (e: Exception) {
+                    Log.e("LyricsManager", "Translation chunk error", e)
                     translatedLines.addAll(List(chunk.size) { "" })
                 }
             }
@@ -246,7 +276,7 @@ object LyricsManager {
             return@withContext finalLines
 
         } catch (e: Exception) {
-            Log.e("LyricsManager", "Lingva Translation error: ${e.message}")
+            Log.e("LyricsManager", "Google Translation error: ${e.message}")
         }
         return@withContext lines
     }
