@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 enum class SettingsRoute {
     MAIN, APPEARANCE, PLAYBACK, INTEGRATION, DATA, CONTACT, ADVANCED, ABOUT
@@ -80,7 +81,11 @@ fun SettingsScreen(
 
     val currentLocales = AppCompatDelegate.getApplicationLocales()
     val isSystemLanguage = currentLocales.isEmpty
-    val currentLanguageTag = if (!isSystemLanguage) currentLocales[0]?.toLanguageTag() else ""
+    val currentLanguageTag = if (!isSystemLanguage) {
+        currentLocales[0]?.toLanguageTag() ?: Locale.getDefault().toLanguageTag()
+    } else {
+        Locale.getDefault().toLanguageTag()
+    }
 
     val supportedLanguages = remember(currentLanguageTag, isSystemLanguage) {
         listOf(
