@@ -99,29 +99,23 @@ fun MiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .height(72.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
     ) {
-        // Фон плеера
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(16.dp))
-                .clickable { onClick() }
-        ) {
-            if (actualArt != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(actualArt)
-                        .size(200)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().blur(radius = 25.dp)
-                )
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
-            } else {
-                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
-            }
+        if (actualArt != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(actualArt)
+                    .size(200)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(radius = 25.dp)
+            )
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
+        } else {
+            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
@@ -159,7 +153,6 @@ fun MiniPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Текст
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = track.title,
@@ -178,7 +171,6 @@ fun MiniPlayer(
                     )
                 }
 
-                // Кнопки
                 IconButton(onClick = onPlayPause) {
                     Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Color.White)
                 }
@@ -186,7 +178,7 @@ fun MiniPlayer(
                     Icon(Icons.Default.SkipNext, null, tint = Color.White)
                 }
             }
-            // Прогресс
+
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
