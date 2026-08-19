@@ -267,4 +267,10 @@
     <string name="downloading_update">Inii-download ang update...</string>
     <string name="install_failed">Bigo sa pagpasimula ng pag-install</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Matalinong pagpapalakas ng low-end at sub-bass nang walang clipping</string>
+    <string name="settings_bass_gain">Lakas ng bass</string>
+
+    <string name="action_search_online">Mag-hanap online</string>
+
 </resources>

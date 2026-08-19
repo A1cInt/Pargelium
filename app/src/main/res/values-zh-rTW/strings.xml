@@ -275,4 +275,10 @@
     <string name="lang_system">跟隨系統</string>
 
     <string name="streaming">串流</string>
+
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">智慧低音與超低音增強，防止削波失真</string>
+    <string name="settings_bass_gain">低音強度</string>
+
+    <string name="action_search_online">線上搜尋</string>
 </resources>

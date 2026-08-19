@@ -265,4 +265,10 @@
 
     <string name="action_play">Reproducir</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Mejora inteligente de graves y subgraves sin distorsión</string>
+    <string name="settings_bass_gain">Intensidad de graves</string>
+
+    <string name="action_search_online">Buscar en línea</string>
+
 </resources>

@@ -108,7 +108,8 @@ fun SettingsScreen(
             "id" to context.getString(R.string.lang_id),
             "tl" to context.getString(R.string.lang_tl),
             "zh-CN" to context.getString(R.string.lang_zh),
-            "zh-TW" to context.getString(R.string.lang_zh_tw)
+            "zh-TW" to context.getString(R.string.lang_zh_tw),
+            "uk" to context.getString(R.string.lang_uk)
         )
     }
 

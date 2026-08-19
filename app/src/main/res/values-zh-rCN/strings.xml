@@ -275,4 +275,10 @@
     <string name="lang_system">跟随系统</string>
 
     <string name="streaming">流媒体</string>
+
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">智能低音与超低音增强，防止削波失真</string>
+    <string name="settings_bass_gain">低音强度</string>
+
+    <string name="action_search_online">在线搜索</string>
 </resources>

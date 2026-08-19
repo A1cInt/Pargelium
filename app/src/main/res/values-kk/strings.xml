@@ -261,4 +261,10 @@
 
     <string name="action_play">Ойнату</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Клиппингсіз төменгі жиіліктер мен саб-басты интеллектуалды күшейту</string>
+    <string name="settings_bass_gain">Басс қарқындылығы</string>
+
+    <string name="action_search_online">Желіден іздеу</string>
+
 </resources>

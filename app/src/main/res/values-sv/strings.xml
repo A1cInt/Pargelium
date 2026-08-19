@@ -265,4 +265,10 @@
 
     <string name="action_play">Spela upp</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Intelligent förstärkning av låga frekvenser och sub-bas utan klippning</string>
+    <string name="settings_bass_gain">Basintensitet</string>
+
+    <string name="action_search_online">Sök online</string>
+
 </resources>

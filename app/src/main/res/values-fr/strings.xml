@@ -261,4 +261,10 @@
 
     <string name="action_play">Lire</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Amélioration intelligente des basses et sous-basses sans saturation</string>
+    <string name="settings_bass_gain">Intensité des basses</string>
+
+    <string name="action_search_online">Chercher en ligne</string>
+
 </resources>

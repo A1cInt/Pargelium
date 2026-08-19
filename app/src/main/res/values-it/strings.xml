@@ -265,4 +265,10 @@
 
     <string name="action_play">Riproduci</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Pompaggio intelligente delle basse frequenze e dei sub-bass senza clipping</string>
+    <string name="settings_bass_gain">Intensità bassi</string>
+
+    <string name="action_search_online">Cerca online</string>
+
 </resources>

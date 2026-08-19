@@ -261,4 +261,10 @@
 
     <string name="action_play">Toista</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Matalien taajuuksien ja sub-basson älykäs korostus ilman leikkautumista</string>
+    <string name="settings_bass_gain">Basson voimakkuus</string>
+
+    <string name="action_search_online">Etsi verkosta</string>
+
 </resources>

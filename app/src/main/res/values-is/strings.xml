@@ -261,4 +261,10 @@
 
     <string name="action_play">Spila</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Gáfað efling á lágtíðni og undir-bassa án afskurðar</string>
+    <string name="settings_bass_gain">Bassaatvik</string>
+
+    <string name="action_search_online">Leta á netinu</string>
+
 </resources>

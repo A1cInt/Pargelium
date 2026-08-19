@@ -261,4 +261,10 @@
 
     <string name="action_play">Αναπαραγωγή</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Έξυπνη ενίσχυση χαμηλών συχνοτήτων και υπο-μπάσων χωρίς παραμόρφωση</string>
+    <string name="settings_bass_gain">Ένταση μπάσων</string>
+
+    <string name="action_search_online">Αναζήτηση στο διαδίκτυο</string>
+
 </resources>

@@ -263,4 +263,10 @@
 
     <string name="action_play">再生</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">音の歪み（クリッピング）を防ぎながら低音とサブベースを インテリジェントに強調</string>
+    <string name="settings_bass_gain">低音の強度</string>
+
+    <string name="action_search_online">オンラインで検索</string>
+
 </resources>

@@ -261,4 +261,10 @@
 
     <string name="action_play">Seinn</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Enhancement cliste d\'íseal-chianta agus fo-dord gan bearradh</string>
+    <string name="settings_bass_gain">Intensacht dord</string>
+
+    <string name="action_search_online">Cúlaigh ar líne</string>
+
 </resources>

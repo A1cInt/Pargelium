@@ -272,4 +272,10 @@
 
     <string name="lang_system">Sesuai sistem</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Peningkatan nada rendah dan sub-bass cerdas tanpa klipping</string>
+    <string name="settings_bass_gain">Intensitas bass</string>
+
+    <string name="action_search_online">Cari secara online</string>
+
 </resources>

@@ -265,4 +265,10 @@
 
     <string name="action_play">Abspielen</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Intelligente Verstärkung von Tiefen und Sub-Bass ohne Übersteuerung</string>
+    <string name="settings_bass_gain">Bass-Intensität</string>
+
+    <string name="action_search_online">Online suchen</string>
+
 </resources>

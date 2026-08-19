@@ -57,6 +57,7 @@
     <string name="lang_zh_desc">Simplified Chinese</string>
     <string name="lang_zh_tw">繁體中文</string>
     <string name="lang_zh_tw_desc">Traditional Chinese</string>
+    <string name="lang_uk">Українська</string>
 
     <string name="settings_privacy">Privacy</string>
     <string name="privacy_secure">Secure mode</string>

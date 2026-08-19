@@ -261,4 +261,10 @@
 
     <string name="action_play">चलाएं</string>
 
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">बिना क्लिपिंग के लो-एंड और सब-बेस का इंटेलिजेंट एन्हांसमेंट</string>
+    <string name="settings_bass_gain">बेस तीव्रता</string>
+
+    <string name="action_search_online">ऑनलाइन खोजें</string>
+
 </resources>
