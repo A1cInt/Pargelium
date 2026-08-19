@@ -343,6 +343,24 @@ fun SettingsScreen(
                                         isSecureEnabled = newValue
                                         PrefsManager.saveSecureMode(newValue)
                                         onSecureChanged(newValue)
+
+                                        var ctx = context
+                                        while (ctx is android.content.ContextWrapper) {
+                                            if (ctx is android.app.Activity) break
+                                            ctx = ctx.baseContext
+                                        }
+
+                                        (ctx as? android.app.Activity)?.window?.let { window ->
+                                            if (newValue) {
+                                                window.setFlags(
+                                                    android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                                                    android.view.WindowManager.LayoutParams.FLAG_SECURE
+                                                )
+                                            } else {
+                                                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                                            }
+                                            window.attributes = window.attributes
+                                        }
                                     }
                                 ),
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)

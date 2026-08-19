@@ -56,5 +56,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
+
+        window.attributes = window.attributes
     }
 }
