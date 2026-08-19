@@ -1,0 +1,278 @@
+<resources>
+    <string name="app_name">Pargelium</string>
+
+    <string name="music_not_found">未找到音乐</string>
+
+    <string name="nav_library">曲库</string>
+    <string name="nav_radio">电台</string>
+    <string name="nav_playlists">播放列表</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">设置</string>
+
+    <string name="lyrics_not_found">未找到歌词</string>
+    <string name="header_lyrics">歌词</string>
+    <string name="header_live_radio">直播电台</string>
+    <string name="header_now_playing">正在播放</string>
+    <string name="status_live_broadcast">现场直播</string>
+    <string name="meta_unknown">未知</string>
+
+    <string name="radio_title">网络电台</string>
+    <string name="radio_search_hint">搜索流派、国家或名称…</string>
+
+    <string name="settings_title">设置</string>
+
+    <string name="settings_appearance">外观</string>
+    <string name="theme_auto">自动</string>
+    <string name="theme_auto_desc">跟随系统</string>
+    <string name="theme_light">浅色主题</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">深色主题</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">纯黑</string>
+    <string name="theme_opal">黑曜石</string>
+    <string name="theme_opal_desc">深邃色调</string>
+
+    <string name="settings_language">语言 / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">俄语</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">英语</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+    <string name="lang_id">Bahasa Indonesia</string>
+    <string name="lang_tl">Tagalog</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_zh_desc">简体中文</string>
+    <string name="lang_zh_tw">繁體中文</string>
+    <string name="lang_zh_tw_desc">繁体中文</string>
+
+    <string name="settings_privacy">隐私</string>
+    <string name="privacy_secure">安全模式</string>
+    <string name="privacy_secure_desc">禁止截屏和屏幕录制</string>
+
+    <string name="settings_data">数据</string>
+    <string name="data_clear_cache">清除歌词缓存</string>
+    <string name="data_clear_cache_desc">删除已保存的离线歌词</string>
+    <string name="msg_cache_cleared">已清除 %1$d 个歌词文件</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">智能增强：%1$s</string>
+    <string name="eq_preset_fmt">预设：%1$s</string>
+    <string name="eq_preset_custom">自定义</string>
+
+    <string name="effect_bass">深层低音</string>
+    <string name="effect_room">虚拟空间</string>
+    <string name="effect_tube">电子管温暖</string>
+    <string name="effect_mp3">MP3 修复</string>
+    <string name="effect_mp3_desc">还原丢失的细节</string>
+    <string name="effect_crossfeed">耳机模式</string>
+    <string name="effect_crossfeed_desc">自然声场</string>
+
+    <string name="preset_flat">平坦</string>
+    <string name="preset_bass_boost">低音增强</string>
+    <string name="preset_rock">摇滚</string>
+    <string name="preset_pop">流行</string>
+    <string name="preset_vocal">人声</string>
+    <string name="preset_harman">Harman 目标曲线</string>
+
+    <string name="txt_disc">光盘 %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="other">%1$d 首曲目</item>
+    </plurals>
+
+    <string name="track_bookmarks">曲目书签</string>
+    <string name="new_bookmark">新建书签</string>
+    <string name="create_bookmark">创建书签</string>
+    <string name="no_bookmarks_yet">暂无书签</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_delete">删除</string>
+    <string name="edit_bookmark">编辑书签</string>
+    <string name="bookmark_name">书签名称</string>
+    <string name="bookmark_time_hint">时间（MM:SS 或 HH:MM:SS）</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
+    <string name="playback_queue">播放队列</string>
+    <string name="action_repeat">重复</string>
+    <string name="choose_canvas">选择画布（视频/GIF）</string>
+    <string name="reset_canvas">重置画布</string>
+    <string name="background">背景</string>
+    <string name="bookmarks">书签</string>
+    <string name="translation">翻译</string>
+    <string name="action_collapse">收起</string>
+    <string name="action_lyrics">歌词</string>
+
+    <string name="unknown_artist">未知艺术家</string>
+    <string name="artist_not_found">曲库中未找到艺术家</string>
+    <string name="play_next_msg">接下来播放</string>
+    <string name="added_to_queue_msg">已加入队列</string>
+    <string name="watch_settings_saved">手表设置已保存</string>
+    <string name="search_hint">搜索…</string>
+    <string name="search_no_results">未找到结果</string>
+    <string name="tab_albums">专辑</string>
+    <string name="tab_artists">艺术家</string>
+    <string name="tab_tracks">曲目</string>
+    <string name="no_artists">暂无艺术家</string>
+    <string name="add_to_playlist">添加到播放列表</string>
+    <string name="no_playlists">暂无播放列表。</string>
+    <string name="added_to_playlist_msg">已添加到 %1$s</string>
+    <string name="description_label">描述</string>
+    <string name="click_to_add_description">点击添加描述…</string>
+    <string name="popular_tracks">热门曲目</string>
+
+    <string name="profile_banner_desc">个人主页横幅</string>
+    <string name="unknown_yet">暂未知晓</string>
+    <string name="rank_novice">新手</string>
+    <string name="rank_listener">听众</string>
+    <string name="rank_melomane">音乐爱好者</string>
+    <string name="rank_audiophile">发烧友</string>
+    <string name="rank_music_maniac">音乐狂人</string>
+    <string name="plays_count_label">播放次数</string>
+    <string name="favorite_artist_label">最喜欢的艺术家</string>
+    <string name="top_10_artists">十大艺术家</string>
+    <string name="your_music_dna">你的音乐 DNA</string>
+    <string name="listen_music_for_stats">听音乐，你的统计数据就会显示在这里！</string>
+    <string name="music_ranks_title">音乐等级</string>
+    <string name="tracks_left_for_rank_fmt">还差 %2$d 首曲目达到「%1$s」</string>
+    <string name="max_rank_achieved">你已达成最高等级！你是传奇。</string>
+    <string name="rank_unlocked">已解锁</string>
+    <string name="rank_required_plays_fmt">需要：%1$d 次播放</string>
+
+    <string name="search_error_fmt">搜索错误：%1$s</string>
+    <string name="tab_online_radio">网络电台</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">搜索电台…</string>
+    <string name="search_flac_hint">搜索 FLAC…</string>
+    <string name="search_saavn_hint">在 JioSaavn 中搜索…</string>
+    <string name="stream_error_fmt">流媒体错误：%1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="other">%1$d 次</item>
+    </plurals>
+
+    <string name="new_playlist">新建播放列表</string>
+    <string name="create_your_collection">创建你的收藏</string>
+    <string name="click_to_add_banner">点击添加横幅</string>
+    <string name="playlist_empty_msg">播放列表为空。点击“+”添加音乐。</string>
+    <string name="playlist_name_label">名称</string>
+    <string name="action_create">创建</string>
+    <string name="add_tracks_title">添加曲目</string>
+    <string name="search_track_hint">搜索曲目…</string>
+    <string name="cd_banner">横幅</string>
+    <string name="cd_banner_blurred">模糊横幅</string>
+    <string name="cd_cover">封面</string>
+    <string name="cd_track_cover">曲目封面</string>
+
+    <string name="sound_effects_title">音效</string>
+    <string name="eq_section_title">均衡器</string>
+    <string name="click_to_select_model">点击选择型号</string>
+    <string name="connected_device_fmt">已连接：%1$s</string>
+    <string name="autoeq_title">AutoEQ（耳机数据库）</string>
+    <string name="ten_band_eq_title">10 段均衡器</string>
+    <string name="ten_band_eq_desc">手动频率调节</string>
+    <string name="reset_to_zero">重置为零</string>
+    <string name="bass_management_title">低音管理</string>
+    <string name="deep_bass_title">深层低音</string>
+    <string name="deep_bass_desc">紧实干净、无失真的录音室级低音</string>
+    <string name="setting_power">强度</string>
+    <string name="setting_frequency">频率</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">空间与效果</string>
+    <string name="reverb_title">混响（Freeverb）</string>
+    <string name="reverb_desc">录音室级声学大厅回声</string>
+    <string name="setting_room_size">房间大小</string>
+    <string name="setting_wall_damp">墙壁吸音</string>
+    <string name="setting_mix_level">电平（混音）</string>
+    <string name="spatializer_title">3D 立体声（Spatializer）</string>
+    <string name="spatializer_desc">将声场扩展到头戴式耳机之外</string>
+    <string name="setting_stereo_width">立体声宽度</string>
+    <string name="haas_title">哈斯效应（Haas）</string>
+    <string name="haas_desc">心理声学上的“头外”听感</string>
+    <string name="setting_right_delay">右声道延迟</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">修复（Exciter）</string>
+    <string name="exciter_desc">高频结晶</string>
+    <string name="setting_intensity">强度</string>
+    <string name="tube_amp_title">电子管放大器</string>
+    <string name="tube_amp_desc">温暖的模拟饱和</string>
+    <string name="crossfeed_title">交叉馈送（Crossfeed）</string>
+    <string name="crossfeed_desc">混合声道以获得自然声音</string>
+    <string name="select_headphone_model">选择耳机型号</string>
+
+    <string-array name="reverb_modes">
+        <item>自定义</item>
+        <item>录音室</item>
+        <item>房间</item>
+        <item>大厅</item>
+        <item>大教堂</item>
+        <item>深渊</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">集成</string>
+    <string name="integration_auto_detect">识别耳机</string>
+    <string name="integration_auto_detect_desc">自动加载 AutoEQ 配置文件</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">需要 WearOS 手表</string>
+    <string name="data_reset_autoeq">重置 AutoEQ 配置</string>
+    <string name="data_reset_autoeq_desc">删除已下载的频率预设</string>
+    <string name="msg_autoeq_reset">AutoEQ 设置已重置</string>
+    <string name="settings_contact">联系我</string>
+    <string name="contact_pm">私信</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">我的频道</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
+    <string name="choose_language">选择语言</string>
+
+    <string name="settings_playback">播放</string>
+    <string name="settings_advanced">高级设置</string>
+    <string name="settings_about">关于</string>
+
+    <string name="settings_track_info">曲目信息</string>
+    <string name="settings_track_info_desc">显示比特率、采样率和格式（例如 FLAC）</string>
+
+    <string name="adv_dev_mode">开发者模式</string>
+    <string name="adv_dev_mode_desc">允许访问系统播放器开关</string>
+    <string name="adv_module_control">模块管理</string>
+    <string name="adv_module_control_desc">启用或禁用应用组件</string>
+
+    <string name="about_version">应用版本</string>
+    <string name="about_version_desc">Pargelium 1.1\n做自己该做的事的播放器。</string>
+
+    <string name="adv_warning_title">警告</string>
+    <string name="adv_warning_text">这些设置用于深度自定义。禁用系统组件（流媒体、可视化、均衡器）可能导致应用行为异常或不稳定。\n\n你确定要继续吗？</string>
+    <string name="action_understand">我理解</string>
+    <string name="action_back">返回</string>
+
+    <string name="update_auto_check">自动检查更新</string>
+    <string name="update_auto_check_desc">启动时在 GitHub 上检查新版本</string>
+    <string name="update_check_now">立即检查更新</string>
+    <string name="checking_updates">正在检查更新…</string>
+    <string name="no_updates_found">你已是最新版本</string>
+    <string name="update_check_failed">检查更新失败</string>
+    <string name="update_available">有可用更新 %1$s</string>
+    <string name="update_available_desc">下载并安装 Pargelium 新版本。</string>
+    <string name="action_download">下载</string>
+    <string name="action_skip">跳过</string>
+    <string name="downloading_update">正在下载更新…</string>
+    <string name="install_failed">启动安装失败</string>
+
+    <string name="action_play">播放</string>
+
+    <string name="lang_system">跟随系统</string>
+
+    <string name="streaming">流媒体</string>
+</resources>

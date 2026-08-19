@@ -47,7 +47,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 enum class SettingsRoute {
     MAIN, APPEARANCE, PLAYBACK, INTEGRATION, DATA, CONTACT, ADVANCED, ABOUT
@@ -81,9 +80,9 @@ fun SettingsScreen(
 
     val currentLocales = AppCompatDelegate.getApplicationLocales()
     val isSystemLanguage = currentLocales.isEmpty
-    val currentLanguageCode = if (!isSystemLanguage) currentLocales[0]?.language else Locale.getDefault().language
+    val currentLanguageTag = if (!isSystemLanguage) currentLocales[0]?.toLanguageTag() else ""
 
-    val supportedLanguages = remember(currentLanguageCode, isSystemLanguage) {
+    val supportedLanguages = remember(currentLanguageTag, isSystemLanguage) {
         listOf(
             "auto" to context.getString(R.string.lang_system),
             "ru" to context.getString(R.string.lang_ru),
@@ -102,14 +101,16 @@ fun SettingsScreen(
             "kk" to context.getString(R.string.lang_kk),
             "ga" to context.getString(R.string.lang_ga),
             "id" to context.getString(R.string.lang_id),
-            "tl" to context.getString(R.string.lang_tl)
+            "tl" to context.getString(R.string.lang_tl),
+            "zh-CN" to context.getString(R.string.lang_zh),
+            "zh-TW" to context.getString(R.string.lang_zh_tw)
         )
     }
 
     val currentLanguageName = if (isSystemLanguage) {
         stringResource(R.string.lang_system)
     } else {
-        supportedLanguages.find { it.first == currentLanguageCode }?.second ?: stringResource(R.string.lang_system)
+        supportedLanguages.find { it.first == currentLanguageTag }?.second ?: stringResource(R.string.lang_system)
     }
 
     val themes = remember {
@@ -546,7 +547,7 @@ fun SettingsScreen(
                 )
                 LazyColumn {
                     items(supportedLanguages) { (code, name) ->
-                        val isSelected = if (code == "auto") isSystemLanguage else (!isSystemLanguage && currentLanguageCode == code)
+                        val isSelected = if (code == "auto") isSystemLanguage else (!isSystemLanguage && currentLanguageTag == code)
                         ListItem(
                             headlineContent = {
                                 Text(
