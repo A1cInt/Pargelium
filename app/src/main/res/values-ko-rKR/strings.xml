@@ -1,0 +1,289 @@
+<resources>
+    <string name="app_name">Pargelium</string>
+
+    <string name="music_not_found">음악을 찾을 수 없습니다</string>
+
+    <string name="nav_library">라이브러리</string>
+    <string name="nav_radio">라디오</string>
+    <string name="nav_playlists">재생 목록</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">설정</string>
+
+    <string name="lyrics_not_found">가사를 찾을 수 없습니다</string>
+    <string name="header_lyrics">가사</string>
+    <string name="header_live_radio">라이브 라디오</string>
+    <string name="header_now_playing">현재 재생 중</string>
+    <string name="status_live_broadcast">라이브 방송</string>
+    <string name="meta_unknown">알 수 없음</string>
+
+    <string name="radio_title">온라인 라디오</string>
+    <string name="radio_search_hint">장르, 국가 또는 제목...</string>
+
+    <string name="settings_title">설정</string>
+
+    <string name="settings_appearance">외관</string>
+    <string name="theme_auto">자동</string>
+    <string name="theme_auto_desc">시스템 기본값</string>
+    <string name="theme_light">라이트 테마</string>
+    <string name="theme_light_desc">오로라 라이트</string>
+    <string name="theme_dark">다크 테마</string>
+    <string name="theme_dark_desc">오로라 다크</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">완전한 블랙</string>
+    <string name="theme_opal">블랙 오팔</string>
+    <string name="theme_opal_desc">깊은 그림자</string>
+
+    <string name="settings_language">언어</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">러시아어</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">영어</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+    <string name="lang_id">Bahasa Indonesia</string>
+    <string name="lang_tl">Tagalog</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_zh_desc">중국어 간체</string>
+    <string name="lang_zh_tw">繁體中文</string>
+    <string name="lang_zh_tw_desc">중국어 번체</string>
+    <string name="lang_uk">Українська</string>
+    <string name="lang_pt">Português</string>
+    <string name="lang_tr">Türkçe</string>
+
+    <string name="settings_privacy">개인정보 보호</string>
+    <string name="privacy_secure">보안 모드</string>
+    <string name="privacy_secure_desc">스크린샷 및 화면 녹화 방지</string>
+
+    <string name="settings_data">데이터</string>
+    <string name="data_clear_cache">가사 캐시 지우기</string>
+    <string name="data_clear_cache_desc">저장된 오프라인 가사 삭제</string>
+    <string name="msg_cache_cleared">가사 파일 %1$d개 삭제됨</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP 엔진</string>
+    <string name="eq_smart_enhance_fmt">스마트 향상: %1$s</string>
+    <string name="eq_preset_fmt">사전 설정: %1$s</string>
+    <string name="eq_preset_custom">사용자 지정</string>
+
+    <string name="effect_bass">딥 베이스</string>
+    <string name="effect_room">가상 룸</string>
+    <string name="effect_tube">진공관 따뜻함</string>
+    <string name="effect_mp3">MP3 복원</string>
+    <string name="effect_mp3_desc">손실된 디테일 복원</string>
+    <string name="effect_crossfeed">헤드폰 모드</string>
+    <string name="effect_crossfeed_desc">자연스러운 음장</string>
+
+    <string name="preset_flat">플랫</string>
+    <string name="preset_bass_boost">베이스 부스트</string>
+    <string name="preset_rock">록</string>
+    <string name="preset_pop">팝</string>
+    <string name="preset_vocal">보컬</string>
+    <string name="preset_harman">하만 타겟</string>
+
+    <string name="txt_disc">디스크 %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d 트랙</item>
+        <item quantity="other">%1$d 트랙</item>
+    </plurals>
+
+    <string name="track_bookmarks">트랙 북마크</string>
+    <string name="new_bookmark">새 북마크</string>
+    <string name="create_bookmark">북마크 만들기</string>
+    <string name="no_bookmarks_yet">아직 북마크가 없습니다</string>
+    <string name="action_edit">편집</string>
+    <string name="action_delete">삭제</string>
+    <string name="edit_bookmark">북마크 편집</string>
+    <string name="bookmark_name">북마크 이름</string>
+    <string name="bookmark_time_hint">시간 (MM:SS 또는 HH:MM:SS)</string>
+    <string name="action_save">저장</string>
+    <string name="action_cancel">취소</string>
+    <string name="playback_queue">재생 대기열</string>
+    <string name="action_repeat">반복</string>
+    <string name="choose_canvas">캔버스 선택 (비디오/GIF)</string>
+    <string name="reset_canvas">캔버스 초기화</string>
+    <string name="background">배경</string>
+    <string name="bookmarks">북마크</string>
+    <string name="translation">번역</string>
+    <string name="action_collapse">축소</string>
+    <string name="action_lyrics">가사</string>
+
+    <string name="unknown_artist">알 수 없는 아티스트</string>
+    <string name="artist_not_found">라이브러리에서 아티스트를 찾을 수 없음</string>
+    <string name="play_next_msg">다음 재생</string>
+    <string name="added_to_queue_msg">대기열에 추가됨</string>
+    <string name="watch_settings_saved">워치 설정 저장됨</string>
+    <string name="search_hint">검색...</string>
+    <string name="search_no_results">검색 결과 없음</string>
+    <string name="tab_albums">앨범</string>
+    <string name="tab_artists">아티스트</string>
+    <string name="tab_tracks">트랙</string>
+    <string name="no_artists">아티스트 없음</string>
+    <string name="add_to_playlist">재생 목록에 추가</string>
+    <string name="no_playlists">재생 목록 없음.</string>
+    <string name="added_to_playlist_msg">%1$s에 추가됨</string>
+    <string name="description_label">설명</string>
+    <string name="click_to_add_description">탭하여 설명 추가...</string>
+    <string name="popular_tracks">인기 트랙</string>
+
+    <string name="profile_banner_desc">프로필 배너</string>
+    <string name="unknown_yet">아직 알 수 없음</string>
+    <string name="rank_novice">초보자</string>
+    <string name="rank_listener">리스너</string>
+    <string name="rank_melomane">음악 애호가</string>
+    <string name="rank_audiophile">오디오필</string>
+    <string name="rank_music_maniac">뮤직 매니악</string>
+    <string name="plays_count_label">재생 횟수</string>
+    <string name="favorite_artist_label">가장 좋아하는 아티스트</string>
+    <string name="top_10_artists">상위 10명 아티스트</string>
+    <string name="your_music_dna">당신의 음악 DNA</string>
+    <string name="listen_music_for_stats">음악을 들으면 여기에 통계가 표시됩니다!</string>
+    <string name="music_ranks_title">음악 랭크</string>
+    <string name="tracks_left_for_rank_fmt">«%1$s» 달성까지 %2$d 트랙 남음</string>
+    <string name="max_rank_achieved">최고 랭크에 도달했습니다! 당신은 전설입니다.</string>
+    <string name="rank_unlocked">잠금 해제됨</string>
+    <string name="rank_required_plays_fmt">필요 횟수: %1$d회 재생</string>
+
+    <string name="search_error_fmt">검색 오류: %1$s</string>
+    <string name="tab_online_radio">온라인 라디오</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">스테이션 검색...</string>
+    <string name="search_flac_hint">FLAC 검색...</string>
+    <string name="search_saavn_hint">JioSaavn에서 검색...</string>
+    <string name="stream_error_fmt">스트리밍 오류: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d 번</item>
+        <item quantity="other">%1$d 번</item>
+    </plurals>
+
+    <string name="new_playlist">새 재생 목록</string>
+    <string name="create_your_collection">나만의 컬렉션 만들기</string>
+    <string name="click_to_add_banner">탭하여 배너 추가</string>
+    <string name="playlist_empty_msg">재생 목록이 비어 있습니다. \'+\'를 탭하여 음악을 추가하세요.</string>
+    <string name="playlist_name_label">이름</string>
+    <string name="action_create">만들기</string>
+    <string name="add_tracks_title">트랙 추가</string>
+    <string name="search_track_hint">트랙 검색...</string>
+    <string name="cd_banner">배너</string>
+    <string name="cd_banner_blurred">흐릿한 배너</string>
+    <string name="cd_cover">커버</string>
+    <string name="cd_track_cover">트랙 커버</string>
+
+    <string name="sound_effects_title">사운드 효과</string>
+    <string name="eq_section_title">이퀄라이제이션</string>
+    <string name="click_to_select_model">탭하여 모델 선택</string>
+    <string name="connected_device_fmt">연결됨: %1$s</string>
+    <string name="autoeq_title">AutoEQ (헤드폰 기반)</string>
+    <string name="ten_band_eq_title">10 밴드 이퀄라이저</string>
+    <string name="ten_band_eq_desc">수동 주파수 튜닝</string>
+    <string name="reset_to_zero">초기화</string>
+    <string name="bass_management_title">베이스 관리</string>
+    <string name="deep_bass_title">딥 베이스</string>
+    <string name="deep_bass_desc">왜곡 없는 단단하고 선명한 스튜디오 베이스</string>
+    <string name="setting_power">파워</string>
+    <string name="setting_frequency">주파수</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">공간 및 효과</string>
+    <string name="reverb_title">리버브 (Freeverb)</string>
+    <string name="reverb_desc">스튜디오 어쿠스틱 홀 에코</string>
+    <string name="setting_room_size">룸 크기</string>
+    <string name="setting_wall_damp">벽면 댐핑</string>
+    <string name="setting_mix_level">레벨 (믹스)</string>
+    <string name="spatializer_title">3D 스테레오 (Spatializer)</string>
+    <string name="spatializer_desc">헤드폰을 넘어 사운드스테이지 확장</string>
+    <string name="setting_stereo_width">스테레오 너비</string>
+    <string name="haas_title">하스 효과 (Haas Effect)</string>
+    <string name="haas_desc">심리음향적 헤드 밖 사운드</string>
+    <string name="setting_right_delay">우측 채널 지연</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">복원 (Exciter)</string>
+    <string name="exciter_desc">고주파 결정화</string>
+    <string name="setting_intensity">강도</string>
+    <string name="tube_amp_title">진공관 앰프</string>
+    <string name="tube_amp_desc">따뜻한 아날로그 새츄레이션</string>
+    <string name="crossfeed_title">크로스피드 (Crossfeed)</string>
+    <string name="crossfeed_desc">자연스러운 사운드를 위해 채널 혼합</string>
+    <string name="select_headphone_model">헤드폰 모델 선택</string>
+
+    <string-array name="reverb_modes">
+        <item>사용자 지정</item>
+        <item>스튜디오</item>
+        <item>룸</item>
+        <item>홀</item>
+        <item>대성당</item>
+        <item>심연</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">통합</string>
+    <string name="integration_auto_detect">헤드폰 감지</string>
+    <string name="integration_auto_detect_desc">자동으로 AutoEQ 프로필 불러오기</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">WearOS 워치 필요</string>
+    <string name="data_reset_autoeq">AutoEQ 프로필 초기화</string>
+    <string name="data_reset_autoeq_desc">다운로드한 주파수 프리셋 삭제</string>
+    <string name="msg_autoeq_reset">AutoEQ 설정 초기화됨</string>
+    <string name="settings_contact">문의하기</string>
+    <string name="contact_pm">개인 메시지</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">내 채널</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
+    <string name="choose_language">언어 선택</string>
+
+    <string name="settings_playback">재생</string>
+    <string name="settings_advanced">고급 설정</string>
+    <string name="settings_about">정보</string>
+
+    <string name="settings_track_info">트랙 정보</string>
+    <string name="settings_track_info_desc">비트레이트, 샘플링 속도 및 포맷 표시 (예: FLAC)</string>
+
+    <string name="adv_dev_mode">개발자 모드</string>
+    <string name="adv_dev_mode_desc">시스템 플레이어 토글에 대한 접근 허용</string>
+    <string name="adv_module_control">모듈 관리</string>
+    <string name="adv_module_control_desc">앱 구성 요소 활성화 또는 비활성화</string>
+
+    <string name="about_version">앱 버전</string>
+    <string name="about_version_desc">Pargelium 1.2\n기본에 충실한 플레이어.</string>
+
+    <string name="adv_warning_title">경고</string>
+    <string name="adv_warning_text">이 설정은 심층적인 맞춤 설정을 위한 것입니다. 시스템 구성 요소(스트리밍, 시각화, 이퀄라이저)를 비활성화하면 예기치 않은 앱 동작이나 불안정이 발생할 수 있습니다.\n\n계속하시겠습니까?</string>
+    <string name="action_understand">이해했습니다</string>
+    <string name="action_back">뒤로</string>
+
+    <string name="update_auto_check">자동 업데이트 확인</string>
+    <string name="update_auto_check_desc">시작 시 GitHub에서 새 버전 확인</string>
+    <string name="update_check_now">지금 업데이트 확인</string>
+    <string name="checking_updates">업데이트 확인 중...</string>
+    <string name="no_updates_found">최신 버전입니다</string>
+    <string name="update_check_failed">업데이트 확인 실패</string>
+    <string name="update_available">%1$s 업데이트 가능</string>
+    <string name="update_available_desc">Pargelium의 새 버전을 다운로드하고 설치하세요.</string>
+    <string name="action_download">다운로드</string>
+    <string name="action_skip">건너뛰기</string>
+    <string name="downloading_update">업데이트 다운로드 중...</string>
+    <string name="install_failed">설치 시작 실패</string>
+
+    <string name="action_play">재생</string>
+
+    <string name="lang_system">시스템 기본값</string>
+
+    <string name="streaming">스트리밍</string>
+
+    <string name="settings_bass_boost">다이내믹 베이스 부스트</string>
+    <string name="settings_bass_boost_desc">클리핑 없는 지능형 로우엔드 및 서브 베이스 향상</string>
+    <string name="settings_bass_gain">베이스 강도</string>
+
+    <string name="action_search_online">온라인 검색</string>
+</resources>

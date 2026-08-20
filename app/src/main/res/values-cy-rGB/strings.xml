@@ -1,0 +1,292 @@
+<resources>
+    <string name="app_name">Pargelium</string>
+
+    <string name="music_not_found">Heb ddod o hyd i gerddoriaeth</string>
+
+    <string name="nav_library">Llyfr.</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Rhestri chwarae</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Gosodiadau</string>
+
+    <string name="lyrics_not_found">Heb ddod o hyd i\'r geiriau</string>
+    <string name="header_lyrics">GEIRIAU</string>
+    <string name="header_live_radio">RADIO BYW</string>
+    <string name="header_now_playing">YN CHWARAE NAWR</string>
+    <string name="status_live_broadcast">DARLLEDIAD BYW</string>
+    <string name="meta_unknown">ANHYSBYS</string>
+
+    <string name="radio_title">Radio Ar-lein</string>
+    <string name="radio_search_hint">Genre, gwlad, neu deitl...</string>
+
+    <string name="settings_title">Gosodiadau</string>
+
+    <string name="settings_appearance">Ymddangosiad</string>
+    <string name="theme_auto">Awtomatig</string>
+    <string name="theme_auto_desc">Rhagosodiad system</string>
+    <string name="theme_light">Thema Olau</string>
+    <string name="theme_light_desc">Goleuni Awrora</string>
+    <string name="theme_dark">Thema Dywyll</string>
+    <string name="theme_dark_desc">Tywyllwch Awrora</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Du du</string>
+    <string name="theme_opal">Opal Du</string>
+    <string name="theme_opal_desc">Cysgod tywyll</string>
+
+    <string name="settings_language">Iaith</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Rwseg</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Saesneg</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+    <string name="lang_id">Bahasa Indonesia</string>
+    <string name="lang_tl">Tagalog</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_zh_desc">Tsieinëeg Symledig</string>
+    <string name="lang_zh_tw">繁體中文</string>
+    <string name="lang_zh_tw_desc">Tsieinëeg Traddodiadol</string>
+    <string name="lang_uk">Українська</string>
+    <string name="lang_pt">Português</string>
+    <string name="lang_tr">Türkçe</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_fo">Føroyskt</string>
+    <string name="lang_ka">ქართული</string>
+
+    <string name="settings_privacy">Preifatrwydd</string>
+    <string name="privacy_secure">Modd diogel</string>
+    <string name="privacy_secure_desc">Atal sgrinluniau a recordio sgrin</string>
+
+    <string name="settings_data">Data</string>
+    <string name="data_clear_cache">Clirio celc geiriau</string>
+    <string name="data_clear_cache_desc">Dileu geiriau all-lein a gadwyd</string>
+    <string name="msg_cache_cleared">Cliriwyd %1$d ffeil geiriau</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Injan Pro DSP</string>
+    <string name="eq_smart_enhance_fmt">Gwella Clyfar: %1$s</string>
+    <string name="eq_preset_fmt">Rhagosodiad: %1$s</string>
+    <string name="eq_preset_custom">Cyfaddas</string>
+
+    <string name="effect_bass">Bas Dwfn</string>
+    <string name="effect_room">Ystafell Rithwir</string>
+    <string name="effect_tube">Cynhesrwydd Tiwb</string>
+    <string name="effect_mp3">Adfer MP3</string>
+    <string name="effect_mp3_desc">Adfer manylion coll</string>
+    <string name="effect_crossfeed">Modd Clustffonau</string>
+    <string name="effect_crossfeed_desc">Maes sain naturiol</string>
+
+    <string name="preset_flat">Fflat</string>
+    <string name="preset_bass_boost">Hwb Bas</string>
+    <string name="preset_rock">Roc</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Llais</string>
+    <string name="preset_harman">Targed Harman</string>
+
+    <string name="txt_disc">Disg %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d trac</item>
+        <item quantity="other">%1$d trac</item>
+    </plurals>
+
+    <string name="track_bookmarks">Nodau tudalen trac</string>
+    <string name="new_bookmark">Nod tudalen newydd</string>
+    <string name="create_bookmark">Creu nod tudalen</string>
+    <string name="no_bookmarks_yet">Dim nodau tudalen eto</string>
+    <string name="action_edit">Golygu</string>
+    <string name="action_delete">Dileu</string>
+    <string name="edit_bookmark">Golygu nod tudalen</string>
+    <string name="bookmark_name">Enw\'r nod tudalen</string>
+    <string name="bookmark_time_hint">Amser (MM:SS neu HH:MM:SS)</string>
+    <string name="action_save">Cadw</string>
+    <string name="action_cancel">Canslo</string>
+    <string name="playback_queue">Ciw chwarae</string>
+    <string name="action_repeat">Ailadrodd</string>
+    <string name="choose_canvas">Dewis Cynfas (Fideo/GIF)</string>
+    <string name="reset_canvas">Ailosod Cynfas</string>
+    <string name="background">Cefndir</string>
+    <string name="bookmarks">Nodau tudalen</string>
+    <string name="translation">Cyfieithiad</string>
+    <string name="action_collapse">Cwympo</string>
+    <string name="action_lyrics">Geiriau</string>
+
+    <string name="unknown_artist">Artist Anhysbys</string>
+    <string name="artist_not_found">Heb ddod o hyd i\'r artist yn y llyfrgell</string>
+    <string name="play_next_msg">Chwarae nesaf</string>
+    <string name="added_to_queue_msg">Ychwanegwyd at y ciw</string>
+    <string name="watch_settings_saved">Cadwyd gosodiadau\'r oriawr</string>
+    <string name="search_hint">Chwilio...</string>
+    <string name="search_no_results">Dim canlyniadau</string>
+    <string name="tab_albums">Albymau</string>
+    <string name="tab_artists">Artistiaid</string>
+    <string name="tab_tracks">Traciau</string>
+    <string name="no_artists">Dim artistiaid</string>
+    <string name="add_to_playlist">Ychwanegu at y rhestr chwarae</string>
+    <string name="no_playlists">Dim rhestri chwarae.</string>
+    <string name="added_to_playlist_msg">Ychwanegwyd at %1$s</string>
+    <string name="description_label">Disgrifiad</string>
+    <string name="click_to_add_description">Tapiwch i ychwanegu disgrifiad...</string>
+    <string name="popular_tracks">Traciau poblogaidd</string>
+
+    <string name="profile_banner_desc">Baner proffil</string>
+    <string name="unknown_yet">Anhysbys eto</string>
+    <string name="rank_novice">Newyddian</string>
+    <string name="rank_listener">Gwrandawr</string>
+    <string name="rank_melomane">Cariad Cerddoriaeth</string>
+    <string name="rank_audiophile">Awdioffil</string>
+    <string name="rank_music_maniac">Maniac Cerddoriaeth</string>
+    <string name="plays_count_label">Chwaraeadau</string>
+    <string name="favorite_artist_label">Hoff Artist</string>
+    <string name="top_10_artists">Y 10 Artist Gorau</string>
+    <string name="your_music_dna">Eich DNA Cerddoriaeth</string>
+    <string name="listen_music_for_stats">Gwrandewch ar gerddoriaeth, a bydd eich ystadegau\'n ymddangos yma!</string>
+    <string name="music_ranks_title">Rhengoedd Cerddoriaeth</string>
+    <string name="tracks_left_for_rank_fmt">%2$d trac ar ôl i gyrraedd «%1$s»</string>
+    <string name="max_rank_achieved">Rydych chi wedi cyrraedd y rheng uchaf! Rydych chi\'n chwedl.</string>
+    <string name="rank_unlocked">Wedi\'i ddatgloi</string>
+    <string name="rank_required_plays_fmt">Angenrheidiol: %1$d chwarae</string>
+
+    <string name="search_error_fmt">Gwall chwilio: %1$s</string>
+    <string name="tab_online_radio">Radio Ar-lein</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Chwilio gorsaf...</string>
+    <string name="search_flac_hint">Chwilio FLAC...</string>
+    <string name="search_saavn_hint">Chwilio yn JioSaavn...</string>
+    <string name="stream_error_fmt">Gwall ffrwd: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d waith</item>
+        <item quantity="other">%1$d gwaith</item>
+    </plurals>
+
+    <string name="new_playlist">Rhestr chwarae newydd</string>
+    <string name="create_your_collection">Creu eich casgliad</string>
+    <string name="click_to_add_banner">Tapiwch i ychwanegu baner</string>
+    <string name="playlist_empty_msg">Mae\'r rhestr chwarae\'n wag. Tapiwch \'+\' i ychwanegu cerddoriaeth.</string>
+    <string name="playlist_name_label">Enw</string>
+    <string name="action_create">Creu</string>
+    <string name="add_tracks_title">Ychwanegu traciau</string>
+    <string name="search_track_hint">Chwilio trac...</string>
+    <string name="cd_banner">Baner</string>
+    <string name="cd_banner_blurred">Baner aneglur</string>
+    <string name="cd_cover">Clawr</string>
+    <string name="cd_track_cover">Clawr trac</string>
+
+    <string name="sound_effects_title">Effeithiau Sain</string>
+    <string name="eq_section_title">Cyfartalu</string>
+    <string name="click_to_select_model">Tapiwch i ddewis model</string>
+    <string name="connected_device_fmt">Cysylltiedig: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Sefyllfa Clustffonau)</string>
+    <string name="ten_band_eq_title">Cyfartalwr 10-Band</string>
+    <string name="ten_band_eq_desc">Tiwnio amledd â llaw</string>
+    <string name="reset_to_zero">Ailosod i sero</string>
+    <string name="bass_management_title">Rheoli Bas</string>
+    <string name="deep_bass_title">Bas Dwfn</string>
+    <string name="deep_bass_desc">Bas stiwdio dynn a chlir heb ystumio</string>
+    <string name="setting_power">Pŵer</string>
+    <string name="setting_frequency">Amledd</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Gofod ac Effeithiau</string>
+    <string name="reverb_title">Adlais (Freeverb)</string>
+    <string name="reverb_desc">Adlais neuadd acwstig stiwdio</string>
+    <string name="setting_room_size">Maint ystafell</string>
+    <string name="setting_wall_damp">Lleithio wal</string>
+    <string name="setting_mix_level">Lefel (Cymysgedd)</string>
+    <string name="spatializer_title">Stereo 3D (Spatializer)</string>
+    <string name="spatializer_desc">Yn ehangu\'r llwyfan sain y tu hwnt i glustffonau</string>
+    <string name="setting_stereo_width">Lled stereo</string>
+    <string name="haas_title">Effaith Haas</string>
+    <string name="haas_desc">Sain allan o\'r pen seic-acwstig</string>
+    <string name="setting_right_delay">Oedi sianel dde</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Adfer (Exciter)</string>
+    <string name="exciter_desc">Grisialu amledd uchel</string>
+    <string name="setting_intensity">Dwysedd</string>
+    <string name="tube_amp_title">Mwyhadur Tiwb</string>
+    <string name="tube_amp_desc">Dirlawnder analog cynnes</string>
+    <string name="crossfeed_title">Traws-borthiant</string>
+    <string name="crossfeed_desc">Yn cymysgu sianeli ar gyfer sain naturiol</string>
+    <string name="select_headphone_model">Dewiswch fodel clustffon</string>
+
+    <string-array name="reverb_modes">
+        <item>Cyfaddas</item>
+        <item>Stiwdio</item>
+        <item>Ystafell</item>
+        <item>Neuadd</item>
+        <item>Eglwys Gadeiriol</item>
+        <item>Affwys</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integreiddio</string>
+    <string name="integration_auto_detect">Canfod clustffonau</string>
+    <string name="integration_auto_detect_desc">Llwytho proffil AutoEQ yn awtomatig</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Mae angen oriawr WearOS</string>
+    <string name="data_reset_autoeq">Ailosod proffil AutoEQ</string>
+    <string name="data_reset_autoeq_desc">Tynnu rhagosodiad amledd a lwythwyd i lawr</string>
+    <string name="msg_autoeq_reset">Ailosod gosodiadau AutoEQ</string>
+    <string name="settings_contact">Cysylltu â mi</string>
+    <string name="contact_pm">Negeseuon Preifat</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Fy sianel</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
+    <string name="choose_language">Dewis iaith</string>
+
+    <string name="settings_playback">Chwarae</string>
+    <string name="settings_advanced">Gosodiadau Uwch</string>
+    <string name="settings_about">Am</string>
+
+    <string name="settings_track_info">Gwybodaeth trac</string>
+    <string name="settings_track_info_desc">Dangos cyfradd didau, cyfradd samplu, a fformat (e.e., FLAC)</string>
+
+    <string name="adv_dev_mode">Modd datblygwr</string>
+    <string name="adv_dev_mode_desc">Caniatáu mynediad i doglau chwaraewr y system</string>
+    <string name="adv_module_control">Rheoli modiwlau</string>
+    <string name="adv_module_control_desc">Galluogi neu analluogi cydrannau ap</string>
+
+    <string name="about_version">Fersiwn ap</string>
+    <string name="about_version_desc">Pargelium 1.2\nY chwaraewr sy\'n gwneud yr hyn y dylai.</string>
+
+    <string name="adv_warning_title">Rhybudd</string>
+    <string name="adv_warning_text">Bwriedir y gosodiadau hyn ar gyfer addasu dwfn. Gall analluogi cydrannau system (ffrydio, delweddu, cyfartalwr) arwain at ymddygiad ap annisgwyl neu ansefydlogrwydd.\n\nYdych chi\'n siŵr eich bod am barhau?</string>
+    <string name="action_understand">Deallaf</string>
+    <string name="action_back">Nôl</string>
+
+    <string name="update_auto_check">Gwirio am ddiweddariadau yn awtomatig</string>
+    <string name="update_auto_check_desc">Gwirio am fersiynau newydd ar GitHub wrth gychwyn</string>
+    <string name="update_check_now">Gwirio am ddiweddariadau nawr</string>
+    <string name="checking_updates">Yn gwirio am ddiweddariadau...</string>
+    <string name="no_updates_found">Mae gennych y fersiwn ddiweddaraf</string>
+    <string name="update_check_failed">Methwyd gwirio am ddiweddariadau</string>
+    <string name="update_available">Diweddariad %1$s ar gael</string>
+    <string name="update_available_desc">Lawrlwythwch a gosodwch fersiwn newydd o Pargelium.</string>
+    <string name="action_download">Lawrlwytho</string>
+    <string name="action_skip">Hepgor</string>
+    <string name="downloading_update">Yn lawrlwytho\'r diweddariad...</string>
+    <string name="install_failed">Methwyd â lansio\'r gosodiad</string>
+
+    <string name="action_play">Chwarae</string>
+
+    <string name="lang_system">Rhagosodiad system</string>
+
+    <string name="streaming">Ffrydio</string>
+
+    <string name="settings_bass_boost">Hwb Bas Dynamig</string>
+    <string name="settings_bass_boost_desc">Gwella bas deallus heb glipio</string>
+    <string name="settings_bass_gain">Dwysedd bas</string>
+
+    <string name="action_search_online">Chwilio ar-lein</string>
+</resources>

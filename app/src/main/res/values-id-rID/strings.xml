@@ -1,0 +1,281 @@
+<resources>
+    <string name="app_name">Pargelium</string>
+
+    <string name="music_not_found">Musik tidak ditemukan</string>
+
+    <string name="nav_library">Pustaka</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Playlist</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Setelan</string>
+
+    <string name="lyrics_not_found">Lirik tidak ditemukan</string>
+    <string name="header_lyrics">LIRIK</string>
+    <string name="header_live_radio">RADIO LANGSUNG</string>
+    <string name="header_now_playing">SEDANG DIPUTAR</string>
+    <string name="status_live_broadcast">SIARAN LANGSUNG</string>
+    <string name="meta_unknown">TIDAK DIKETAHUI</string>
+
+    <string name="radio_title">Radio Online</string>
+    <string name="radio_search_hint">Genre, negara, atau judul...</string>
+
+    <string name="settings_title">Pengaturan</string>
+
+    <string name="settings_appearance">Tampilan</string>
+    <string name="theme_auto">Otomatis</string>
+    <string name="theme_auto_desc">Sesuai sistem</string>
+    <string name="theme_light">Tema terang</string>
+    <string name="theme_light_desc">Aurora Terang</string>
+    <string name="theme_dark">Tema gelap</string>
+    <string name="theme_dark_desc">Aurora Gelap</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Hitam pekat</string>
+    <string name="theme_opal">Opal Hitam</string>
+    <string name="theme_opal_desc">Nuansa dalam</string>
+
+    <string name="settings_language">Язык / Language</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Rusia</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Inggris</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+
+    <string name="settings_privacy">Privasi</string>
+    <string name="privacy_secure">Mode privat</string>
+    <string name="privacy_secure_desc">Cegah tangkapan dan rekaman layar</string>
+
+    <string name="settings_data">Data</string>
+    <string name="data_clear_cache">Hapus cache lirik</string>
+    <string name="data_clear_cache_desc">Hapus lirik offline yang disimpan</string>
+    <string name="msg_cache_cleared">Dihapus %1$d file lirik</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP Engine</string>
+    <string name="eq_smart_enhance_fmt">Smart Enhance: %1$s</string>
+    <string name="eq_preset_fmt">Preset: %1$s</string>
+    <string name="eq_preset_custom">Kustom</string>
+
+    <string name="effect_bass">Bass Dalam</string>
+    <string name="effect_room">Ruang Virtual</string>
+    <string name="effect_tube">Kehangatan Tabung</string>
+    <string name="effect_mp3">Restorasi MP3</string>
+    <string name="effect_mp3_desc">Kembalikan detail yang hilang</string>
+    <string name="effect_crossfeed">Mode Headphone</string>
+    <string name="effect_crossfeed_desc">Medan suara alami</string>
+
+    <string name="preset_flat">Datar</string>
+    <string name="preset_bass_boost">Peningkat Bass</string>
+    <string name="preset_rock">Rock</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Vokal</string>
+    <string name="preset_harman">Harman Target</string>
+
+    <string name="txt_disc">Disk %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d trek</item>
+        <item quantity="few">%1$d trek</item>
+        <item quantity="many">%1$d trek</item>
+        <item quantity="other">%1$d trek</item>
+    </plurals>
+
+    <string name="track_bookmarks">Penanda trek</string>
+    <string name="new_bookmark">Penanda baru</string>
+    <string name="create_bookmark">Buat penanda</string>
+    <string name="no_bookmarks_yet">Belum ada penanda di sini</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Hapus</string>
+    <string name="edit_bookmark">Edit penanda</string>
+    <string name="bookmark_name">Nama penanda</string>
+    <string name="bookmark_time_hint">Waktu (MM:DD atau JJ:MM:DD)</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_cancel">Batal</string>
+    <string name="playback_queue">Antrean pemutaran</string>
+    <string name="action_repeat">Ulangi</string>
+    <string name="choose_canvas">Pilih Canvas (Video/GIF)</string>
+    <string name="reset_canvas">Atur ulang Canvas</string>
+    <string name="background">Latar belakang</string>
+    <string name="bookmarks">Penanda</string>
+    <string name="translation">Terjemahan</string>
+    <string name="action_collapse">Tutup</string>
+    <string name="action_lyrics">Lirik</string>
+
+    <string name="unknown_artist">Artis tidak dikenal</string>
+    <string name="artist_not_found">Artis tidak ditemukan di pustaka</string>
+    <string name="play_next_msg">Putar selanjutnya</string>
+    <string name="added_to_queue_msg">Ditambahkan ke antrean</string>
+    <string name="watch_settings_saved">Pengaturan jam disimpan</string>
+    <string name="search_hint">Cari...</string>
+    <string name="search_no_results">Tidak ada hasil</string>
+    <string name="tab_albums">Album</string>
+    <string name="tab_artists">Artis</string>
+    <string name="tab_tracks">Trek</string>
+    <string name="no_artists">Tidak ada artis</string>
+    <string name="add_to_playlist">Tambahkan ke playlist</string>
+    <string name="no_playlists">Tidak ada playlist.</string>
+    <string name="added_to_playlist_msg">Ditambahkan ke %1$s</string>
+    <string name="description_label">Deskripsi</string>
+    <string name="click_to_add_description">Ketuk untuk menambahkan deskripsi...</string>
+    <string name="popular_tracks">Trek populer</string>
+
+    <string name="profile_banner_desc">Banner profil</string>
+    <string name="unknown_yet">Belum diketahui</string>
+    <string name="rank_novice">Pemula</string>
+    <string name="rank_listener">Pendengar</string>
+    <string name="rank_melomane">Pecinta Musik</string>
+    <string name="rank_audiophile">Audiofil</string>
+    <string name="rank_music_maniac">Maniak Musik</string>
+    <string name="plays_count_label">Pemutaran</string>
+    <string name="favorite_artist_label">Artis favorit</string>
+    <string name="top_10_artists">10 Artis Teratas</string>
+    <string name="your_music_dna">DNA musikmu</string>
+    <string name="listen_music_for_stats">Dengarkan musik, dan statistikmu akan muncul di sini!</string>
+    <string name="music_ranks_title">Peringkat musik</string>
+    <string name="tracks_left_for_rank_fmt">Tersisa %2$d trek untuk mencapai peringkat «%1$s»</string>
+    <string name="max_rank_achieved">Anda telah mencapai peringkat maksimum! Anda adalah legenda.</string>
+    <string name="rank_unlocked">Terbuka</string>
+    <string name="rank_required_plays_fmt">Diperlukan: %1$d pemutaran</string>
+
+    <string name="search_error_fmt">Kesalahan pencarian: %1$s</string>
+    <string name="tab_online_radio">Radio Online</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Cari stasiun...</string>
+    <string name="search_flac_hint">Cari FLAC...</string>
+    <string name="search_saavn_hint">Cari di JioSaavn...</string>
+    <string name="stream_error_fmt">Kesalahan streaming: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d kali</item>
+        <item quantity="few">%1$d kali</item>
+        <item quantity="many">%1$d kali</item>
+        <item quantity="other">%1$d kali</item>
+    </plurals>
+
+    <string name="new_playlist">Playlist baru</string>
+    <string name="create_your_collection">Buat koleksimu</string>
+    <string name="click_to_add_banner">Ketuk untuk menambahkan banner</string>
+    <string name="playlist_empty_msg">Playlist kosong. Ketuk \'+\' untuk menambahkan musik.</string>
+    <string name="playlist_name_label">Nama</string>
+    <string name="action_create">Buat</string>
+    <string name="add_tracks_title">Tambahkan trek</string>
+    <string name="search_track_hint">Cari trek...</string>
+    <string name="cd_banner">Banner</string>
+    <string name="cd_banner_blurred">Banner buram</string>
+    <string name="cd_cover">Sampul</string>
+    <string name="cd_track_cover">Sampul trek</string>
+
+    <string name="sound_effects_title">Efek Suara</string>
+    <string name="eq_section_title">Ekualisasi</string>
+    <string name="click_to_select_model">Ketuk untuk memilih model</string>
+    <string name="connected_device_fmt">Terhubung: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Basis Headphone)</string>
+    <string name="ten_band_eq_title">Ekualiser 10-Band</string>
+    <string name="ten_band_eq_desc">Pengaturan frekuensi manual</string>
+    <string name="reset_to_zero">Atur ulang ke nol</string>
+    <string name="bass_management_title">Manajemen Bass</string>
+    <string name="deep_bass_title">Bass Dalam</string>
+    <string name="deep_bass_desc">Bass studio yang padat dan jernih tanpa distorsi</string>
+    <string name="setting_power">Daya</string>
+    <string name="setting_frequency">Frekuensi</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Ruang dan Efek</string>
+    <string name="reverb_title">Reverb (Freeverb)</string>
+    <string name="reverb_desc">Gema akustik aula studio</string>
+    <string name="setting_room_size">Ukuran ruangan</string>
+    <string name="setting_wall_damp">Peredam dinding</string>
+    <string name="setting_mix_level">Tingkat (Mix)</string>
+    <string name="spatializer_title">Stereo 3D (Spatializer)</string>
+    <string name="spatializer_desc">Memperluas panggung suara melampaui headphone</string>
+    <string name="setting_stereo_width">Lebar stereo</string>
+    <string name="haas_title">Efek Haas</string>
+    <string name="haas_desc">Mengeluarkan suara \'dari kepala\' secara psikoakustik</string>
+    <string name="setting_right_delay">Jeda saluran kanan</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Restorasi (Exciter)</string>
+    <string name="exciter_desc">Kristalisasi frekuensi tinggi</string>
+    <string name="setting_intensity">Intensitas</string>
+    <string name="tube_amp_title">Amplifier Tabung</string>
+    <string name="tube_amp_desc">Saturasi analog yang hangat</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Mencampur saluran untuk suara alami</string>
+    <string name="select_headphone_model">Pilih model headphone</string>
+
+    <string-array name="reverb_modes">
+        <item>Kustom</item>
+        <item>Studio</item>
+        <item>Ruangan</item>
+        <item>Aula</item>
+        <item>Katedral</item>
+        <item>Jurang</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integrasi</string>
+    <string name="integration_auto_detect">Deteksi headphone</string>
+    <string name="integration_auto_detect_desc">Memuat profil AutoEQ secara otomatis</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Membutuhkan jam tangan WearOS</string>
+    <string name="data_reset_autoeq">Atur ulang profil AutoEQ</string>
+    <string name="data_reset_autoeq_desc">Hapus preset frekuensi yang diunduh</string>
+    <string name="msg_autoeq_reset">Pengaturan AutoEQ diatur ulang</string>
+    <string name="settings_contact">Hubungi saya</string>
+    <string name="contact_pm">Pesan Pribadi</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Saluran saya</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
+    <string name="choose_language">Pilih bahasa</string>
+
+    <string name="settings_playback">Pemutaran</string>
+    <string name="settings_advanced">Pengaturan Lanjutan</string>
+    <string name="settings_about">Tentang aplikasi</string>
+
+    <string name="settings_track_info">Info trek</string>
+    <string name="settings_track_info_desc">Tampilkan bitrate, sample rate, dan format (mis., FLAC)</string>
+
+    <string name="adv_dev_mode">Mode pengembang</string>
+    <string name="adv_dev_mode_desc">Berikan akses ke tombol sistem pemutar</string>
+    <string name="adv_module_control">Manajemen modul</string>
+    <string name="adv_module_control_desc">Aktifkan atau nonaktifkan komponen aplikasi</string>
+
+    <string name="about_version">Versi aplikasi</string>
+    <string name="about_version_desc">Pargelium 1.2\nPemutar musik yang bekerja sesuai fungsinya.</string>
+
+    <string name="adv_warning_title">Peringatan</string>
+    <string name="adv_warning_text">Pengaturan ini ditujukan untuk kustomisasi mendalam. Menonaktifkan komponen sistem (streaming, visualisasi, ekualiser) dapat menyebabkan perilaku aplikasi yang tidak terduga atau ketidakstabilan.\n\nApakah Anda yakin ingin melanjutkan?</string>
+    <string name="action_understand">Saya mengerti</string>
+    <string name="action_back">Kembali</string>
+
+    <string name="update_auto_check">Pemeriksaan pembaruan otomatis</string>
+    <string name="update_auto_check_desc">Periksa versi baru di GitHub saat aplikasi dibuka</string>
+    <string name="update_check_now">Periksa pembaruan sekarang</string>
+    <string name="checking_updates">Memeriksa pembaruan...</string>
+    <string name="no_updates_found">Anda menggunakan versi terbaru</string>
+    <string name="update_check_failed">Gagal memeriksa pembaruan</string>
+    <string name="update_available">Pembaruan %1$s tersedia</string>
+    <string name="update_available_desc">Unduh dan pasang versi baru Pargelium.</string>
+    <string name="action_download">Unduh</string>
+    <string name="action_skip">Lewati</string>
+    <string name="downloading_update">Mengunduh pembaruan...</string>
+    <string name="install_failed">Gagal memulai pemasangan</string>
+
+    <string name="lang_system">Sesuai sistem</string>
+
+    <string name="settings_bass_boost">Dynamic Bass Boost</string>
+    <string name="settings_bass_boost_desc">Peningkatan nada rendah dan sub-bass cerdas tanpa klipping</string>
+    <string name="settings_bass_gain">Intensitas bass</string>
+
+    <string name="action_search_online">Cari secara online</string>
+
+</resources>

@@ -1,0 +1,291 @@
+<resources>
+    <string name="app_name">Pargelium</string>
+
+    <string name="music_not_found">მუსიკა ვერ მოიძებნა</string>
+
+    <string name="nav_library">ბიბლ.</string>
+    <string name="nav_radio">რადიო</string>
+    <string name="nav_playlists">ფლეილისტები</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">პარამეტრები</string>
+
+    <string name="lyrics_not_found">ტექსტი ვერ მოიძებნა</string>
+    <string name="header_lyrics">ტექსტი</string>
+    <string name="header_live_radio">ლაივ რადიო</string>
+    <string name="header_now_playing">ახლა უკრავს</string>
+    <string name="status_live_broadcast">პირდაპირი ტრანსლაცია</string>
+    <string name="meta_unknown">უცნობია</string>
+
+    <string name="radio_title">ონლაინ რადიო</string>
+    <string name="radio_search_hint">ჟანრი, ქვეყანა ან სახელი...</string>
+
+    <string name="settings_title">პარამეტრები</string>
+
+    <string name="settings_appearance">იერსახე</string>
+    <string name="theme_auto">ავტო</string>
+    <string name="theme_auto_desc">სისტემის ნაგულისხმევი</string>
+    <string name="theme_light">ღია თემა</string>
+    <string name="theme_light_desc">Aurora Light</string>
+    <string name="theme_dark">მუქი თემა</string>
+    <string name="theme_dark_desc">Aurora Dark</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">სრულიად შავი</string>
+    <string name="theme_opal">Black Opal</string>
+    <string name="theme_opal_desc">მუქი ჩრდილი</string>
+
+    <string name="settings_language">ენა</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">რუსული</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">ინგლისური</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+    <string name="lang_id">Bahasa Indonesia</string>
+    <string name="lang_tl">Tagalog</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_zh_desc">გამარტივებული ჩინური</string>
+    <string name="lang_zh_tw">繁體中文</string>
+    <string name="lang_zh_tw_desc">ტრადიციული ჩინური</string>
+    <string name="lang_uk">Українська</string>
+    <string name="lang_pt">Português</string>
+    <string name="lang_tr">Türkçe</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_fo">Føroyskt</string>
+
+    <string name="settings_privacy">კონფიდენციალურობა</string>
+    <string name="privacy_secure">უსაფრთხო რეჟიმი</string>
+    <string name="privacy_secure_desc">ეკრანის გადაღების და ჩაწერის აკრძალვა</string>
+
+    <string name="settings_data">მონაცემები</string>
+    <string name="data_clear_cache">ტექსტების ქეშის წაშლა</string>
+    <string name="data_clear_cache_desc">შენახული ოფლაინ ტექსტების წაშლა</string>
+    <string name="msg_cache_cleared">წაიშალა %1$d ტექსტის ფაილი</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Pro DSP ძრავა</string>
+    <string name="eq_smart_enhance_fmt">ჭკვიანი გაუმჯობესება: %1$s</string>
+    <string name="eq_preset_fmt">პრესეტი: %1$s</string>
+    <string name="eq_preset_custom">მორგებული</string>
+
+    <string name="effect_bass">ღრმა ბასი</string>
+    <string name="effect_room">ვირტუალური ოთახი</string>
+    <string name="effect_tube">ლამპის სითბო</string>
+    <string name="effect_mp3">MP3-ის აღდგენა</string>
+    <string name="effect_mp3_desc">დაკარგული დეტალების აღდგენა</string>
+    <string name="effect_crossfeed">ყურსასმენის რეჟიმი</string>
+    <string name="effect_crossfeed_desc">ბუნებრივი ხმის ველი</string>
+
+    <string name="preset_flat">ბრტყელი</string>
+    <string name="preset_bass_boost">ბასის გაძლიერება</string>
+    <string name="preset_rock">როკი</string>
+    <string name="preset_pop">პოპი</string>
+    <string name="preset_vocal">ვოკალი</string>
+    <string name="preset_harman">Harman-ის მრუდი</string>
+
+    <string name="txt_disc">დისკი %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d ტრეკი</item>
+        <item quantity="other">%1$d ტრეკი</item>
+    </plurals>
+
+    <string name="track_bookmarks">ტრეკის სანიშნეები</string>
+    <string name="new_bookmark">ახალი სანიშნე</string>
+    <string name="create_bookmark">სანიშნეს შექმნა</string>
+    <string name="no_bookmarks_yet">სანიშნეები ჯერ არ არის</string>
+    <string name="action_edit">რედაქტირება</string>
+    <string name="action_delete">წაშლა</string>
+    <string name="edit_bookmark">სანიშნეს რედაქტირება</string>
+    <string name="bookmark_name">სანიშნეს სახელი</string>
+    <string name="bookmark_time_hint">დრო (MM:SS ან HH:MM:SS)</string>
+    <string name="action_save">შენახვა</string>
+    <string name="action_cancel">გაუქმება</string>
+    <string name="playback_queue">დაკვრის რიგი</string>
+    <string name="action_repeat">გამეორება</string>
+    <string name="choose_canvas">Canvas-ის არჩევა (ვიდეო/GIF)</string>
+    <string name="reset_canvas">Canvas-ის განულება</string>
+    <string name="background">ფონი</string>
+    <string name="bookmarks">სანიშნეები</string>
+    <string name="translation">თარგმანი</string>
+    <string name="action_collapse">ჩაკეცვა</string>
+    <string name="action_lyrics">ტექსტი</string>
+
+    <string name="unknown_artist">უცნობი შემსრულებელი</string>
+    <string name="artist_not_found">შემსრულებელი ვერ მოიძებნა</string>
+    <string name="play_next_msg">შემდეგის დაკვრა</string>
+    <string name="added_to_queue_msg">დაემატა რიგში</string>
+    <string name="watch_settings_saved">საათის პარამეტრები შენახულია</string>
+    <string name="search_hint">ძიება...</string>
+    <string name="search_no_results">ვერაფერი მოიძებნა</string>
+    <string name="tab_albums">ალბომები</string>
+    <string name="tab_artists">შემსრულებლები</string>
+    <string name="tab_tracks">ტრეკები</string>
+    <string name="no_artists">შემსრულებლები არ არის</string>
+    <string name="add_to_playlist">ფლეილისტში დამატება</string>
+    <string name="no_playlists">ფლეილისტები არ არის.</string>
+    <string name="added_to_playlist_msg">დაემატა %1$s-ში</string>
+    <string name="description_label">აღწერა</string>
+    <string name="click_to_add_description">შეეხეთ აღწერის დასამატებლად...</string>
+    <string name="popular_tracks">პოპულარული ტრეკები</string>
+
+    <string name="profile_banner_desc">პროფილის ბანერი</string>
+    <string name="unknown_yet">ჯერ უცნობია</string>
+    <string name="rank_novice">დამწყები</string>
+    <string name="rank_listener">მსმენელი</string>
+    <string name="rank_melomane">მელომანი</string>
+    <string name="rank_audiophile">აუდიოფილი</string>
+    <string name="rank_music_maniac">მუსიკის მანიაკი</string>
+    <string name="plays_count_label">მოსმენა</string>
+    <string name="favorite_artist_label">საყვარელი შემსრულებელი</string>
+    <string name="top_10_artists">ტოპ 10 შემსრულებელი</string>
+    <string name="your_music_dna">თქვენი მუსიკალური DNA</string>
+    <string name="listen_music_for_stats">მოუსმინეთ მუსიკას და აქ გამოჩნდება თქვენი სტატისტიკა!</string>
+    <string name="music_ranks_title">მუსიკალური რანგები</string>
+    <string name="tracks_left_for_rank_fmt">დარჩა %2$d ტრეკი «%1$s»-მდე</string>
+    <string name="max_rank_achieved">თქვენ მიაღწიეთ მაქსიმალურ რანგს! თქვენ ლეგენდა ხართ.</string>
+    <string name="rank_unlocked">განბლოკილია</string>
+    <string name="rank_required_plays_fmt">საჭიროა: %1$d მოსმენა</string>
+
+    <string name="search_error_fmt">ძიების შეცდომა: %1$s</string>
+    <string name="tab_online_radio">ონლაინ რადიო</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">სადგურის ძიება...</string>
+    <string name="search_flac_hint">FLAC ძიება...</string>
+    <string name="search_saavn_hint">JioSaavn-ში ძიება...</string>
+    <string name="stream_error_fmt">სტრიმის შეცდომა: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d-ჯერ</item>
+        <item quantity="other">%1$d-ჯერ</item>
+    </plurals>
+
+    <string name="new_playlist">ახალი ფლეილისტი</string>
+    <string name="create_your_collection">შექმენით თქვენი კოლექცია</string>
+    <string name="click_to_add_banner">შეეხეთ ბანერის დასამატებლად</string>
+    <string name="playlist_empty_msg">ფლეილისტი ცარიელია. შეეხეთ \'+\'-ს მუსიკის დასამატებლად.</string>
+    <string name="playlist_name_label">სახელი</string>
+    <string name="action_create">შექმნა</string>
+    <string name="add_tracks_title">ტრეკების დამატება</string>
+    <string name="search_track_hint">ტრეკის ძიება...</string>
+    <string name="cd_banner">ბანერი</string>
+    <string name="cd_banner_blurred">ბუნდოვანი ბანერი</string>
+    <string name="cd_cover">ყდა</string>
+    <string name="cd_track_cover">ტრეკის ყდა</string>
+
+    <string name="sound_effects_title">ხმის ეფექტები</string>
+    <string name="eq_section_title">ეკვალაიზაცია</string>
+    <string name="click_to_select_model">შეეხეთ მოდელის ასარჩევად</string>
+    <string name="connected_device_fmt">დაკავშირებულია: %1$s</string>
+    <string name="autoeq_title">AutoEQ (ყურსასმენის ბაზა)</string>
+    <string name="ten_band_eq_title">10-ზოლიანი ეკვალაიზერი</string>
+    <string name="ten_band_eq_desc">სიხშირის ხელით მართვა</string>
+    <string name="reset_to_zero">განულება</string>
+    <string name="bass_management_title">ბასის მართვა</string>
+    <string name="deep_bass_title">ღრმა ბასი</string>
+    <string name="deep_bass_desc">სუფთა და მკვრივი სტუდიური ბასი დამახინჯების გარეშე</string>
+    <string name="setting_power">სიმძლავრე</string>
+    <string name="setting_frequency">სიხშირე</string>
+    <string name="unit_hz">ჰც</string>
+    <string name="space_and_effects_title">სივრცე და ეფექტები</string>
+    <string name="reverb_title">რევერბერაცია (Freeverb)</string>
+    <string name="reverb_desc">აკუსტიკური სტუდიური დარბაზის ექო</string>
+    <string name="setting_room_size">ოთახის ზომა</string>
+    <string name="setting_wall_damp">კედლის შთანთქმა</string>
+    <string name="setting_mix_level">დონე (მიქსი)</string>
+    <string name="spatializer_title">3D სტერეო (Spatializer)</string>
+    <string name="spatializer_desc">აფართოებს ხმის სცენას ყურსასმენებს მიღმა</string>
+    <string name="setting_stereo_width">სტერეოს სიგანე</string>
+    <string name="haas_title">ჰაასის ეფექტი</string>
+    <string name="haas_desc">ფსიქოაკუსტიკური ხმა თავის გარეთ</string>
+    <string name="setting_right_delay">მარჯვენა არხის დაყოვნება</string>
+    <string name="unit_ms">მწ</string>
+    <string name="exciter_title">აღდგენა (Exciter)</string>
+    <string name="exciter_desc">მაღალი სიხშირეების კრისტალიზაცია</string>
+    <string name="setting_intensity">ინტენსივობა</string>
+    <string name="tube_amp_title">ლამპური გამაძლიერებელი</string>
+    <string name="tube_amp_desc">თბილი ანალოგური გაჯერება</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">ურევს არხებს ბუნებრივი ხმისთვის</string>
+    <string name="select_headphone_model">აირჩიეთ ყურსასმენის მოდელი</string>
+
+    <string-array name="reverb_modes">
+        <item>მორგებული</item>
+        <item>სტუდია</item>
+        <item>ოთახი</item>
+        <item>დარბაზი</item>
+        <item>საკათედრო ტაძარი</item>
+        <item>უფსკრული</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">ინტეგრაცია</string>
+    <string name="integration_auto_detect">ყურსასმენების ამოცნობა</string>
+    <string name="integration_auto_detect_desc">ავტომატურად ტვირთავს AutoEQ პროფილს</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">საჭიროებს WearOS საათს</string>
+    <string name="data_reset_autoeq">AutoEQ პროფილის განულება</string>
+    <string name="data_reset_autoeq_desc">გადმოწერილი სიხშირის პრესეტის წაშლა</string>
+    <string name="msg_autoeq_reset">AutoEQ პარამეტრები განულდა</string>
+    <string name="settings_contact">კონტაქტი</string>
+    <string name="contact_pm">პირადი შეტყობინებები</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">ჩემი არხი</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
+    <string name="choose_language">ენის არჩევა</string>
+
+    <string name="settings_playback">დაკვრა</string>
+    <string name="settings_advanced">დამატებითი პარამეტრები</string>
+    <string name="settings_about">პროგრამის შესახებ</string>
+
+    <string name="settings_track_info">ტრეკის ინფორმაცია</string>
+    <string name="settings_track_info_desc">აჩვენებს ბიტრეიტს, დისკრეტიზაციის სიხშირეს და ფორმატს (მაგ., FLAC)</string>
+
+    <string name="adv_dev_mode">დეველოპერის რეჟიმი</string>
+    <string name="adv_dev_mode_desc">სისტემური დამკვრელის გადამრთველებზე წვდომა</string>
+    <string name="adv_module_control">მოდულების მართვა</string>
+    <string name="adv_module_control_desc">აპლიკაციის კომპონენტების ჩართვა ან გამორთვა</string>
+
+    <string name="about_version">აპლიკაციის ვერსია</string>
+    <string name="about_version_desc">Pargelium 1.2\nდამკვრელი, რომელიც აკეთებს იმას, რაც უნდა აკეთოს.</string>
+
+    <string name="adv_warning_title">გაფრთხილება</string>
+    <string name="adv_warning_text">ეს პარამეტრები განკუთვნილია ღრმა მორგებისთვის. სისტემური კომპონენტების (სტრიმინგი, ვიზუალიზაცია, ეკვალაიზერი) გამორთვამ შეიძლება გამოიწვიოს აპლიკაციის არასტაბილურობა.\n\nდარწმუნებული ხართ, რომ გსურთ გაგრძელება?</string>
+    <string name="action_understand">გასაგებია</string>
+    <string name="action_back">უკან</string>
+
+    <string name="update_auto_check">განახლებების ავტომატური შემოწმება</string>
+    <string name="update_auto_check_desc">ახალი ვერსიების შემოწმება GitHub-ზე გაშვებისას</string>
+    <string name="update_check_now">განახლებების შემოწმება ახლავე</string>
+    <string name="checking_updates">მოწმდება განახლებები...</string>
+    <string name="no_updates_found">თქვენ გაქვთ უახლესი ვერსია</string>
+    <string name="update_check_failed">განახლებების შემოწმება ვერ მოხერხდა</string>
+    <string name="update_available">ხელმისაწვდომია განახლება %1$s</string>
+    <string name="update_available_desc">ჩამოტვირთეთ და დააინსტალირეთ Pargelium-ის ახალი ვერსია.</string>
+    <string name="action_download">ჩამოტვირთვა</string>
+    <string name="action_skip">გამოტოვება</string>
+    <string name="downloading_update">მიმდინარეობს განახლების ჩამოტვირთვა...</string>
+    <string name="install_failed">ინსტალაციის დაწყება ვერ მოხერხდა</string>
+
+    <string name="action_play">დაკვრა</string>
+
+    <string name="lang_system">სისტემის ნაგულისხმევი</string>
+
+    <string name="streaming">სტრიმინგი</string>
+
+    <string name="settings_bass_boost">დინამიური ბასის გაძლიერება</string>
+    <string name="settings_bass_boost_desc">ჭკვიანი დაბალი სიხშირეების და საბ-ბასის გაძლიერება დამახინჯების გარეშე</string>
+    <string name="settings_bass_gain">ბასის ინტენსივობა</string>
+
+    <string name="action_search_online">ონლაინ ძიება</string>
+</resources>

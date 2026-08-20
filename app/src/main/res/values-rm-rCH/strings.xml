@@ -1,0 +1,293 @@
+<resources>
+    <string name="app_name">Pargelium</string>
+
+    <string name="music_not_found">Musica betg chattada</string>
+
+    <string name="nav_library">Bibl.</string>
+    <string name="nav_radio">Radio</string>
+    <string name="nav_playlists">Glistas</string>
+    <string name="nav_eq">EQ</string>
+    <string name="nav_settings">Impostaziuns</string>
+
+    <string name="lyrics_not_found">Text betg chattà</string>
+    <string name="header_lyrics">TEXT</string>
+    <string name="header_live_radio">RADIO LIVE</string>
+    <string name="header_now_playing">ACTUALMAIN</string>
+    <string name="status_live_broadcast">EMISSIUN LIVE</string>
+    <string name="meta_unknown">NUNENCONUSCHENT</string>
+
+    <string name="radio_title">Radio Online</string>
+    <string name="radio_search_hint">Gener, pajais u titel...</string>
+
+    <string name="settings_title">Impostaziuns</string>
+
+    <string name="settings_appearance">Apparenza</string>
+    <string name="theme_auto">Automatic</string>
+    <string name="theme_auto_desc">Standard dal sistem</string>
+    <string name="theme_light">Tema cler</string>
+    <string name="theme_light_desc">Glisch Aurora</string>
+    <string name="theme_dark">Tema stgir</string>
+    <string name="theme_dark_desc">Stgirezza Aurora</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_amoled_desc">Nair profund</string>
+    <string name="theme_opal">Opal nair</string>
+    <string name="theme_opal_desc">Sumbriva profunda</string>
+
+    <string name="settings_language">Lingua</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_ru_desc">Russ</string>
+    <string name="lang_en">English</string>
+    <string name="lang_en_desc">Englais</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_it">Italiano</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_pl">Polski</string>
+    <string name="lang_sv">Svenska</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_is">Íslenska</string>
+    <string name="lang_hi">हिन्दी</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_el">Ελληνικά</string>
+    <string name="lang_fi">Suomi</string>
+    <string name="lang_kk">Қазақ</string>
+    <string name="lang_ga">Gaeilge</string>
+    <string name="lang_id">Bahasa Indonesia</string>
+    <string name="lang_tl">Tagalog</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_zh_desc">Chinais simplifitgà</string>
+    <string name="lang_zh_tw">繁體中文</string>
+    <string name="lang_zh_tw_desc">Chinais tradiziunal</string>
+    <string name="lang_uk">Українська</string>
+    <string name="lang_pt">Português</string>
+    <string name="lang_tr">Türkçe</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_fo">Føroyskt</string>
+    <string name="lang_ka">ქართული</string>
+    <string name="lang_cy">Cymraeg</string>
+
+    <string name="settings_privacy">Sfera privata</string>
+    <string name="privacy_secure">Modus segir</string>
+    <string name="privacy_secure_desc">Impedir screenshots ed inregistraziuns dal fadi</string>
+
+    <string name="settings_data">Datas</string>
+    <string name="data_clear_cache">Stidar il cache da texts</string>
+    <string name="data_clear_cache_desc">Stidar texts da chanzuns arcunads offline</string>
+    <string name="msg_cache_cleared">Stidà %1$d datotecas da text</string>
+
+    <string name="eq_title">Pargelium EQ</string>
+    <string name="eq_subtitle">Motur Pro DSP</string>
+    <string name="eq_smart_enhance_fmt">Meglierament intelligent: %1$s</string>
+    <string name="eq_preset_fmt">Preselecziun: %1$s</string>
+    <string name="eq_preset_custom">Persunalisà</string>
+
+    <string name="effect_bass">Bass profund</string>
+    <string name="effect_room">Chombra virtuala</string>
+    <string name="effect_tube">Chalira da bischens</string>
+    <string name="effect_mp3">Restauraziun da MP3</string>
+    <string name="effect_mp3_desc">Restituir detagls sperdids</string>
+    <string name="effect_crossfeed">Modus dad udidors</string>
+    <string name="effect_crossfeed_desc">Champ tunal natiral</string>
+
+    <string name="preset_flat">Plan</string>
+    <string name="preset_bass_boost">Rinforz dal bass</string>
+    <string name="preset_rock">Rock</string>
+    <string name="preset_pop">Pop</string>
+    <string name="preset_vocal">Vocal</string>
+    <string name="preset_harman">Target da Harman</string>
+
+    <string name="txt_disc">Disc %1$d</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%1$d titel</item>
+        <item quantity="other">%1$d titels</item>
+    </plurals>
+
+    <string name="track_bookmarks">Marcadors dal titel</string>
+    <string name="new_bookmark">Nov marcador</string>
+    <string name="create_bookmark">Crear marcador</string>
+    <string name="no_bookmarks_yet">Anc nagins marcadors</string>
+    <string name="action_edit">Modifitgar</string>
+    <string name="action_delete">Stidar</string>
+    <string name="edit_bookmark">Modifitgar il marcador</string>
+    <string name="bookmark_name">Num dal marcador</string>
+    <string name="bookmark_time_hint">Temp (MM:SS u HH:MM:SS)</string>
+    <string name="action_save">Memorisar</string>
+    <string name="action_cancel">Anullar</string>
+    <string name="playback_queue">Coda da reproducziun</string>
+    <string name="action_repeat">Repeter</string>
+    <string name="choose_canvas">Tschernir Canvas (Video/GIF)</string>
+    <string name="reset_canvas">Rimetter Canvas</string>
+    <string name="background">Fund</string>
+    <string name="bookmarks">Marcadors</string>
+    <string name="translation">Translaziun</string>
+    <string name="action_collapse">Sarrar</string>
+    <string name="action_lyrics">Text</string>
+
+    <string name="unknown_artist">Artist nunenconuschent</string>
+    <string name="artist_not_found">Artist betg chattà en la biblioteca</string>
+    <string name="play_next_msg">Sunar proxim</string>
+    <string name="added_to_queue_msg">Agiuntà a la coda</string>
+    <string name="watch_settings_saved">Impostaziuns da l\'ura memorisadas</string>
+    <string name="search_hint">Tschertgar...</string>
+    <string name="search_no_results">Chattà nagins resultats</string>
+    <string name="tab_albums">Albums</string>
+    <string name="tab_artists">Artists</string>
+    <string name="tab_tracks">Titels</string>
+    <string name="no_artists">Nagins artists</string>
+    <string name="add_to_playlist">Agiuntar a la glista</string>
+    <string name="no_playlists">Naginas glistas.</string>
+    <string name="added_to_playlist_msg">Agiuntà a %1$s</string>
+    <string name="description_label">Descripziun</string>
+    <string name="click_to_add_description">Toccai per agiuntar ina descripziun...</string>
+    <string name="popular_tracks">Titels populars</string>
+
+    <string name="profile_banner_desc">Banderola da profil</string>
+    <string name="unknown_yet">Anc nunenconuschent</string>
+    <string name="rank_novice">Noviz</string>
+    <string name="rank_listener">Auditur</string>
+    <string name="rank_melomane">Amatur da musica</string>
+    <string name="rank_audiophile">Audiofil</string>
+    <string name="rank_music_maniac">Maniac da musica</string>
+    <string name="plays_count_label">Reproducziuns</string>
+    <string name="favorite_artist_label">Artist preferì</string>
+    <string name="top_10_artists">Top 10 Artists</string>
+    <string name="your_music_dna">Voss DNA da musica</string>
+    <string name="listen_music_for_stats">Tadlai musica e vossas statisticas cumparan qua!</string>
+    <string name="music_ranks_title">Rangs da musica</string>
+    <string name="tracks_left_for_rank_fmt">Anc %2$d titels per cuntanscher «%1$s»</string>
+    <string name="max_rank_achieved">Vus avais cuntanschì il rang maximal! Vus essas ina legenda.</string>
+    <string name="rank_unlocked">Sbloccà</string>
+    <string name="rank_required_plays_fmt">Necessari: %1$d reproducziuns</string>
+
+    <string name="search_error_fmt">Sbagl da tschertgar: %1$s</string>
+    <string name="tab_online_radio">Radio Online</string>
+    <string name="tab_flac">FLAC</string>
+    <string name="tab_jiosaavn">JioSaavn</string>
+    <string name="search_station_hint">Tschertgar staziun...</string>
+    <string name="search_flac_hint">Tschertgar FLAC...</string>
+    <string name="search_saavn_hint">Tschertgar en JioSaavn...</string>
+    <string name="stream_error_fmt">Sbagl dal stream: %1$s</string>
+
+    <plurals name="plays_times">
+        <item quantity="one">%1$d giada</item>
+        <item quantity="other">%1$d giadas</item>
+    </plurals>
+
+    <string name="new_playlist">Nova glista</string>
+    <string name="create_your_collection">Creai vossa collecziun</string>
+    <string name="click_to_add_banner">Toccai per agiuntar ina banderola</string>
+    <string name="playlist_empty_msg">La glista è vida. Toccai \'+\' per agiuntar musica.</string>
+    <string name="playlist_name_label">Num</string>
+    <string name="action_create">Crear</string>
+    <string name="add_tracks_title">Agiuntar titels</string>
+    <string name="search_track_hint">Tschertgar titel...</string>
+    <string name="cd_banner">Banderola</string>
+    <string name="cd_banner_blurred">Banderola sfuscada</string>
+    <string name="cd_cover">Cuverta</string>
+    <string name="cd_track_cover">Cuverta dal titel</string>
+
+    <string name="sound_effects_title">Effets da tun</string>
+    <string name="eq_section_title">Gualisaziun</string>
+    <string name="click_to_select_model">Toccai per tschernir in model</string>
+    <string name="connected_device_fmt">Connectà: %1$s</string>
+    <string name="autoeq_title">AutoEQ (Basa dad udidors)</string>
+    <string name="ten_band_eq_title">Equalizer da 10 bands</string>
+    <string name="ten_band_eq_desc">Adattaziun manuala da la frequenza</string>
+    <string name="reset_to_zero">Rimetter a nulla</string>
+    <string name="bass_management_title">Gestziun dal bass</string>
+    <string name="deep_bass_title">Bass profund</string>
+    <string name="deep_bass_desc">Bass da studio cler e ferm senza distorsiun</string>
+    <string name="setting_power">Prestaziun</string>
+    <string name="setting_frequency">Frequenza</string>
+    <string name="unit_hz">Hz</string>
+    <string name="space_and_effects_title">Stanza ed effets</string>
+    <string name="reverb_title">Reverb (Freeverb)</string>
+    <string name="reverb_desc">Ebo da halla acustica da studio</string>
+    <string name="setting_room_size">Grondezza da la stanza</string>
+    <string name="setting_wall_damp">Isolaziun da la paraid</string>
+    <string name="setting_mix_level">Nivel (Mix)</string>
+    <string name="spatializer_title">Stereo 3D (Spatializer)</string>
+    <string name="spatializer_desc">Extenda il champ tunal sur ils udidors or</string>
+    <string name="setting_stereo_width">Ladezza dal stereo</string>
+    <string name="haas_title">Effet da Haas</string>
+    <string name="haas_desc">Tun psicoacustic ordaifer il chau</string>
+    <string name="setting_right_delay">Retard dal chanal dretg</string>
+    <string name="unit_ms">ms</string>
+    <string name="exciter_title">Restauraziun (Exciter)</string>
+    <string name="exciter_desc">Cristallisaziun da frequenzas autas</string>
+    <string name="setting_intensity">Intensitad</string>
+    <string name="tube_amp_title">Amplificatur a bischens</string>
+    <string name="tube_amp_desc">Saturaziun analoga chauda</string>
+    <string name="crossfeed_title">Crossfeed</string>
+    <string name="crossfeed_desc">Maschada chanals per in tun natiral</string>
+    <string name="select_headphone_model">Tschernir model dad udidors</string>
+
+    <string-array name="reverb_modes">
+        <item>Persunalisà</item>
+        <item>Studio</item>
+        <item>Chombra</item>
+        <item>Halla</item>
+        <item>Catedrala</item>
+        <item>Abis</item>
+    </string-array>
+
+    <string name="theme_pargelia">Pargelia</string>
+    <string name="settings_integration">Integraziun</string>
+    <string name="integration_auto_detect">Enconuscher udidors</string>
+    <string name="integration_auto_detect_desc">Chargia automaticamain il profil dad AutoEQ</string>
+    <string name="integration_wear_api">Pargelium Wear API</string>
+    <string name="integration_wear_api_desc">Pretenda in\'ura WearOS</string>
+    <string name="data_reset_autoeq">Rimetter il profil dad AutoEQ</string>
+    <string name="data_reset_autoeq_desc">Stidar il pre-set da frequenza telechargià</string>
+    <string name="msg_autoeq_reset">Impostaziuns dad AutoEQ rimessas</string>
+    <string name="settings_contact">Contactai mai</string>
+    <string name="contact_pm">Messadis privats</string>
+    <string name="contact_pm_desc">Telegram: @alcint</string>
+    <string name="contact_channel">Mè chanal</string>
+    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
+    <string name="choose_language">Tschernir la lingua</string>
+
+    <string name="settings_playback">Reproducziun</string>
+    <string name="settings_advanced">Impostaziuns extendidas</string>
+    <string name="settings_about">Sur da</string>
+
+    <string name="settings_track_info">Infurmaziuns dal titel</string>
+    <string name="settings_track_info_desc">Mussar bitrate, rata da samplar e format (p. ex. FLAC)</string>
+
+    <string name="adv_dev_mode">Modus da svilupader</string>
+    <string name="adv_dev_mode_desc">Conceder l\'access als interupturs dal sunader dal sistem</string>
+    <string name="adv_module_control">Gestziun da moduls</string>
+    <string name="adv_module_control_desc">Activar u deactivar components da l\'app</string>
+
+    <string name="about_version">Versiun da l\'app</string>
+    <string name="about_version_desc">Pargelium 1.2\nIl sunader che fa quai ch\'el duai.</string>
+
+    <string name="adv_warning_title">Avertiment</string>
+    <string name="adv_warning_text">Questas impostaziuns èn previsas per ina persunalisaziun profunda. Deactivar components dal sistem (streaming, visualisaziun, equalizer) po manar ad in cumportament nunspetgà u inastabilitad da l\'app.\n\nEsas vus segir che vus vulais cuntinuar?</string>
+    <string name="action_understand">Jau chapesch</string>
+    <string name="action_back">Enavos</string>
+
+    <string name="update_auto_check">Tschertga d\'actualisaziuns automatica</string>
+    <string name="update_auto_check_desc">Tschertgar actualisaziuns novas sin GitHub tar l\'entschatta</string>
+    <string name="update_check_now">Tschertgar actualisaziuns ussa</string>
+    <string name="checking_updates">Tschertgar actualisaziuns...</string>
+    <string name="no_updates_found">Vus avais la versiun la pli nova</string>
+    <string name="update_check_failed">Errur tar la tschertga d\'actualisaziuns</string>
+    <string name="update_available">Actualisaziun %1$s disponibla</string>
+    <string name="update_available_desc">Telechargiar ed installar la nova versiun da Pargelium.</string>
+    <string name="action_download">Telechargiar</string>
+    <string name="action_skip">Surir</string>
+    <string name="downloading_update">Telechargiar l\'actualisaziun...</string>
+    <string name="install_failed">Betg pussaivel dad iniziar l\'installaziun</string>
+
+    <string name="action_play">Reproducir</string>
+
+    <string name="lang_system">Standard dal sistem</string>
+
+    <string name="streaming">Streaming</string>
+
+    <string name="settings_bass_boost">Rinforz dinamic dal bass</string>
+    <string name="settings_bass_boost_desc">Meglierament intelligent da las frequenzas bassas senza distorsiun</string>
+    <string name="settings_bass_gain">Intensitad dal bass</string>
+
+    <string name="action_search_online">Tschertgar online</string>
+</resources>

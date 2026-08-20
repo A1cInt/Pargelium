@@ -58,6 +58,13 @@
     <string name="lang_zh_tw">繁體中文</string>
     <string name="lang_zh_tw_desc">Traditional Chinese</string>
     <string name="lang_uk">Українська</string>
+    <string name="lang_pt">Português</string>
+    <string name="lang_tr">Türkçe</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_fo">Føroyskt</string>
+    <string name="lang_ka">ქართული</string>
+    <string name="lang_cy">Cymraeg</string>
+    <string name="lang_rm">Rumantsch</string>
 
     <string name="settings_privacy">Privacy</string>
     <string name="privacy_secure">Secure mode</string>
