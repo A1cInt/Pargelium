@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 object AudioRepository {
@@ -52,6 +53,63 @@ object AudioRepository {
 
         cachedAlbums = albums
         return albums
+    }
+
+    fun getAudioFilePath(context: Context, uri: Uri): String? {
+        val projection = arrayOf(MediaStore.Audio.Media.DATA)
+        return try {
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                val colIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                if (colIdx != -1 && cursor.moveToFirst()) {
+                    cursor.getString(colIdx)
+                } else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun findLrcFileForTrack(context: Context, track: AudioTrack): File? {
+        val filePath = getAudioFilePath(context, track.uri) ?: return null
+        val audioFile = File(filePath)
+        val parentDir = audioFile.parentFile ?: return null
+
+        val sameNameLrc = File(parentDir, "${audioFile.nameWithoutExtension}.lrc")
+        if (sameNameLrc.exists() && sameNameLrc.canRead()) {
+            return sameNameLrc
+        }
+
+        val titleLrc = File(parentDir, "${track.title}.lrc")
+        if (titleLrc.exists() && titleLrc.canRead()) {
+            return titleLrc
+        }
+
+        try {
+            val matchedFile = parentDir.listFiles { file ->
+                file.isFile && file.extension.equals("lrc", ignoreCase = true) &&
+                        (file.nameWithoutExtension.equals(audioFile.nameWithoutExtension, ignoreCase = true) ||
+                                file.nameWithoutExtension.equals(track.title, ignoreCase = true))
+            }?.firstOrNull()
+
+            if (matchedFile != null && matchedFile.canRead()) {
+                return matchedFile
+            }
+        } catch (e: Exception) { }
+
+        return null
+    }
+
+    fun findLrcContentForTrack(context: Context, track: AudioTrack): String? {
+        val file = findLrcFileForTrack(context, track) ?: return null
+        return try {
+            file.readText(Charsets.UTF_8)
+        } catch (e: Exception) {
+            try {
+                file.readText(charset("windows-1251"))
+            } catch (e2: Exception) {
+                null
+            }
+        }
     }
 
     fun findCanvasForTrack(context: Context, trackUri: Uri): Uri? {
@@ -188,7 +246,7 @@ object AudioRepository {
 
     fun forceScan(context: Context, onComplete: () -> Unit) {
         val pathsToScan = mutableListOf<String>()
-        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b")
+        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc")
 
         val folders = listOf(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),

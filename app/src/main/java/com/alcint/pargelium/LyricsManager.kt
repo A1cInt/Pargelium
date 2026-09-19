@@ -118,18 +118,20 @@ object LyricsManager {
 
     suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> {
         return withContext(Dispatchers.IO) {
-            val cachedLyrics = loadFromCache(context, track)
-            if (!cachedLyrics.isNullOrEmpty()) {
-                return@withContext cachedLyrics
-            }
+            val localLrc = AudioRepository.findLrcContentForTrack(context, track)
+                ?: findLocalLrcFile(context, track)
 
-            val localLrcContent = findLocalLrcFile(context, track.uri)
-            if (!localLrcContent.isNullOrBlank()) {
-                val parsed = parseLrcOrPlain(localLrcContent, track.duration)
+            if (!localLrc.isNullOrBlank()) {
+                val parsed = parseLrcOrPlain(localLrc, track.duration)
                 if (parsed.isNotEmpty()) {
                     saveToCache(context, track, parsed)
                     return@withContext parsed
                 }
+            }
+
+            val cachedLyrics = loadFromCache(context, track)
+            if (!cachedLyrics.isNullOrEmpty()) {
+                return@withContext cachedLyrics
             }
 
             val embeddedLyrics = getEmbeddedLyrics(context, track.uri)
@@ -277,42 +279,29 @@ object LyricsManager {
         return@withContext lines
     }
 
-    private fun findLocalLrcFile(context: Context, uri: Uri): String? {
-        var realPath: String? = null
+    private fun findLocalLrcFile(context: Context, track: AudioTrack): String? {
+        val path = AudioRepository.getAudioFilePath(context, track.uri) ?: return null
+        val audioFile = File(path)
+        val parent = audioFile.parentFile ?: return null
 
-        if (uri.scheme == "content") {
-            try {
-                val projection = arrayOf(MediaStore.Audio.Media.DATA)
-                context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        realPath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
-                    }
+        val candidates = listOf(
+            File(parent, "${audioFile.nameWithoutExtension}.lrc"),
+            File(parent, "${audioFile.nameWithoutExtension}.LRC"),
+            File(parent, "${audioFile.nameWithoutExtension}.txt"),
+            File(parent, "${track.title}.lrc"),
+            File(parent, "${track.title}.LRC"),
+            File(parent, "${track.title}.txt")
+        )
+
+        for (candidate in candidates) {
+            if (candidate.exists() && candidate.canRead() && candidate.length() > 0) {
+                return try {
+                    candidate.readText(Charsets.UTF_8)
+                } catch (e: Exception) {
+                    try { candidate.readText(charset("windows-1251")) } catch (e2: Exception) { null }
                 }
-            } catch (e: Exception) {}
-        } else if (uri.scheme == "file") {
-            realPath = uri.path
+            }
         }
-
-        var finalPath = realPath ?: uri.path ?: return null
-
-        try {
-            if (finalPath.startsWith("/document/raw:")) {
-                finalPath = finalPath.replaceFirst("/document/raw:", "")
-            }
-            finalPath = URLDecoder.decode(finalPath, "UTF-8")
-        } catch (e: Exception) {}
-
-        try {
-            val pathNoExt = finalPath.substringBeforeLast(".")
-            val possibleExtensions = listOf(".lrc", ".LRC", ".txt")
-
-            for (ext in possibleExtensions) {
-                val lrcFile = File("$pathNoExt$ext")
-                if (lrcFile.exists() && lrcFile.canRead() && lrcFile.length() > 0) {
-                    return lrcFile.readText()
-                }
-            }
-        } catch (e: Exception) {}
 
         return null
     }
