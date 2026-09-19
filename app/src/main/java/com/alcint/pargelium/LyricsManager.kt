@@ -15,7 +15,10 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Url
 import java.io.File
@@ -79,15 +82,28 @@ interface LyricsNetworkApi {
     @GET
     suspend fun getOvh(@Url url: String): OvhResponse
 
-    @GET
-    suspend fun translateGoogle(@Url url: String): JsonElement
+    @FormUrlEncoded
+    @POST("https://translate.googleapis.com/translate_a/single")
+    suspend fun translateGooglePost(
+        @Query("client") client: String = "gtx",
+        @Query("sl") sl: String = "auto",
+        @Query("tl") tl: String,
+        @Query("dt") dt: String = "t",
+        @Field("q") q: String
+    ): JsonElement
 }
 
 object LyricsManager {
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0")
+                .build()
+            chain.proceed(request)
+        }
         .build()
 
     private val api = Retrofit.Builder()
@@ -241,31 +257,40 @@ object LyricsManager {
             val translatedLines = mutableListOf<String>()
 
             for (chunk in chunkedLines) {
-                val originalText = chunk.joinToString("\n") { it.text }
+                val originalText = chunk.joinToString("\n") { it.text.ifBlank { " " } }
 
                 try {
-                    val encodedQuery = URLEncoder.encode(originalText, "UTF-8")
-                    val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetLang&dt=t&q=$encodedQuery"
+                    val response = api.translateGooglePost(
+                        tl = targetLang,
+                        q = originalText
+                    )
 
-                    val response = api.translateGoogle(url)
-                    val sentences = response.asJsonArray.get(0).asJsonArray
+                    val jsonArray = response.asJsonArray
+                    val sentences = jsonArray.get(0).asJsonArray
 
                     val translatedTextBuilder = StringBuilder()
                     for (i in 0 until sentences.size()) {
-                        translatedTextBuilder.append(sentences.get(i).asJsonArray.get(0).asString)
+                        val sentenceObj = sentences.get(i)
+                        if (sentenceObj.isJsonArray) {
+                            val part = sentenceObj.asJsonArray.get(0).asString
+                            translatedTextBuilder.append(part)
+                        }
                     }
 
                     val translatedChunk = translatedTextBuilder.toString().split("\n")
-                    translatedLines.addAll(translatedChunk)
-
+                    for (i in chunk.indices) {
+                        val trans = translatedChunk.getOrNull(i)?.trim() ?: ""
+                        translatedLines.add(trans)
+                    }
                 } catch (e: Exception) {
+                    Log.e("LyricsManager", "Translation chunk error", e)
                     translatedLines.addAll(List(chunk.size) { "" })
                 }
             }
 
             val finalLines = lines.mapIndexed { index, line ->
                 val translated = translatedLines.getOrNull(index)?.trim() ?: ""
-                if (translated.isNotEmpty() && translated.lowercase() != line.text.trim().lowercase()) {
+                if (translated.isNotBlank() && !translated.equals(line.text.trim(), ignoreCase = true)) {
                     line.copy(translation = translated)
                 } else {
                     line
@@ -275,7 +300,9 @@ object LyricsManager {
             saveToCache(context, track, finalLines)
             return@withContext finalLines
 
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            Log.e("LyricsManager", "Translation general error", e)
+        }
         return@withContext lines
     }
 
