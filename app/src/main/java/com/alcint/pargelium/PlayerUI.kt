@@ -546,6 +546,7 @@ fun FullPlayerScreen(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
+    val audioOutput = rememberAudioOutputState(context)
 
     val showTrackInfoBar = PrefsManager.getShowTrackInfoBar()
 
@@ -1035,8 +1036,35 @@ fun FullPlayerScreen(
                         }
 
                         Spacer(Modifier.weight(1f))
-                        if (showTrackInfoBar) {
-                            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp).align(Alignment.CenterHorizontally)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f)) } }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.1f),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                ) {
+                                    Icon(painterResource(audioOutput.iconResId), null, tint = iconTint, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(audioOutput.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+                                }
+                            }
+
+                            if (showTrackInfoBar) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                                        Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1337,10 +1365,39 @@ fun FullPlayerScreen(
                                 }
                             }
                         }
+
                         Spacer(modifier = Modifier.height(16.dp))
-                        if (showTrackInfoBar) {
-                            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp).align(Alignment.CenterHorizontally)) { Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) { Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f)) } }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.1f),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                ) {
+                                    Icon(painterResource(audioOutput.iconResId), null, tint = iconTint, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(audioOutput.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+                                }
+                            }
+
+                            if (showTrackInfoBar) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                                        Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+                                    }
+                                }
+                            }
                         }
+
                     }
                     Spacer(modifier = Modifier.height(32.dp))
                 }
@@ -1371,4 +1428,42 @@ fun parseDurationToMs(durationStr: String): Long {
         }
     } catch (e: Exception) { }
     return -1L
+}
+
+data class AudioOutputState(val name: String, val iconResId: Int)
+
+@Composable
+fun rememberAudioOutputState(context: android.content.Context): AudioOutputState {
+    val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
+    val helper = remember { AudioDeviceHelper(context) }
+
+    var state by remember { mutableStateOf(AudioOutputState("Speaker", R.drawable.ic_play_mobile)) }
+
+    DisposableEffect(audioManager) {
+        val updateState = {
+            val outputs = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+
+            val active = outputs.firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || it.type == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET || it.type == android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER }
+                ?: outputs.firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES || it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET || it.type == android.media.AudioDeviceInfo.TYPE_USB_DEVICE }
+                ?: outputs.firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                ?: outputs.firstOrNull()
+
+            if (active != null) {
+                val name = active.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Speaker"
+                state = AudioOutputState(name, helper.getDeviceIcon(active))
+            }
+        }
+
+        updateState()
+
+        val callback = object : android.media.AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) = updateState()
+            override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>?) = updateState()
+        }
+        audioManager.registerAudioDeviceCallback(callback, null)
+
+        onDispose { audioManager.unregisterAudioDeviceCallback(callback) }
+    }
+
+    return state
 }
