@@ -241,10 +241,6 @@
     <string name="data_reset_autoeq_desc">Remove downloaded frequency preset</string>
     <string name="msg_autoeq_reset">AutoEQ settings reset</string>
     <string name="settings_contact">Contact me</string>
-    <string name="contact_pm">Private Messages</string>
-    <string name="contact_pm_desc">Telegram: @alcint</string>
-    <string name="contact_channel">My channel</string>
-    <string name="contact_channel_desc">Telegram: t.me/AlcReleases</string>
     <string name="choose_language">Choose language</string>
 
     <string name="settings_playback">Playback</string>
@@ -291,4 +287,21 @@
     <string name="settings_bass_gain">Bass intensity</string>
 
     <string name="action_search_online">Search online</string>
+
+    <string name="about_developer">Developer: AlcInt</string>
+    <string name="contact_pm">Telegram</string>
+    <string name="contact_pm_desc">@alcint</string>
+    <string name="contact_channel">Telegram Channel</string>
+    <string name="contact_channel_desc">@AlcReleases</string>
+    <string name="contact_group">Telegram Group</string>
+    <string name="contact_group_desc">@AlcIntGroup</string>
+    <string name="contact_github">GitHub</string>
+    <string name="contact_github_desc">github.com/A1cInt</string>
+    <string name="contact_boosty">Boosty</string>
+    <string name="contact_boosty_desc">Support on Boosty</string>
+    <string name="contact_donationalerts">DonationAlerts</string>
+    <string name="contact_donationalerts_desc">Send a donation</string>
+    <string name="contact_session">Session</string>
+    <string name="contact_session_desc">05d910ef7e99c2275714a633ada72a7b197f93555d19d90b66b89e4af276398105</string>
+    <string name="msg_copied">Copied to clipboard</string>
 </resources>

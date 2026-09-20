@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -34,10 +35,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -45,12 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 enum class SettingsRoute {
-    MAIN, APPEARANCE, PLAYBACK, INTEGRATION, DATA, CONTACT, ADVANCED, ABOUT
+    MAIN, APPEARANCE, PLAYBACK, INTEGRATION, DATA, ADVANCED, ABOUT
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -197,7 +201,6 @@ fun SettingsScreen(
                             SettingsRoute.PLAYBACK -> stringResource(R.string.settings_playback)
                             SettingsRoute.INTEGRATION -> stringResource(R.string.settings_integration)
                             SettingsRoute.DATA -> stringResource(R.string.settings_data)
-                            SettingsRoute.CONTACT -> stringResource(R.string.settings_contact)
                             SettingsRoute.ADVANCED -> stringResource(R.string.settings_advanced)
                             SettingsRoute.ABOUT -> stringResource(R.string.settings_about)
                             else -> ""
@@ -224,8 +227,6 @@ fun SettingsScreen(
                             SettingsMenuEntry(title = stringResource(R.string.settings_integration), icon = painterResource(R.drawable.ic_watch_api), tint = MaterialTheme.colorScheme.tertiary) { currentRoute = SettingsRoute.INTEGRATION }
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             SettingsMenuEntry(title = stringResource(R.string.settings_data), icon = painterResource(R.drawable.ic_text_delete), tint = MaterialTheme.colorScheme.error) { currentRoute = SettingsRoute.DATA }
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                            SettingsMenuEntry(title = stringResource(R.string.settings_contact), icon = painterResource(R.drawable.ic_social), tint = MaterialTheme.colorScheme.primary) { currentRoute = SettingsRoute.CONTACT }
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             SettingsMenuEntry(title = stringResource(R.string.settings_advanced), icon = Icons.Default.SettingsSuggest, tint = MaterialTheme.colorScheme.error) { currentRoute = SettingsRoute.ADVANCED }
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -422,38 +423,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingsRoute.CONTACT -> {
-                        SettingsGroup {
-                            ListItem(
-                                headlineContent = { Text(stringResource(R.string.contact_pm), fontWeight = FontWeight.Bold) },
-                                supportingContent = { Text(stringResource(R.string.contact_pm_desc)) },
-                                leadingContent = {
-                                    IconContainer(painter = painterResource(id = R.drawable.ic_magic_handshake), color = MaterialTheme.colorScheme.primary)
-                                },
-                                modifier = Modifier.clickable {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/alcint"))
-                                    context.startActivity(intent)
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-                            ListItem(
-                                headlineContent = { Text(stringResource(R.string.contact_channel), fontWeight = FontWeight.Bold) },
-                                supportingContent = { Text(stringResource(R.string.contact_channel_desc)) },
-                                leadingContent = {
-                                    IconContainer(painter = painterResource(id = R.drawable.ic_social), color = MaterialTheme.colorScheme.tertiary)
-                                },
-                                modifier = Modifier.clickable {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/AlcReleases"))
-                                    context.startActivity(intent)
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                        }
-                    }
-
                     SettingsRoute.ADVANCED -> {
                         SettingsGroup {
                             ListItem(
@@ -497,28 +466,163 @@ fun SettingsScreen(
                         var easterEggClickCount by remember { mutableStateOf(0) }
                         var lastClickTime by remember { mutableStateOf(0L) }
 
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            AsyncImage(
+                                model = "https://github.com/A1cInt.png",
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        val currentTime = System.currentTimeMillis()
+                                        if (currentTime - lastClickTime < 400) {
+                                            easterEggClickCount++
+                                            if (easterEggClickCount >= 5) {
+                                                easterEggClickCount = 0
+                                                context.startActivity(Intent(context, EasterEggActivity::class.java))
+                                            }
+                                        } else {
+                                            easterEggClickCount = 1
+                                        }
+                                        lastClickTime = currentTime
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = stringResource(R.string.about_developer),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_pm), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_pm_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_icon_telegram), color = Color(0xFF2AABEE))
+                                },
+                                modifier = Modifier.clickable {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/alcint")))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_channel), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_channel_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_icon_telegram), color = Color(0xFF2AABEE))
+                                },
+                                modifier = Modifier.clickable {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/AlcReleases")))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_group), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_group_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_icon_telegram), color = Color(0xFF2AABEE))
+                                },
+                                modifier = Modifier.clickable {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/AlcIntGroup")))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        SettingsGroup {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_github), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_github_desc)) },
+                                leadingContent = {
+                                    val isDarkTheme = isSystemInDarkTheme()
+                                    val githubIcon = if (isDarkTheme) R.drawable.ic_icon_github_light else R.drawable.ic_icon_github_dark
+                                    IconContainer(painter = painterResource(id = githubIcon), color = MaterialTheme.colorScheme.onSurface)
+                                },
+                                modifier = Modifier.clickable {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/A1cInt")))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_boosty), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_boosty_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_icon_boosty), color = Color(0xFFF15F2C))
+                                },
+                                modifier = Modifier.clickable {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://boosty.to/alcint")))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_donationalerts), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_donationalerts_desc)) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_icon_donationalerts), color = Color(0xFFF58220))
+                                },
+                                modifier = Modifier.clickable {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.donationalerts.com/r/alcint")))
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.contact_session), fontWeight = FontWeight.Bold) },
+                                supportingContent = { Text(stringResource(R.string.contact_session_desc), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                leadingContent = {
+                                    IconContainer(painter = painterResource(id = R.drawable.ic_icon_session), color = Color(0xFF00D18B))
+                                },
+                                modifier = Modifier.clickable {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Session ID", "05d910ef7e99c2275714a633ada72a7b197f93555d19d90b66b89e4af276398105")
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, context.getString(R.string.msg_copied), Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         SettingsGroup {
                             ListItem(
                                 headlineContent = { Text(stringResource(R.string.about_version), fontWeight = FontWeight.Bold) },
                                 supportingContent = { Text(stringResource(R.string.about_version_desc)) },
                                 leadingContent = {
                                     IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.primary)
-                                },
-                                modifier = Modifier.clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    val currentTime = System.currentTimeMillis()
-                                    if (currentTime - lastClickTime < 400) {
-                                        easterEggClickCount++
-                                        if (easterEggClickCount >= 5) {
-                                            easterEggClickCount = 0
-                                            context.startActivity(Intent(context, EasterEggActivity::class.java))
-                                        }
-                                    } else {
-                                        easterEggClickCount = 1
-                                    }
-                                    lastClickTime = currentTime
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
