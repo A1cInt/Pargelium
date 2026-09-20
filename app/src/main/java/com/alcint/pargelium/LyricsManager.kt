@@ -27,10 +27,50 @@ import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+data class SyllableWord(
+    val text: String,
+    val startMs: Long,
+    val endMs: Long
+)
+
 data class LyricLine(
     val timeMs: Long,
     val text: String,
-    val translation: String? = null
+    val translation: String? = null,
+    val words: List<SyllableWord> = emptyList()
+)
+
+data class BetterLyricsWord(
+    @SerializedName("text") val text: String?,
+    @SerializedName("offset") val offset: Long?,
+    @SerializedName("duration") val duration: Long?
+)
+
+data class BetterLyricsLine(
+    @SerializedName("text") val text: String?,
+    @SerializedName("offset") val offset: Long?,
+    @SerializedName("duration") val duration: Long?,
+    @SerializedName("words") val words: List<BetterLyricsWord>?
+)
+
+data class BetterLyricsResponse(
+    @SerializedName("lines") val lines: List<BetterLyricsLine>?,
+    @SerializedName("lyrics") val lyrics: String?
+)
+
+data class LyricsPlusWord(
+    @SerializedName("string") val string: String?,
+    @SerializedName("time") val time: Long?,
+    @SerializedName("duration") val duration: Long?
+)
+
+data class LyricsPlusLine(
+    @SerializedName("words") val words: List<LyricsPlusWord>?,
+    @SerializedName("time") val time: Long?
+)
+
+data class LyricsPlusResponse(
+    @SerializedName("lines") val lines: List<LyricsPlusLine>?
 )
 
 data class LrcLibResponse(
@@ -59,6 +99,20 @@ data class MxLyrics(
 )
 
 interface LyricsNetworkApi {
+    @GET("https://lyrics-api.boidu.dev/lyrics")
+    suspend fun getBetterLyrics(
+        @Query("song") song: String,
+        @Query("artist") artist: String,
+        @Query("duration") duration: Int
+    ): BetterLyricsResponse
+
+    @GET("https://lyricsplus.prjktla.my.id/v1/lyrics")
+    suspend fun getLyricsPlus(
+        @Query("title") title: String,
+        @Query("artist") artist: String,
+        @Query("duration") duration: Int
+    ): LyricsPlusResponse
+
     @GET("https://lrclib.net/api/get")
     suspend fun getLrcLib(
         @Query("artist_name") artist: String,
@@ -115,6 +169,7 @@ object LyricsManager {
 
     private val gson = Gson()
     private val lrcRegex = Regex("\\[(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?](.*)")
+    private val enhancedRegex = Regex("<(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?>([^<]*)")
 
     private fun getCurrentAppLanguage(): String {
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -134,6 +189,17 @@ object LyricsManager {
 
     suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> {
         return withContext(Dispatchers.IO) {
+            val cachedLyrics = loadFromCache(context, track)
+            if (!cachedLyrics.isNullOrEmpty()) {
+                return@withContext cachedLyrics
+            }
+
+            val betterLyrics = fetchBetterLyricsOnline(track)
+            if (betterLyrics.isNotEmpty()) {
+                saveToCache(context, track, betterLyrics)
+                return@withContext betterLyrics
+            }
+
             val localLrc = AudioRepository.findLrcContentForTrack(context, track)
                 ?: findLocalLrcFile(context, track)
 
@@ -145,9 +211,10 @@ object LyricsManager {
                 }
             }
 
-            val cachedLyrics = loadFromCache(context, track)
-            if (!cachedLyrics.isNullOrEmpty()) {
-                return@withContext cachedLyrics
+            val fallbackOnline = fetchFallbackOnlineLyrics(track)
+            if (fallbackOnline.isNotEmpty()) {
+                saveToCache(context, track, fallbackOnline)
+                return@withContext fallbackOnline
             }
 
             val embeddedLyrics = getEmbeddedLyrics(context, track.uri)
@@ -165,54 +232,138 @@ object LyricsManager {
 
     suspend fun searchLyricsOnline(context: Context, track: AudioTrack): List<LyricLine> {
         return withContext(Dispatchers.IO) {
-            val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
-            if (!validMetadata) return@withContext emptyList()
-
-            val cleanArtist = cleanMetadata(track.artist)
-            val cleanTitle = cleanMetadata(track.title)
-
-            var rawLyrics: String? = null
-
-            try {
-                val response = api.getLrcLib(cleanArtist, cleanTitle, track.album.takeIf { it.isNotBlank() }, (track.duration / 1000).toInt())
-                rawLyrics = response.syncedLyrics ?: response.plainLyrics
-            } catch (e: Exception) {
-                try {
-                    val searchResponse = api.searchLrcLib("$cleanArtist $cleanTitle")
-                    if (searchResponse.isNotEmpty()) {
-                        rawLyrics = searchResponse[0].syncedLyrics ?: searchResponse[0].plainLyrics
-                    }
-                } catch (ex: Exception) {}
+            val betterLyrics = fetchBetterLyricsOnline(track)
+            if (betterLyrics.isNotEmpty()) {
+                saveToCache(context, track, betterLyrics)
+                return@withContext betterLyrics
             }
 
-            if (rawLyrics.isNullOrBlank()) {
-                try {
-                    val response = api.getMusixmatch(cleanArtist, cleanTitle)
-                    rawLyrics = response.message?.body?.lyrics?.lyrics_body
-                } catch (e: Exception) {}
-            }
-
-            if (rawLyrics.isNullOrBlank()) {
-                try {
-                    val encodedArtist = URLEncoder.encode(cleanArtist, "UTF-8").replace("+", "%20")
-                    val encodedTitle = URLEncoder.encode(cleanTitle, "UTF-8").replace("+", "%20")
-                    val ovhUrl = "https://api.lyrics.ovh/v1/$encodedArtist/$encodedTitle"
-
-                    val response = api.getOvh(ovhUrl)
-                    rawLyrics = response.lyrics
-                } catch (e: Exception) {}
-            }
-
-            if (!rawLyrics.isNullOrBlank()) {
-                val parsed = parseLrcOrPlain(rawLyrics, track.duration)
-                if (parsed.isNotEmpty()) {
-                    saveToCache(context, track, parsed)
-                    return@withContext parsed
-                }
+            val fallback = fetchFallbackOnlineLyrics(track)
+            if (fallback.isNotEmpty()) {
+                saveToCache(context, track, fallback)
+                return@withContext fallback
             }
 
             return@withContext emptyList()
         }
+    }
+
+    private suspend fun fetchBetterLyricsOnline(track: AudioTrack): List<LyricLine> {
+        val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
+        if (!validMetadata) return emptyList()
+
+        val cleanArtist = cleanMetadata(track.artist)
+        val cleanTitle = cleanMetadata(track.title)
+        val durationSec = (track.duration / 1000).toInt()
+
+        try {
+            val betterResp = api.getBetterLyrics(cleanTitle, cleanArtist, durationSec)
+            if (!betterResp.lines.isNullOrEmpty()) {
+                val result = mutableListOf<LyricLine>()
+                for (line in betterResp.lines) {
+                    val lineStart = line.offset ?: 0L
+                    val text = line.text ?: ""
+                    val wordsList = mutableListOf<SyllableWord>()
+
+                    if (!line.words.isNullOrEmpty()) {
+                        for (w in line.words) {
+                            val wStart = lineStart + (w.offset ?: 0L)
+                            val wEnd = wStart + (w.duration ?: 300L)
+                            val wText = w.text ?: ""
+                            if (wText.isNotEmpty()) {
+                                wordsList.add(SyllableWord(wText, wStart, wEnd))
+                            }
+                        }
+                    }
+                    result.add(LyricLine(lineStart, text.trim(), null, wordsList))
+                }
+                if (result.isNotEmpty()) {
+                    return result.sortedBy { it.timeMs }
+                }
+            } else if (!betterResp.lyrics.isNullOrBlank()) {
+                val parsed = parseLrcOrPlain(betterResp.lyrics, track.duration)
+                if (parsed.isNotEmpty()) return parsed
+            }
+        } catch (_: Exception) {}
+
+        try {
+            val lpResp = api.getLyricsPlus(cleanTitle, cleanArtist, durationSec)
+            if (!lpResp.lines.isNullOrEmpty()) {
+                val result = mutableListOf<LyricLine>()
+                for (line in lpResp.lines) {
+                    val lineStart = line.time ?: 0L
+                    val wordsList = mutableListOf<SyllableWord>()
+                    var fullText = ""
+
+                    if (!line.words.isNullOrEmpty()) {
+                        for (w in line.words) {
+                            val wStart = w.time ?: lineStart
+                            val wEnd = wStart + (w.duration ?: 300L)
+                            val wText = w.string ?: ""
+                            if (wText.isNotEmpty()) {
+                                wordsList.add(SyllableWord(wText, wStart, wEnd))
+                                fullText += wText
+                            }
+                        }
+                    }
+                    if (fullText.isNotBlank()) {
+                        result.add(LyricLine(lineStart, fullText.trim(), null, wordsList))
+                    }
+                }
+                if (result.isNotEmpty()) {
+                    return result.sortedBy { it.timeMs }
+                }
+            }
+        } catch (_: Exception) {}
+
+        return emptyList()
+    }
+
+    private suspend fun fetchFallbackOnlineLyrics(track: AudioTrack): List<LyricLine> {
+        val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
+        if (!validMetadata) return emptyList()
+
+        val cleanArtist = cleanMetadata(track.artist)
+        val cleanTitle = cleanMetadata(track.title)
+        val durationSec = (track.duration / 1000).toInt()
+
+        var rawLyrics: String? = null
+
+        try {
+            val response = api.getLrcLib(cleanArtist, cleanTitle, track.album.takeIf { it.isNotBlank() }, durationSec)
+            rawLyrics = response.syncedLyrics ?: response.plainLyrics
+        } catch (e: Exception) {
+            try {
+                val searchResponse = api.searchLrcLib("$cleanArtist $cleanTitle")
+                if (searchResponse.isNotEmpty()) {
+                    rawLyrics = searchResponse[0].syncedLyrics ?: searchResponse[0].plainLyrics
+                }
+            } catch (ex: Exception) {}
+        }
+
+        if (rawLyrics.isNullOrBlank()) {
+            try {
+                val response = api.getMusixmatch(cleanArtist, cleanTitle)
+                rawLyrics = response.message?.body?.lyrics?.lyrics_body
+            } catch (e: Exception) {}
+        }
+
+        if (rawLyrics.isNullOrBlank()) {
+            try {
+                val encodedArtist = URLEncoder.encode(cleanArtist, "UTF-8").replace("+", "%20")
+                val encodedTitle = URLEncoder.encode(cleanTitle, "UTF-8").replace("+", "%20")
+                val ovhUrl = "https://api.lyrics.ovh/v1/$encodedArtist/$encodedTitle"
+
+                val response = api.getOvh(ovhUrl)
+                rawLyrics = response.lyrics
+            } catch (e: Exception) {}
+        }
+
+        if (!rawLyrics.isNullOrBlank()) {
+            return parseLrcOrPlain(rawLyrics, track.duration)
+        }
+
+        return emptyList()
     }
 
     private fun parseLrcOrPlain(lrcContent: String, trackDuration: Long): List<LyricLine> {
@@ -220,31 +371,62 @@ object LyricsManager {
         var isSynced = false
 
         lrcContent.lines().forEach { line ->
-            if (line.isBlank()) return@forEach
             val match = lrcRegex.find(line)
             if (match != null) {
                 isSynced = true
                 val min = match.groupValues[1]
                 val sec = match.groupValues[2]
                 val msStr = match.groupValues[3]
-                val text = match.groupValues[4]
+                var text = match.groupValues[4]
 
                 val ms = if (msStr.isEmpty()) 0L else if (msStr.length == 2) msStr.toLong() * 10 else msStr.toLong()
                 val timestamp = (min.toLong() * 60 * 1000) + (sec.toLong() * 1000) + ms
-                lines.add(LyricLine(timestamp, text.trim()))
+
+                val wordMatches = enhancedRegex.findAll(text).toList()
+                val words = mutableListOf<SyllableWord>()
+
+                if (wordMatches.isNotEmpty()) {
+                    text = ""
+                    for (i in wordMatches.indices) {
+                        val m = wordMatches[i]
+                        val wMin = m.groupValues[1].toLong()
+                        val wSec = m.groupValues[2].toLong()
+                        val wMsStr = m.groupValues[3]
+                        val wMs = if (wMsStr.isEmpty()) 0L else if (wMsStr.length == 2) wMsStr.toLong() * 10 else wMsStr.toLong()
+                        val wStart = wMin * 60_000L + wSec * 1_000L + wMs
+                        val wText = m.groupValues[4]
+
+                        val wEnd = if (i + 1 < wordMatches.size) {
+                            val nm = wordMatches[i + 1]
+                            val nmMin = nm.groupValues[1].toLong()
+                            val nmSec = nm.groupValues[2].toLong()
+                            val nmMsStr = nm.groupValues[3]
+                            val nmMs = if (nmMsStr.isEmpty()) 0L else if (nmMsStr.length == 2) nmMsStr.toLong() * 10 else nmMsStr.toLong()
+                            nmMin * 60_000L + nmSec * 1_000L + nmMs
+                        } else {
+                            wStart + 500L
+                        }
+
+                        if (wText.isNotEmpty()) {
+                            words.add(SyllableWord(wText, wStart, wEnd))
+                            text += wText
+                        }
+                    }
+                }
+
+                lines.add(LyricLine(timestamp, text.trim(), null, words))
+            } else if (line.isNotBlank() && !isSynced) {
+                lines.add(LyricLine(0L, line.trim(), null, emptyList()))
             }
         }
 
         if (isSynced && lines.isNotEmpty()) return lines.sortedBy { it.timeMs }
 
-        val plainLines = lrcContent.lines().filter { it.isNotBlank() }
-        if (plainLines.isEmpty()) return emptyList()
-
         val safeDuration = if (trackDuration > 0) trackDuration else 180_000L
-        val timePerLine = safeDuration / plainLines.size
+        val timePerLine = safeDuration / lines.size.coerceAtLeast(1)
 
-        return plainLines.mapIndexed { index, text ->
-            LyricLine(index * timePerLine, text.trim())
+        return lines.mapIndexed { index, plainText ->
+            LyricLine(index * timePerLine, plainText.text.trim())
         }
     }
 
@@ -343,7 +525,7 @@ object LyricsManager {
         } finally {
             try {
                 retriever.release()
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
         }
     }
 
@@ -358,7 +540,7 @@ object LyricsManager {
         try {
             val json = gson.toJson(lines)
             getCacheFile(context, track).writeText(json)
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
     }
 
     private fun loadFromCache(context: Context, track: AudioTrack): List<LyricLine>? {
@@ -368,7 +550,7 @@ object LyricsManager {
                 val json = file.readText()
                 val type = object : TypeToken<List<LyricLine>>() {}.type
                 return gson.fromJson(json, type)
-            } catch (e: Exception) {}
+            } catch (_: Exception) {}
         }
         return null
     }
@@ -382,7 +564,7 @@ object LyricsManager {
                     if (file.delete()) deletedCount++
                 }
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
         return deletedCount
     }
 }
