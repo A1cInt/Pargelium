@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.alcint.pargelium.liquid.LiquidGlassSwitch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -262,7 +263,13 @@ fun SettingsScreen(
                                     IconContainer(icon = Icons.Default.Info, color = MaterialTheme.colorScheme.secondary)
                                 },
                                 trailingContent = {
-                                    Switch(checked = isTrackInfoBarEnabled, onCheckedChange = null)
+                                    LiquidGlassSwitch(
+                                        checked = isTrackInfoBarEnabled,
+                                        onCheckedChange = { newValue ->
+                                            isTrackInfoBarEnabled = newValue
+                                            PrefsManager.saveShowTrackInfoBar(newValue)
+                                        }
+                                    )
                                 },
                                 modifier = Modifier.toggleable(
                                     value = isTrackInfoBarEnabled,
@@ -301,7 +308,13 @@ fun SettingsScreen(
                                     IconContainer(painter = painterResource(id = R.drawable.ic_earphones), color = MaterialTheme.colorScheme.primary)
                                 },
                                 trailingContent = {
-                                    Switch(checked = isAutoDetectHeadphonesEnabled, onCheckedChange = null)
+                                    LiquidGlassSwitch(
+                                        checked = isAutoDetectHeadphonesEnabled,
+                                        onCheckedChange = { newValue ->
+                                            isAutoDetectHeadphonesEnabled = newValue
+                                            PrefsManager.saveAutoDetectHeadphones(newValue)
+                                        }
+                                    )
                                 },
                                 modifier = Modifier.toggleable(
                                     value = isAutoDetectHeadphonesEnabled,
@@ -322,7 +335,14 @@ fun SettingsScreen(
                                     IconContainer(painter = painterResource(id = R.drawable.ic_watch_api), color = MaterialTheme.colorScheme.primary)
                                 },
                                 trailingContent = {
-                                    Switch(checked = isFossWearEnabled, onCheckedChange = null)
+                                    LiquidGlassSwitch(
+                                        checked = isFossWearEnabled,
+                                        onCheckedChange = { newValue ->
+                                            isFossWearEnabled = newValue
+                                            PrefsManager.saveFossWearEnabled(newValue)
+                                            onFossWearChanged(newValue)
+                                        }
+                                    )
                                 },
                                 modifier = Modifier.toggleable(
                                     value = isFossWearEnabled,
@@ -344,7 +364,32 @@ fun SettingsScreen(
                                     IconContainer(painter = painterResource(id = R.drawable.ic_mobile_def), color = MaterialTheme.colorScheme.secondary)
                                 },
                                 trailingContent = {
-                                    Switch(checked = isSecureEnabled, onCheckedChange = null)
+                                    LiquidGlassSwitch(
+                                        checked = isSecureEnabled,
+                                        onCheckedChange = { newValue ->
+                                            isSecureEnabled = newValue
+                                            PrefsManager.saveSecureMode(newValue)
+                                            onSecureChanged(newValue)
+
+                                            var ctx = context
+                                            while (ctx is android.content.ContextWrapper) {
+                                                if (ctx is android.app.Activity) break
+                                                ctx = ctx.baseContext
+                                            }
+
+                                            (ctx as? android.app.Activity)?.window?.let { window ->
+                                                if (newValue) {
+                                                    window.setFlags(
+                                                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                                                        android.view.WindowManager.LayoutParams.FLAG_SECURE
+                                                    )
+                                                } else {
+                                                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                                                }
+                                                window.attributes = window.attributes
+                                            }
+                                        }
+                                    )
                                 },
                                 modifier = Modifier.toggleable(
                                     value = isSecureEnabled,
@@ -432,7 +477,17 @@ fun SettingsScreen(
                                     IconContainer(Icons.Default.SettingsSuggest, color = MaterialTheme.colorScheme.error)
                                 },
                                 trailingContent = {
-                                    Switch(checked = isAdvancedSettingsEnabled, onCheckedChange = null)
+                                    LiquidGlassSwitch(
+                                        checked = isAdvancedSettingsEnabled,
+                                        onCheckedChange = { newValue ->
+                                            if (newValue) {
+                                                showAdvancedWarningDialog = true
+                                            } else {
+                                                isAdvancedSettingsEnabled = false
+                                                PrefsManager.saveAdvancedSettingsEnabled(false)
+                                            }
+                                        }
+                                    )
                                 },
                                 modifier = Modifier.toggleable(
                                     value = isAdvancedSettingsEnabled,
@@ -636,7 +691,13 @@ fun SettingsScreen(
                                     IconContainer(icon = Icons.Default.Sync, color = MaterialTheme.colorScheme.secondary)
                                 },
                                 trailingContent = {
-                                    Switch(checked = isAutoUpdateEnabled, onCheckedChange = null)
+                                    LiquidGlassSwitch(
+                                        checked = isAutoUpdateEnabled,
+                                        onCheckedChange = { newValue ->
+                                            isAutoUpdateEnabled = newValue
+                                            PrefsManager.saveAutoUpdateEnabled(newValue)
+                                        }
+                                    )
                                 },
                                 modifier = Modifier.toggleable(
                                     value = isAutoUpdateEnabled,

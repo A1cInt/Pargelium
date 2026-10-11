@@ -282,4 +282,30 @@ object PrefsManager {
     fun getWidgetTitle(): String = prefs.getString("widget_title", "Pargelium") ?: "Pargelium"
     fun getWidgetArtist(): String = prefs.getString("widget_artist", "Выберите трек") ?: "Выберите трек"
     fun getWidgetIsPlaying(): Boolean = prefs.getBoolean("widget_is_playing", false)
+
+    // Vacuum Tube
+    fun getTubeEnabled(): Boolean = prefs.getBoolean("dsp_tube_enabled", false)
+    fun saveTubeEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_tube_enabled", enabled).apply()
+    fun getTubeDrive(): Float = prefs.getFloat("dsp_tube_drive", 2.0f)
+    fun saveTubeDrive(drive: Float) = prefs.edit().putFloat("dsp_tube_drive", drive).apply()
+
+    // Stereo Widener
+    fun getStereoWideEnabled(): Boolean = prefs.getBoolean("dsp_stereowide_enabled", false)
+    fun saveStereoWideEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_stereowide_enabled", enabled).apply()
+    fun getStereoWidth(): Float = prefs.getFloat("dsp_stereowide_width", 60.0f)
+    fun saveStereoWidth(width: Float) = prefs.edit().putFloat("dsp_stereowide_width", width).apply()
+
+    // BS2B Crossfeed
+    fun getBs2bEnabled(): Boolean = prefs.getBoolean("dsp_bs2b_enabled", false)
+    fun saveBs2bEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_bs2b_enabled", enabled).apply()
+    fun getBs2bMode(): Int = prefs.getInt("dsp_bs2b_mode", 0)
+    fun saveBs2bMode(mode: Int) = prefs.edit().putInt("dsp_bs2b_mode", mode).apply()
+
+    // Master Limiter
+    fun getLimThreshold(): Float = prefs.getFloat("dsp_lim_threshold", -0.1f)
+    fun saveLimThreshold(th: Float) = prefs.edit().putFloat("dsp_lim_threshold", th).apply()
+    fun getLimRelease(): Float = prefs.getFloat("dsp_lim_release", 60.0f)
+    fun saveLimRelease(rel: Float) = prefs.edit().putFloat("dsp_lim_release", rel).apply()
+    fun getPostGain(): Float = prefs.getFloat("dsp_post_gain", 0.0f)
+    fun savePostGain(gain: Float) = prefs.edit().putFloat("dsp_post_gain", gain).apply()
 }

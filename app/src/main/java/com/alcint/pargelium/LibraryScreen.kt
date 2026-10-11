@@ -30,6 +30,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -64,6 +66,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -73,13 +76,22 @@ import androidx.media3.session.SessionToken
 import androidx.media3.common.C
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.alcint.pargelium.liquid.FloatingBottomBar
+import com.alcint.pargelium.liquid.FloatingBottomBarItem
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 
 data class ArtistModel(val name: String, val tracks: List<AudioTrack>, val albums: List<AlbumModel>)
+
+data class NavItem(
+    val iconRes: Int,
+    val labelRes: Int
+)
 
 private val artistDelimiterRegex = Regex(" feat\\.? | ft\\.? | & | vs\\.? | x |,")
 
@@ -266,11 +278,16 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val backdrop = LocalBackdrop.current
 
     var themeMode by remember { mutableIntStateOf(PrefsManager.getThemeMode()) }
     val systemDark = isSystemInDarkTheme()
-    var currentScreen by remember { mutableIntStateOf(0) }
 
+    val hasPlaylists = PrefsManager.getFeaturePlaylists()
+    val tabCount = if (hasPlaylists) 5 else 4
+    val pagerState = rememberPagerState { tabCount }
+
+    var isProfileOpen by remember { mutableStateOf(false) }
     var showAdvancedSettings by remember { mutableStateOf(false) }
 
     val albumGridState = rememberLazyGridState()
@@ -309,8 +326,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var lastPreviousClickTime by remember { mutableLongStateOf(0L) }
     val unknownArtistStr = stringResource(id = R.string.unknown_artist)
 
-    LaunchedEffect(currentScreen) {
-        if (currentScreen == 0) {
+    LaunchedEffect(isProfileOpen) {
+        if (!isProfileOpen) {
             userName = PrefsManager.getUserName()
             avatarUri = PrefsManager.getAvatarUri()
         }
@@ -634,6 +651,16 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val targetColor = if (seedColor != Color.Unspecified) seedColor else Color(0xFFD0BCFF)
     val targetScheme = rememberPargeliumScheme(targetColor, themeMode, systemDark)
 
+    val navItems = remember(hasPlaylists) {
+        listOfNotNull(
+            NavItem(R.drawable.ic_action_key, R.string.nav_library),
+            NavItem(R.drawable.ic_satellite_alt, R.string.nav_radio),
+            if (hasPlaylists) NavItem(R.drawable.ic_package_2, R.string.nav_playlists) else null,
+            NavItem(R.drawable.ic_instant_mix, R.string.nav_eq),
+            NavItem(R.drawable.ic_settings_heart, R.string.nav_settings)
+        )
+    }
+
     MaterialTheme(colorScheme = targetScheme) {
         SharedTransitionLayout {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -668,8 +695,9 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             if (foundArtist != null) {
                                 selectedArtist = foundArtist
                                 selectedAlbum = null
-                                currentScreen = 0
+                                isProfileOpen = false
                                 isSearchActive = false
+                                scope.launch { pagerState.scrollToPage(0) }
                                 snapPlayer(false)
                             } else {
                                 Toast.makeText(context, context.getString(R.string.artist_not_found), Toast.LENGTH_SHORT).show()
@@ -677,204 +705,219 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         }
                     }
 
-                    BackHandler(enabled = isPlayerExpanded || selectedAlbum != null || selectedArtist != null || currentScreen == 5 || isSearchActive || trackToShare != null || showAdvancedSettings) {
+                    BackHandler(enabled = isPlayerExpanded || selectedAlbum != null || selectedArtist != null || isProfileOpen || isSearchActive || trackToShare != null || showAdvancedSettings) {
                         when {
                             isPlayerExpanded -> snapPlayer(false)
                             trackToShare != null -> trackToShare = null
                             showAdvancedSettings -> showAdvancedSettings = false
                             selectedAlbum != null -> selectedAlbum = null
                             selectedArtist != null -> selectedArtist = null
-                            currentScreen == 5 -> currentScreen = 0
+                            isProfileOpen -> isProfileOpen = false
                             isSearchActive -> { isSearchActive = false; searchQuery = "" }
                         }
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
 
-                        AnimatedContent(
-                            targetState = currentScreen,
-                            transitionSpec = {
-                                fadeIn(animationSpec = tween(250, easing = LinearOutSlowInEasing)) togetherWith
-                                        fadeOut(animationSpec = tween(250, easing = LinearOutSlowInEasing))
-                            },
-                            label = "TabTransition"
-                        ) { screen ->
-                            when (screen) {
-                                0 -> {
-                                    val currentDetailView = when {
-                                        selectedAlbum != null -> 1
-                                        selectedArtist != null -> 2
-                                        else -> 0
-                                    }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
+                                .layerBackdrop(backdrop)
+                        ) {
+                            if (isProfileOpen) {
+                                ProfileScreen(
+                                    allTracks = allTracks,
+                                    seedColor = targetColor,
+                                    onBack = remember {{ isProfileOpen = false }},
+                                    onArtistClick = handleArtistClick
+                                )
+                            } else {
+                                HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    beyondViewportPageCount = 1
+                                ) { page ->
+                                    val currentScreenIndex = if (!hasPlaylists && page >= 2) page + 1 else page
 
-                                    AnimatedContent(
-                                        targetState = currentDetailView,
-                                        transitionSpec = {
-                                            (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 4 })
-                                                .togetherWith(fadeOut(animationSpec = tween(200)))
-                                        },
-                                        label = "DetailSwitch"
-                                    ) { detailState ->
-                                        when (detailState) {
-                                            1 -> {
-                                                selectedAlbum?.let { album ->
-                                                    AlbumDetailView(
-                                                        album = album,
-                                                        animatedVisibilityScope = this@AnimatedContent,
-                                                        currentTrack = currentTrack,
-                                                        isPlaying = isPlaying,
-                                                        onBack = { selectedAlbum = null },
-                                                        onTrackSelect = { playTrack(it, album.tracks) },
-                                                        onPlayPause = { togglePlayPause() },
-                                                        onAddToQueue = { addToQueue(it) },
-                                                        onPlayNext = { playNext(it) },
-                                                        onAddToPlaylist = { track -> trackAddingToPlaylist = track; showAddToPlaylistSheet = true },
-                                                        onShareTrack = { trackToShare = it },
-                                                        onArtistClick = handleArtistClick
-                                                    )
-                                                }
+                                    when (currentScreenIndex) {
+                                        0 -> {
+                                            val currentDetailView = when {
+                                                selectedAlbum != null -> 1
+                                                selectedArtist != null -> 2
+                                                else -> 0
                                             }
-                                            2 -> {
-                                                selectedArtist?.let { artist ->
-                                                    ArtistProfileView(artist = artist, animatedVisibilityScope = this@AnimatedContent, currentTrack = currentTrack, isPlaying = isPlaying, onBack = { selectedArtist = null }, onTrackSelect = { t, list -> playTrack(t, list) }, onAlbumSelect = { selectedAlbum = it }, onPlayPause = { togglePlayPause() }, onAddToQueue = { addToQueue(it) }, onPlayNext = { playNext(it) }, onAddToPlaylist = { track -> trackAddingToPlaylist = track; showAddToPlaylistSheet = true }, onShareTrack = { trackToShare = it })
-                                                }
-                                            }
-                                            0 -> {
-                                                PullToRefreshBox(
-                                                    isRefreshing = isRefreshing,
-                                                    onRefresh = { loadTracks(true) },
-                                                    modifier = Modifier.fillMaxSize()
-                                                ) {
-                                                    Column(modifier = Modifier.fillMaxSize()) {
-                                                        Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
-                                                        AnimatedContent(
-                                                            targetState = isSearchActive,
-                                                            transitionSpec = {
-                                                                fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using SizeTransform(clip = false)
-                                                            },
-                                                            label = "SearchHeaderAnimation"
-                                                        ) { active ->
-                                                            if (active) {
-                                                                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                                    IconButton(onClick = remember {{ isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }}) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) }
-                                                                    OutlinedTextField(
-                                                                        value = searchQuery, onValueChange = { searchQuery = it }, placeholder = { Text(stringResource(id = R.string.search_hint)) }, modifier = Modifier.weight(1f).height(56.dp), singleLine = true, shape = RoundedCornerShape(24.dp),
-                                                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
-                                                                        trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = remember {{ searchQuery = "" }}) { Icon(Icons.Default.Close, null) } },
-                                                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
-                                                                    )
-                                                                }
-                                                            } else {
-                                                                Column {
-                                                                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                                        Row(
-                                                                            modifier = Modifier
-                                                                                .weight(1f)
-                                                                                .clip(RoundedCornerShape(32.dp))
-                                                                                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { currentScreen = 5 }
-                                                                                .padding(end = 8.dp),
-                                                                            verticalAlignment = Alignment.CenterVertically
-                                                                        ) {
-                                                                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                                                                if (avatarUri != null) AsyncImage(model = ImageRequest.Builder(context).data(avatarUri).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                                                                else Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                                            }
-                                                                            Spacer(Modifier.width(12.dp))
-                                                                            Text(text = userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                                        }
-                                                                        IconButton(onClick = remember {{ isSearchActive = true }}) { Icon(Icons.Default.Search, "Search", tint = MaterialTheme.colorScheme.onBackground) }
-                                                                    }
-                                                                    TabRow(selectedTabIndex = libraryTab, containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary, divider = {}) {
-                                                                        Tab(selected = libraryTab == 0, onClick = remember {{ libraryTab = 0 }}) {
-                                                                            Text(stringResource(id = R.string.tab_albums), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
-                                                                        }
-                                                                        Tab(selected = libraryTab == 1, onClick = remember {{ libraryTab = 1 }}) {
-                                                                            Text(stringResource(id = R.string.tab_artists), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
+                                            AnimatedContent(
+                                                targetState = currentDetailView,
+                                                transitionSpec = {
+                                                    (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 4 })
+                                                        .togetherWith(fadeOut(animationSpec = tween(200)))
+                                                },
+                                                label = "DetailSwitch"
+                                            ) { detailState ->
+                                                when (detailState) {
+                                                    1 -> {
+                                                        selectedAlbum?.let { album ->
+                                                            AlbumDetailView(
+                                                                album = album,
+                                                                animatedVisibilityScope = this@AnimatedContent,
+                                                                currentTrack = currentTrack,
+                                                                isPlaying = isPlaying,
+                                                                onBack = { selectedAlbum = null },
+                                                                onTrackSelect = { playTrack(it, album.tracks) },
+                                                                onPlayPause = { togglePlayPause() },
+                                                                onAddToQueue = { addToQueue(it) },
+                                                                onPlayNext = { playNext(it) },
+                                                                onAddToPlaylist = { track -> trackAddingToPlaylist = track; showAddToPlaylistSheet = true },
+                                                                onShareTrack = { trackToShare = it },
+                                                                onArtistClick = handleArtistClick
+                                                            )
                                                         }
+                                                    }
+                                                    2 -> {
+                                                        selectedArtist?.let { artist ->
+                                                            ArtistProfileView(artist = artist, animatedVisibilityScope = this@AnimatedContent, currentTrack = currentTrack, isPlaying = isPlaying, onBack = { selectedArtist = null }, onTrackSelect = { t, list -> playTrack(t, list) }, onAlbumSelect = { selectedAlbum = it }, onPlayPause = { togglePlayPause() }, onAddToQueue = { addToQueue(it) }, onPlayNext = { playNext(it) }, onAddToPlaylist = { track -> trackAddingToPlaylist = track; showAddToPlaylistSheet = true }, onShareTrack = { trackToShare = it })
+                                                        }
+                                                    }
+                                                    0 -> {
+                                                        PullToRefreshBox(
+                                                            isRefreshing = isRefreshing,
+                                                            onRefresh = { loadTracks(true) },
+                                                            modifier = Modifier.fillMaxSize()
+                                                        ) {
+                                                            Column(modifier = Modifier.fillMaxSize()) {
+                                                                Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
-                                                        if (isSearchActive && searchQuery.isNotEmpty()) {
-                                                            if (filteredAlbums.isEmpty() && filteredTracks.isEmpty() && filteredArtists.isEmpty() && !isLoading) {
-                                                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.search_no_results)) }
-                                                            } else {
-                                                                LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 240.dp)) {
-                                                                    if (filteredArtists.isNotEmpty()) {
-                                                                        item { Text(stringResource(id = R.string.tab_artists), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
-                                                                        item {
-                                                                            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                                                items(filteredArtists, key = { it.name }) { artist -> Box(modifier = Modifier.width(160.dp)) { ArtistCard(artist) { selectedArtist = artist; isSearchActive = false } } }
+                                                                AnimatedContent(
+                                                                    targetState = isSearchActive,
+                                                                    transitionSpec = {
+                                                                        fadeIn(tween(300)) togetherWith fadeOut(tween(300)) using SizeTransform(clip = false)
+                                                                    },
+                                                                    label = "SearchHeaderAnimation"
+                                                                ) { active ->
+                                                                    if (active) {
+                                                                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                                            IconButton(onClick = remember {{ isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }}) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onBackground) }
+                                                                            OutlinedTextField(
+                                                                                value = searchQuery, onValueChange = { searchQuery = it }, placeholder = { Text(stringResource(id = R.string.search_hint)) }, modifier = Modifier.weight(1f).height(56.dp), singleLine = true, shape = RoundedCornerShape(24.dp),
+                                                                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
+                                                                                trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = remember {{ searchQuery = "" }}) { Icon(Icons.Default.Close, null) } },
+                                                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                                                                            )
+                                                                        }
+                                                                    } else {
+                                                                        Column {
+                                                                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                                                Row(
+                                                                                    modifier = Modifier
+                                                                                        .weight(1f)
+                                                                                        .clip(RoundedCornerShape(32.dp))
+                                                                                        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { isProfileOpen = true }
+                                                                                        .padding(end = 8.dp),
+                                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                                ) {
+                                                                                    Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                                                                        if (avatarUri != null) AsyncImage(model = ImageRequest.Builder(context).data(avatarUri).build(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                                                                        else Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                                                    }
+                                                                                    Spacer(Modifier.width(12.dp))
+                                                                                    Text(text = userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                                                }
+                                                                                IconButton(onClick = remember {{ isSearchActive = true }}) { Icon(Icons.Default.Search, "Search", tint = MaterialTheme.colorScheme.onBackground) }
+                                                                            }
+                                                                            TabRow(selectedTabIndex = libraryTab, containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.primary, divider = {}) {
+                                                                                Tab(selected = libraryTab == 0, onClick = remember {{ libraryTab = 0 }}) {
+                                                                                    Text(stringResource(id = R.string.tab_albums), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                                                                                }
+                                                                                Tab(selected = libraryTab == 1, onClick = remember {{ libraryTab = 1 }}) {
+                                                                                    Text(stringResource(id = R.string.tab_artists), modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                                                                                }
                                                                             }
                                                                         }
-                                                                    }
-                                                                    if (filteredAlbums.isNotEmpty()) {
-                                                                        item { Text(stringResource(id = R.string.tab_albums), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
-                                                                        item {
-                                                                            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                                                items(filteredAlbums, key = { it.id }) { alb -> Box(modifier = Modifier.width(160.dp)) { AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } } }
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                    if (filteredTracks.isNotEmpty()) {
-                                                                        item { Text(stringResource(id = R.string.tab_tracks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
-                                                                        items(filteredTracks, key = { it.id }) { track -> TrackRow(track = track, isPlaying = isPlaying, isCurrentTrack = currentTrack?.id == track.id, albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }, onClick = { playTrack(track, filteredTracks) }, onPlayNext = { playNext(track) }, onAddToQueue = { addToQueue(track) }, onAddToPlaylist = { trackAddingToPlaylist = track; showAddToPlaylistSheet = true }, onShare = { trackToShare = track }) }
                                                                     }
                                                                 }
-                                                            }
-                                                        } else {
-                                                            if (libraryTab == 0) {
-                                                                if (filteredAlbums.isEmpty() && !isLoading) {
-                                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.music_not_found)) }
-                                                                } else {
-                                                                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                                                        LazyVerticalGrid(
-                                                                            columns = GridCells.Adaptive(minSize = 160.dp),
-                                                                            state = albumGridState,
-                                                                            contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
-                                                                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                                            modifier = Modifier.fillMaxSize()
-                                                                        ) {
-                                                                            gridItems(filteredAlbums, key = { it.id }) { alb -> AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } }
-                                                                        }
 
-                                                                        if (filteredAlbums.isNotEmpty()) {
-                                                                            Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
-                                                                                FastScrollThumb(
-                                                                                    itemCount = filteredAlbums.size,
+                                                                if (isSearchActive && searchQuery.isNotEmpty()) {
+                                                                    if (filteredAlbums.isEmpty() && filteredTracks.isEmpty() && filteredArtists.isEmpty() && !isLoading) {
+                                                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.search_no_results)) }
+                                                                    } else {
+                                                                        LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 240.dp)) {
+                                                                            if (filteredArtists.isNotEmpty()) {
+                                                                                item { Text(stringResource(id = R.string.tab_artists), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                                                                                item {
+                                                                                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                                                        items(filteredArtists, key = { it.name }) { artist -> Box(modifier = Modifier.width(160.dp)) { ArtistCard(artist) { selectedArtist = artist; isSearchActive = false } } }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            if (filteredAlbums.isNotEmpty()) {
+                                                                                item { Text(stringResource(id = R.string.tab_albums), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                                                                                item {
+                                                                                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                                                        items(filteredAlbums, key = { it.id }) { alb -> Box(modifier = Modifier.width(160.dp)) { AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } } }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            if (filteredTracks.isNotEmpty()) {
+                                                                                item { Text(stringResource(id = R.string.tab_tracks), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp)) }
+                                                                                items(filteredTracks, key = { it.id }) { track -> TrackRow(track = track, isPlaying = isPlaying, isCurrentTrack = currentTrack?.id == track.id, albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }, onClick = { playTrack(track, filteredTracks) }, onPlayNext = { playNext(track) }, onAddToQueue = { addToQueue(track) }, onAddToPlaylist = { trackAddingToPlaylist = track; showAddToPlaylistSheet = true }, onShare = { trackToShare = track }) }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    if (libraryTab == 0) {
+                                                                        if (filteredAlbums.isEmpty() && !isLoading) {
+                                                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.music_not_found)) }
+                                                                        } else {
+                                                                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                                                                LazyVerticalGrid(
+                                                                                    columns = GridCells.Adaptive(minSize = 160.dp),
                                                                                     state = albumGridState,
-                                                                                    getLetter = { index -> filteredAlbums.getOrNull(index)?.title?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
-                                                                                )
+                                                                                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
+                                                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                                                    modifier = Modifier.fillMaxSize()
+                                                                                ) {
+                                                                                    gridItems(filteredAlbums, key = { it.id }) { alb -> AlbumCard(alb, this@AnimatedContent) { selectedAlbum = alb } }
+                                                                                }
+
+                                                                                if (filteredAlbums.isNotEmpty()) {
+                                                                                    Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
+                                                                                        FastScrollThumb(
+                                                                                            itemCount = filteredAlbums.size,
+                                                                                            state = albumGridState,
+                                                                                            getLetter = { index -> filteredAlbums.getOrNull(index)?.title?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
+                                                                                        )
+                                                                                    }
+                                                                                }
                                                                             }
                                                                         }
-                                                                    }
-                                                                }
-                                                            } else {
-                                                                if (filteredArtists.isEmpty() && !isLoading) {
-                                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.no_artists)) }
-                                                                } else {
-                                                                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                                                        LazyVerticalGrid(
-                                                                            columns = GridCells.Adaptive(minSize = 160.dp),
-                                                                            state = artistGridState,
-                                                                            contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
-                                                                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                                            modifier = Modifier.fillMaxSize()
-                                                                        ) {
-                                                                            gridItems(filteredArtists, key = { it.name }) { artist -> ArtistCard(artist) { selectedArtist = artist } }
-                                                                        }
-
-                                                                        if (filteredArtists.isNotEmpty()) {
-                                                                            Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
-                                                                                FastScrollThumb(
-                                                                                    itemCount = filteredArtists.size,
+                                                                    } else {
+                                                                        if (filteredArtists.isEmpty() && !isLoading) {
+                                                                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(id = R.string.no_artists)) }
+                                                                        } else {
+                                                                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                                                                LazyVerticalGrid(
+                                                                                    columns = GridCells.Adaptive(minSize = 160.dp),
                                                                                     state = artistGridState,
-                                                                                    getLetter = { index -> filteredArtists.getOrNull(index)?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
-                                                                                )
+                                                                                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 240.dp),
+                                                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                                                    modifier = Modifier.fillMaxSize()
+                                                                                ) {
+                                                                                    gridItems(filteredArtists, key = { it.name }) { artist -> ArtistCard(artist) { selectedArtist = artist } }
+                                                                                }
+
+                                                                                if (filteredArtists.isNotEmpty()) {
+                                                                                    Box(modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = 240.dp, top = 8.dp)) {
+                                                                                        FastScrollThumb(
+                                                                                            itemCount = filteredArtists.size,
+                                                                                            state = artistGridState,
+                                                                                            getLetter = { index -> filteredArtists.getOrNull(index)?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "" }
+                                                                                        )
+                                                                                    }
+                                                                                }
                                                                             }
                                                                         }
                                                                     }
@@ -885,39 +928,33 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                 }
                                             }
                                         }
+                                        1 -> RadioScreen(onStationSelect = { playTrack(it, listOf(it)) })
+                                        2 -> PlaylistScreen(allTracks = allTracks, seedColor = targetColor, onPlayTrack = { track, list -> playTrack(track, list) }, onAddToQueue = { playNext(it) })
+                                        3 -> EqualizerScreen(seedColor = targetColor)
+                                        4 -> {
+                                            if (showAdvancedSettings) {
+                                                AdvancedSettingsScreen(onBackClick = remember {{ showAdvancedSettings = false }})
+                                            } else {
+                                                SettingsScreen(
+                                                    currentThemeMode = themeMode,
+                                                    onThemeChanged = { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) },
+                                                    onSecureChanged = onSecureRequest,
+                                                    onFossWearChanged = { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() },
+                                                    onNavigateToAdvanced = remember {{ showAdvancedSettings = true }}
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                                1 -> RadioScreen(onStationSelect = { playTrack(it, listOf(it)) })
-                                2 -> PlaylistScreen(allTracks = allTracks, seedColor = targetColor, onPlayTrack = { track, list -> playTrack(track, list) }, onAddToQueue = { playNext(it) })
-                                3 -> EqualizerScreen(seedColor = targetColor)
-                                4 -> {
-                                    if (showAdvancedSettings) {
-                                        AdvancedSettingsScreen(onBackClick = remember {{ showAdvancedSettings = false }})
-                                    } else {
-                                        SettingsScreen(
-                                            currentThemeMode = themeMode,
-                                            onThemeChanged = { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) },
-                                            onSecureChanged = onSecureRequest,
-                                            onFossWearChanged = { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() },
-                                            onNavigateToAdvanced = remember {{ showAdvancedSettings = true }}
-                                        )
-                                    }
-                                }
-                                5 -> ProfileScreen(
-                                    allTracks = allTracks,
-                                    seedColor = targetColor,
-                                    onBack = remember {{ currentScreen = 0 }},
-                                    onArtistClick = handleArtistClick
-                                )
+                            }
+
+                            if (isLoading) {
+                                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f)).clickable(enabled = false) { }, contentAlignment = Alignment.Center) { MorphingPillIndicator() }
                             }
                         }
 
-                        if (isLoading) {
-                            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f)).clickable(enabled = false) { }, contentAlignment = Alignment.Center) { MorphingPillIndicator() }
-                        }
-
-                        Column(modifier = Modifier.align(Alignment.BottomCenter).zIndex(0f)) {
-                            if (currentScreen == 0 && !isSearchActive && selectedAlbum == null && selectedArtist == null) {
+                        Column(modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f)) {
+                            if (pagerState.currentPage == 0 && !isSearchActive && selectedAlbum == null && selectedArtist == null && !isProfileOpen) {
                                 FloatingActionRow(
                                     onRefresh = remember {{ loadTracks(true) }},
                                     onShuffleAll = remember {{ shuffleAll() }})
@@ -933,6 +970,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                         isPlaying = isPlaying,
                                         progress = calculatedProgress,
                                         albumArt = currentAlbumArt,
+                                        backdrop = backdrop, // <-- передаём backdrop экрана библиотеки
                                         onPlayPause = remember {{ togglePlayPause() }},
                                         onSkipNext = remember {{ skipNext() }},
                                         onClick = remember {{ snapPlayer(true) }}
@@ -940,29 +978,49 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                 }
                             }
 
-                            NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 8.dp,
-                                modifier = Modifier.fillMaxWidth()
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 16.dp)
+                                    .navigationBarsPadding(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                val navColors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                NavigationBarItem(selected = currentScreen == 0, onClick = remember {{ currentScreen = 0; selectedAlbum = null; selectedArtist = null }}, icon = { Icon(painterResource(id = R.drawable.ic_action_key), null) }, label = { Text(stringResource(R.string.nav_library)) }, colors = navColors)
-                                NavigationBarItem(selected = currentScreen == 1, onClick = remember {{ currentScreen = 1 }}, icon = { Icon(painterResource(id = R.drawable.ic_satellite_alt), null) }, label = { Text(stringResource(R.string.nav_radio)) }, colors = navColors)
-
-                                if (PrefsManager.getFeaturePlaylists()) {
-                                    NavigationBarItem(selected = currentScreen == 2, onClick = remember {{ currentScreen = 2 }}, icon = { Icon(painterResource(id = R.drawable.ic_package_2), null) }, label = { Text(stringResource(id = R.string.nav_playlists)) }, colors = navColors)
+                                FloatingBottomBar(
+                                    selectedIndex = pagerState.currentPage,
+                                    onSelected = { index: Int ->
+                                        selectedAlbum = null
+                                        selectedArtist = null
+                                        isProfileOpen = false
+                                        scope.launch {
+                                            pagerState.animateScrollToPage(index)
+                                        }
+                                    },
+                                    backdrop = backdrop,
+                                    tabsCount = navItems.size
+                                ) { activateTab ->
+                                    navItems.forEachIndexed { index, item ->
+                                        val isSelected = pagerState.currentPage == index
+                                        FloatingBottomBarItem(
+                                            selected = isSelected,
+                                            onClick = { activateTab(index) }
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(id = item.iconRes),
+                                                contentDescription = stringResource(id = item.labelRes),
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Text(
+                                                text = stringResource(id = item.labelRes),
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
                                 }
-
-                                NavigationBarItem(selected = currentScreen == 3, onClick = remember {{ currentScreen = 3 }}, icon = { Icon(painterResource(id = R.drawable.ic_instant_mix), null) }, label = { Text(stringResource(R.string.nav_eq)) }, colors = navColors)
-                                NavigationBarItem(selected = currentScreen == 4, onClick = remember {{ currentScreen = 4 }}, icon = { Icon(painterResource(id = R.drawable.ic_settings_heart), null) }, label = { Text(stringResource(R.string.nav_settings)) }, colors = navColors)
                             }
                         }
+
                         if (currentTrack != null) {
                             Box(
                                 modifier = Modifier
@@ -1004,8 +1062,11 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                         onQueueItemClick = remember {{ jumpToQueueItem(it) }},
                                         onRemoveFromQueue = remember {{ removeFromQueue(it) }},
                                         onCollapse = remember {{ snapPlayer(false) }},
-                                        currentTab = currentScreen,
-                                        onTabSelected = remember {{ newTab -> currentScreen = newTab; snapPlayer(false) }},
+                                        currentTab = pagerState.currentPage,
+                                        onTabSelected = remember {{ newTab ->
+                                            scope.launch { pagerState.scrollToPage(newTab) }
+                                            snapPlayer(false)
+                                        }},
                                         onArtistClick = handleArtistClick
                                     )
                                 }

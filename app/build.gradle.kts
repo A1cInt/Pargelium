@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.alcint.pargelium"
-        minSdk = 31
+        minSdk = 33
         targetSdk = 37
         versionCode = 4
         versionName = "1.2"
@@ -21,8 +21,18 @@ android {
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
         }
+
+        // Параметры сборки C/C++ через CMake
+        externalNativeBuild {
+            cmake {
+                arguments("-DANDROID_STL=c++_shared")
+                cFlags("-O3", "-ffast-math", "-funroll-loops")
+                cppFlags("-O3", "-ffast-math", "-std=c++17")
+            }
+        }
     }
 
+    // Подключаем CMakeLists.txt из папки cpp
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -42,8 +52,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -52,8 +62,9 @@ android {
 }
 
 kotlin {
+    jvmToolchain(17)
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -76,7 +87,6 @@ dependencies {
     implementation("io.coil-kt:coil:2.6.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.palette:palette-ktx:1.0.0")
 
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -108,4 +118,7 @@ dependencies {
 
     implementation("androidx.glance:glance-appwidget:1.1.0")
     implementation("androidx.glance:glance-material3:1.1.0")
+
+    implementation("top.yukonga.miuix.kmp:miuix-blur:0.9.1")
+    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
 }

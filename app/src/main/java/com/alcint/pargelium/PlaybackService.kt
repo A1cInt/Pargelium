@@ -1,6 +1,5 @@
 package com.alcint.pargelium
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -10,9 +9,9 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.glance.appwidget.updateAll
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
@@ -174,8 +173,13 @@ class PlaybackService : MediaLibraryService() {
                 mediaItems: List<MediaItem>
             ): ListenableFuture<List<MediaItem>> {
                 val updatedMediaItems = mediaItems.map { item ->
+                    val cleanMetadata = item.mediaMetadata.buildUpon()
+                        .setArtworkData(null, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                        .build()
+
                     item.buildUpon()
                         .setUri(item.requestMetadata.mediaUri ?: item.localConfiguration?.uri)
+                        .setMediaMetadata(cleanMetadata)
                         .build()
                 }
                 return Futures.immediateFuture(updatedMediaItems)
@@ -212,38 +216,30 @@ class PlaybackService : MediaLibraryService() {
         wearUpdateJob = serviceScope.launch(Dispatchers.IO) {
             val coverFile = File(applicationContext.cacheDir, "widget_cover.png")
             try {
-                val artworkData = currentItem?.mediaMetadata?.artworkData
-                if (artworkData != null) {
-                    val bitmap = BitmapFactory.decodeByteArray(artworkData, 0, artworkData.size)
-                    FileOutputStream(coverFile).use { out ->
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                    }
-                } else {
-                    val trackId = currentItem?.mediaId?.toLongOrNull() ?: 0L
-                    val saavnTrack = SaavnApi.trackCache[trackId]
-                    val imageUrl: Any? = saavnTrack?.coverUrl?.takeIf { it.isNotEmpty() }
-                        ?: currentItem?.mediaMetadata?.artworkUri
+                val trackId = currentItem?.mediaId?.toLongOrNull() ?: 0L
+                val saavnTrack = SaavnApi.trackCache[trackId]
+                val imageUrl: Any? = saavnTrack?.coverUrl?.takeIf { it.isNotEmpty() }
+                    ?: currentItem?.mediaMetadata?.artworkUri
 
-                    if (imageUrl != null) {
-                        val request = ImageRequest.Builder(applicationContext)
-                            .data(imageUrl)
-                            .size(300)
-                            .allowHardware(false)
-                            .build()
+                if (imageUrl != null) {
+                    val request = ImageRequest.Builder(applicationContext)
+                        .data(imageUrl)
+                        .size(300)
+                        .allowHardware(false)
+                        .build()
 
-                        val result = applicationContext.imageLoader.execute(request)
-                        val bitmap = result.drawable?.toBitmap()
+                    val result = applicationContext.imageLoader.execute(request)
+                    val bitmap = result.drawable?.toBitmap()
 
-                        if (bitmap != null) {
-                            FileOutputStream(coverFile).use { out ->
-                                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                            }
-                        } else {
-                            coverFile.delete()
+                    if (bitmap != null) {
+                        FileOutputStream(coverFile).use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
                         }
                     } else {
                         coverFile.delete()
                     }
+                } else {
+                    coverFile.delete()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

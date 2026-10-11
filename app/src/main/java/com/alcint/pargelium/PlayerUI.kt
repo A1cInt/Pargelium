@@ -9,7 +9,6 @@ package com.alcint.pargelium
 import android.content.ContentUris
 import android.content.Intent
 import android.net.Uri
-import android.os.Build.VERSION.SDK_INT
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,7 +33,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.*
@@ -43,9 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -54,8 +50,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -66,29 +61,30 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import coil.ImageLoader
 import coil.compose.AsyncImage
-import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.alcint.pargelium.liquid.LiquidGlassIconButton
+import com.alcint.pargelium.liquid.LiquidGlassPlayPauseButton
+import ir.mahozad.multiplatform.wavyslider.material3.WavySlider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.isActive
-import ir.mahozad.multiplatform.wavyslider.material3.WavySlider
-import androidx.compose.ui.res.painterResource
 
 @Composable
 fun AuroraBackground(seedColor: Color, isPlaying: Boolean, modifier: Modifier = Modifier) {
@@ -760,6 +756,7 @@ fun FullPlayerScreen(
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
     val audioOutput = rememberAudioOutputState(context)
+    val playerBackdrop = rememberLayerBackdrop()
 
     val showTrackInfoBar = PrefsManager.getShowTrackInfoBar()
 
@@ -938,74 +935,80 @@ fun FullPlayerScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-        val bgModifier = if (blurRadius > 0.dp && !isVideo) {
-            Modifier.fillMaxSize().blur(blurRadius)
-        } else {
-            Modifier.fillMaxSize()
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .layerBackdrop(playerBackdrop)
+        ) {
+            val bgModifier = if (blurRadius > 0.dp && !isVideo) {
+                Modifier.fillMaxSize().blur(blurRadius)
+            } else {
+                Modifier.fillMaxSize()
+            }
 
-        Crossfade(
-            targetState = backgroundState,
-            animationSpec = tween(800),
-            label = "bg_clear",
-            modifier = Modifier.fillMaxSize()
-        ) { state ->
-            when (state) {
-                "canvas" -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (isVideo) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                VideoBackground(videoUri = canvasUri!!)
-                                if (showLyrics) {
-                                    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+            Crossfade(
+                targetState = backgroundState,
+                animationSpec = tween(800),
+                label = "bg_clear",
+                modifier = Modifier.fillMaxSize()
+            ) { state ->
+                when (state) {
+                    "canvas" -> {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (isVideo) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    VideoBackground(videoUri = canvasUri!!)
+                                    if (showLyrics) {
+                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+                                    }
                                 }
+                            } else {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(appContext).data(canvasUri).build(),
+                                    imageLoader = imageLoader,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = bgModifier
+                                )
                             }
-                        } else {
+                        }
+                    }
+                    "cover" -> {
+                        val saavnTrack = SaavnApi.trackCache[track.id]
+                        val artModel: Any? = when {
+                            saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
+                            track.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.albumId)
+                            else -> null
+                        }
+                        if (artModel != null) {
                             AsyncImage(
-                                model = ImageRequest.Builder(appContext).data(canvasUri).build(),
+                                model = ImageRequest.Builder(appContext).data(artModel).build(),
                                 imageLoader = imageLoader,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = bgModifier
                             )
+                        } else {
+                            AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
                         }
                     }
-                }
-                "cover" -> {
-                    val saavnTrack = SaavnApi.trackCache[track.id]
-                    val artModel: Any? = when {
-                        saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-                        track.albumId != 0L -> ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), track.albumId)
-                        else -> null
-                    }
-                    if (artModel != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(appContext).data(artModel).build(),
-                            imageLoader = imageLoader,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = bgModifier
-                        )
-                    } else {
+                    "aurora" -> {
                         AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
                     }
                 }
-                "aurora" -> {
-                    AuroraBackground(seedColor = dynamicSeedColor, isPlaying = isPlaying, modifier = bgModifier)
-                }
             }
-        }
 
-        Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0.0f to Color.Black.copy(alpha = 0.4f),
-                    0.15f to Color.Transparent,
-                    0.6f to Color.Black.copy(alpha = 0.4f),
-                    1.0f to Color.Black.copy(alpha = 0.8f)
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        0.0f to Color.Black.copy(alpha = 0.4f),
+                        0.15f to Color.Transparent,
+                        0.6f to Color.Black.copy(alpha = 0.4f),
+                        1.0f to Color.Black.copy(alpha = 0.8f)
+                    )
                 )
             )
-        )
+        }
 
         val parallaxTransitionSpec: AnimatedContentTransitionScope<Boolean>.() -> ContentTransform = remember {
             {
@@ -1204,63 +1207,75 @@ fun FullPlayerScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 val repeatIcon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
-                                val repeatTint = if (repeatMode == Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.5f) else iconTint
+                                val isRepeatActive = repeatMode != Player.REPEAT_MODE_OFF
 
-                                Surface(
+                                LiquidGlassIconButton(
                                     onClick = onToggleRepeat,
-                                    shape = CircleShape,
-                                    color = Color.White.copy(alpha = 0.08f),
-                                    modifier = Modifier.size(48.dp).tiltOnTouch()
+                                    backdrop = playerBackdrop,
+                                    size = 48.dp,
+                                    activeColor = iconTint,
+                                    isActive = isRepeatActive
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(imageVector = repeatIcon, contentDescription = null, tint = repeatTint, modifier = Modifier.size(22.dp))
-                                    }
+                                    Icon(
+                                        imageVector = repeatIcon,
+                                        contentDescription = stringResource(id = R.string.action_repeat),
+                                        tint = if (isRepeatActive) iconTint else Color.White.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(22.dp)
+                                    )
                                 }
 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    IconButton(
+                                    LiquidGlassIconButton(
                                         onClick = onSkipPrevious,
-                                        modifier = Modifier.size(52.dp).tiltOnTouch()
+                                        backdrop = playerBackdrop,
+                                        size = 52.dp
                                     ) {
-                                        Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(36.dp), tint = Color.White)
+                                        Icon(
+                                            Icons.Default.SkipPrevious,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(32.dp),
+                                            tint = Color.White
+                                        )
                                     }
 
-                                    Surface(
+                                    LiquidGlassPlayPauseButton(
+                                        isPlaying = isPlaying,
                                         onClick = onPlayPause,
-                                        shape = RoundedCornerShape(28.dp),
-                                        color = Color.White,
-                                        modifier = Modifier.size(76.dp).tiltOnTouch()
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                                null,
-                                                modifier = Modifier.size(38.dp),
-                                                tint = Color.Black
-                                            )
-                                        }
-                                    }
+                                        accentColor = iconTint,
+                                        backdrop = playerBackdrop,
+                                        size = 76.dp
+                                    )
 
-                                    IconButton(
+                                    LiquidGlassIconButton(
                                         onClick = onSkipNext,
-                                        modifier = Modifier.size(52.dp).tiltOnTouch()
+                                        backdrop = playerBackdrop,
+                                        size = 52.dp
                                     ) {
-                                        Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(36.dp), tint = Color.White)
+                                        Icon(
+                                            Icons.Default.SkipNext,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(32.dp),
+                                            tint = Color.White
+                                        )
                                     }
                                 }
 
-                                Surface(
+                                LiquidGlassIconButton(
                                     onClick = { showQueue = true },
-                                    shape = CircleShape,
-                                    color = Color.White.copy(alpha = 0.08f),
-                                    modifier = Modifier.size(48.dp).tiltOnTouch()
+                                    backdrop = playerBackdrop,
+                                    size = 48.dp,
+                                    activeColor = iconTint,
+                                    isActive = showQueue
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-                                    }
+                                    Icon(
+                                        Icons.Default.QueueMusic,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.85f),
+                                        modifier = Modifier.size(22.dp)
+                                    )
                                 }
                             }
                             Spacer(modifier = Modifier.height(24.dp))
@@ -1497,63 +1512,75 @@ fun FullPlayerScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             val repeatIcon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
-                            val repeatTint = if (repeatMode == Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.5f) else iconTint
+                            val isRepeatActive = repeatMode != Player.REPEAT_MODE_OFF
 
-                            Surface(
+                            LiquidGlassIconButton(
                                 onClick = onToggleRepeat,
-                                shape = CircleShape,
-                                color = Color.White.copy(alpha = 0.08f),
-                                modifier = Modifier.size(48.dp).tiltOnTouch()
+                                backdrop = playerBackdrop,
+                                size = 48.dp,
+                                activeColor = iconTint,
+                                isActive = isRepeatActive
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(imageVector = repeatIcon, contentDescription = stringResource(id = R.string.action_repeat), tint = repeatTint, modifier = Modifier.size(22.dp))
-                                }
+                                Icon(
+                                    imageVector = repeatIcon,
+                                    contentDescription = stringResource(id = R.string.action_repeat),
+                                    tint = if (isRepeatActive) iconTint else Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(22.dp)
+                                )
                             }
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                IconButton(
+                                LiquidGlassIconButton(
                                     onClick = onSkipPrevious,
-                                    modifier = Modifier.size(52.dp).tiltOnTouch()
+                                    backdrop = playerBackdrop,
+                                    size = 52.dp
                                 ) {
-                                    Icon(Icons.Default.SkipPrevious, null, modifier = Modifier.size(36.dp), tint = Color.White)
+                                    Icon(
+                                        Icons.Default.SkipPrevious,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(32.dp),
+                                        tint = Color.White
+                                    )
                                 }
 
-                                Surface(
+                                LiquidGlassPlayPauseButton(
+                                    isPlaying = isPlaying,
                                     onClick = onPlayPause,
-                                    shape = RoundedCornerShape(28.dp),
-                                    color = Color.White,
-                                    modifier = Modifier.size(76.dp).tiltOnTouch()
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            null,
-                                            modifier = Modifier.size(38.dp),
-                                            tint = Color.Black
-                                        )
-                                    }
-                                }
+                                    accentColor = iconTint,
+                                    backdrop = playerBackdrop,
+                                    size = 76.dp
+                                )
 
-                                IconButton(
+                                LiquidGlassIconButton(
                                     onClick = onSkipNext,
-                                    modifier = Modifier.size(52.dp).tiltOnTouch()
+                                    backdrop = playerBackdrop,
+                                    size = 52.dp
                                 ) {
-                                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(36.dp), tint = Color.White)
+                                    Icon(
+                                        Icons.Default.SkipNext,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(32.dp),
+                                        tint = Color.White
+                                    )
                                 }
                             }
 
-                            Surface(
+                            LiquidGlassIconButton(
                                 onClick = { showQueue = true },
-                                shape = CircleShape,
-                                color = Color.White.copy(alpha = 0.08f),
-                                modifier = Modifier.size(48.dp).tiltOnTouch()
+                                backdrop = playerBackdrop,
+                                size = 48.dp,
+                                activeColor = iconTint,
+                                isActive = showQueue
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-                                }
+                                Icon(
+                                    Icons.Default.QueueMusic,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.85f),
+                                    modifier = Modifier.size(22.dp)
+                                )
                             }
                         }
 
@@ -1608,7 +1635,7 @@ fun FullPlayerScreen(
                                     if (saavnTrack != null) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(Icons.Default.PlayArrow, null, tint = iconTint, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(4.dp))
+                                            Spacer(Modifier.width(6.dp))
                                             Text("JioSaavn", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = iconTint)
                                         }
                                     }
@@ -1678,7 +1705,7 @@ fun parseDurationToMs(durationStr: String): Long {
             val s = parts[2].toLong()
             return (h * 3600 + m * 60 + s) * 1000
         }
-    } catch (e: Exception) { }
+    } catch (_: Exception) { }
     return -1L
 }
 

@@ -202,11 +202,9 @@
     <string name="setting_mix_level">Уровень (Mix)</string>
     <string name="spatializer_title">3D Стерео (Spatializer)</string>
     <string name="spatializer_desc">Расширяет сцену за пределы наушников</string>
-    <string name="setting_stereo_width">Ширина стереобазы</string>
     <string name="haas_title">Эффект Хааса (Haas)</string>
     <string name="haas_desc">Психоакустическое выведение звука \'из головы\'</string>
     <string name="setting_right_delay">Задержка правого канала</string>
-    <string name="unit_ms">мс</string>
     <string name="exciter_title">Восстановление (Exciter)</string>
     <string name="exciter_desc">Кристаллизация высоких частот</string>
     <string name="setting_intensity">Интенсивность</string>
@@ -298,4 +296,37 @@
     <string name="contact_session">Session</string>
     <string name="contact_session_desc">05d910ef7e99c2275714a633ada72a7b197f93555d19d90b66b89e4af276398105</string>
     <string name="msg_copied">Скопировано в буфер обмена</string>
+
+    <!-- Заголовки секций -->
+    <string name="section_master_dynamics">Динамика и лимитер</string>
+    <string name="section_analog_color">Аналоговый окрас</string>
+
+    <!-- Master Limiter -->
+    <string name="limiter_title">Master Limiter</string>
+    <string name="limiter_desc">Пиковый лимитер и защита от клиппинга</string>
+    <string name="setting_limiter_threshold">Порог сжатия</string>
+    <string name="setting_limiter_release">Время восстановления</string>
+    <string name="setting_postgain">Выходное усиление</string>
+    <string name="unit_ms">ms</string>
+
+    <!-- Vacuum Tube -->
+    <string name="tube_title">Vacuum Tube</string>
+    <string name="tube_desc">Эмуляция лампового тракта и насыщения гармониками</string>
+    <string name="setting_tube_drive">Ламповый драйв</string>
+
+    <!-- Stereo Widener -->
+    <string name="stereo_widener_title">Stereo Widener</string>
+    <string name="stereo_widener_desc">Расширение стереопанорамы</string>
+    <string name="setting_stereo_width">Ширина базы</string>
+
+    <!-- BS2B Crossfeed -->
+    <string name="bs2b_title">BS2B Crossfeed</string>
+    <string name="bs2b_desc">Бинауральный кроссфид для снятия усталости от наушников</string>
+
+    <!-- Массивы пресетов BS2B -->
+    <string-array name="bs2b_modes">
+        <item>Default (700 Hz, 4.5 dB)</item>
+        <item>Moy (650 Hz, 9.5 dB)</item>
+        <item>Chu (700 Hz, 6.0 dB)</item>
+    </string-array>
 </resources>

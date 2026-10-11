@@ -16,12 +16,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.media3.common.util.UnstableApi
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+
+val LocalBackdrop = staticCompositionLocalOf<LayerBackdrop> { error("No Backdrop provided") }
 
 @UnstableApi
 class MainActivity : AppCompatActivity() {
@@ -49,20 +55,24 @@ class MainActivity : AppCompatActivity() {
         UpdateManager.checkForUpdates(this, isManual = false)
 
         setContent {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                RequestFilePermissionEffect(
-                    onPermissionGranted = {
-                        AudioRepository.clearCache()
-                        LyricsManager.clearCache(this)
-                    }
-                )
+            val backdrop = rememberLayerBackdrop()
 
-                LibraryScreen(
-                    onSecureRequest = { isSecure -> setSecureMode(isSecure) }
-                )
+            CompositionLocalProvider(LocalBackdrop provides backdrop) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    RequestFilePermissionEffect(
+                        onPermissionGranted = {
+                            AudioRepository.clearCache()
+                            LyricsManager.clearCache(this)
+                        }
+                    )
+
+                    LibraryScreen(
+                        onSecureRequest = { isSecure -> setSecureMode(isSecure) }
+                    )
+                }
             }
         }
     }
