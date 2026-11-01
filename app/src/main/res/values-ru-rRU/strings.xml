@@ -329,4 +329,6 @@
         <item>Moy (650 Hz, 9.5 dB)</item>
         <item>Chu (700 Hz, 6.0 dB)</item>
     </string-array>
+
+    <string name="settings_design">Дизайн</string>
 </resources>

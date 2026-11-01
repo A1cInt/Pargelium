@@ -44,6 +44,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.alcint.pargelium.library.getPrimaryArtist
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

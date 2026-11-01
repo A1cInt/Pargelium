@@ -121,4 +121,7 @@ dependencies {
 
     implementation("top.yukonga.miuix.kmp:miuix-blur:0.9.1")
     implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
+
+    implementation("io.github.kyant0:backdrop:2.0.1")
+    implementation("io.github.kyant0:shapes:1.2.0")
 }

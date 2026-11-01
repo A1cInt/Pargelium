@@ -344,4 +344,6 @@
     <string name="setting_limiter_threshold">Threshold</string>
     <string name="setting_limiter_release">Release Time</string>
     <string name="setting_postgain">Post Gain</string>
+
+    <string name="settings_design">Design</string>
 </resources>
