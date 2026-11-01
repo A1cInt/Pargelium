@@ -1,7 +1,8 @@
 package com.alcint.pargelium.player
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.luminance
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -18,8 +20,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.alcint.pargelium.globalAudioLoudness
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+
+private const val TWO_PI = (2 * PI).toFloat()
 
 @Composable
 fun AuroraBackground(seedColor: Color, isPlaying: Boolean, modifier: Modifier = Modifier) {
@@ -27,108 +32,167 @@ fun AuroraBackground(seedColor: Color, isPlaying: Boolean, modifier: Modifier = 
     val defaultColor = MaterialTheme.colorScheme.primary
     val effectiveSeed = if (seedColor == Color.Unspecified || seedColor == Color.Transparent) defaultColor else seedColor
 
-    val targetColor = if (effectiveSeed.luminance() < 0.1f) defaultColor else effectiveSeed
-    val animatedColor by animateColorAsState(targetValue = targetColor, animationSpec = tween(1500), label = "color")
+    val targetColor = remember(effectiveSeed, defaultColor) {
+        if (effectiveSeed.luminance() < 0.1f) defaultColor else effectiveSeed
+    }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "aurora")
-
-    val animationDuration = if (isPlaying) 15000 else 45000
-    val offset1 by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.28f,
-        animationSpec = infiniteRepeatable(tween(animationDuration, easing = LinearEasing), RepeatMode.Restart),
-        label = "blob1"
-    )
-    val slowScale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(tween(8000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "slowScale"
+    val animatedColorState = animateColorAsState(
+        targetValue = targetColor,
+        animationSpec = tween(1500, easing = LinearEasing),
+        label = "color"
     )
 
-    val color1 = animatedColor.copy(alpha = 0.6f)
-    val color2 = animatedColor.copy(alpha = 0.4f)
-    val bgGradientColors = remember(baseBackground) { listOf(Color.Transparent, baseBackground.copy(alpha = 0.5f), baseBackground) }
+    val bgGradientBrush = remember(baseBackground) {
+        Brush.verticalGradient(
+            listOf(Color.Transparent, baseBackground.copy(alpha = 0.5f), baseBackground)
+        )
+    }
 
-    val smoothedLoudnessState = remember { mutableFloatStateOf(0f) }
+    var frameTick by remember { mutableIntStateOf(0) }
+    val animState = remember { AuroraAnimState() }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     var isAppResumed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            isAppResumed = event == Lifecycle.Event.ON_RESUME
+            isAppResumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(isPlaying, isAppResumed) {
-        if (!isPlaying || !isAppResumed) {
-            var currentLoudness = smoothedLoudnessState.floatValue
-            while (currentLoudness > 0.01f && isActive) {
-                currentLoudness *= 0.9f
-                smoothedLoudnessState.floatValue = currentLoudness
-                delay(32)
-            }
-            smoothedLoudnessState.floatValue = 0f
-            return@LaunchedEffect
-        }
+        if (!isAppResumed) return@LaunchedEffect
 
-        var fast = 0f
-        var slow = 0f
-        var visualLoudness = 0f
-
+        var lastNanos = withFrameNanos { it }
         while (isActive) {
-            withFrameNanos {
-                val target = globalAudioLoudness
-                val safeTarget = if (target.isNaN() || target.isInfinite()) 0f else target
+            withFrameNanos { frameNanos ->
+                val dt = ((frameNanos - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                lastNanos = frameNanos
 
-                fast = fast * 0.85f + safeTarget * 0.15f
-                slow = slow * 0.98f + safeTarget * 0.02f
-                val peak = (fast - slow).coerceAtLeast(0f)
+                val rotationSpeed = if (isPlaying) TWO_PI / 15f else TWO_PI / 45f
+                animState.offset = (animState.offset + rotationSpeed * dt) % TWO_PI
 
-                if (peak > visualLoudness) {
-                    visualLoudness = visualLoudness * 0.5f + peak * 0.5f
-                } else {
-                    visualLoudness *= 0.94f
+                animState.scalePhase = (animState.scalePhase + (TWO_PI / 16f) * dt) % TWO_PI
+                animState.slowScale = 1.0f - 0.1f * cos(animState.scalePhase)
+
+                if (isPlaying) {
+                    val target = globalAudioLoudness
+                    val safeTarget = if (target.isNaN() || target.isInfinite()) 0f else target
+
+                    val stepFactor = (dt * 30f).coerceIn(0.5f, 3f)
+                    animState.fast += (safeTarget - animState.fast) * (0.15f * stepFactor).coerceAtMost(1f)
+                    animState.slow += (safeTarget - animState.slow) * (0.02f * stepFactor).coerceAtMost(1f)
+                    val peak = (animState.fast - animState.slow).coerceAtLeast(0f)
+
+                    if (peak > animState.loudness) {
+                        animState.loudness = animState.loudness * 0.5f + peak * 0.5f
+                    } else {
+                        animState.loudness *= 0.94f
+                    }
+                } else if (animState.loudness > 0.001f) {
+                    animState.loudness *= 0.9f
+                    if (animState.loudness <= 0.001f) animState.loudness = 0f
                 }
-                smoothedLoudnessState.floatValue = visualLoudness
+
+                frameTick++
             }
-            delay(16)
+            val sleepMs = if (isPlaying || animState.loudness > 0.01f) 30L else 64L
+            delay(sleepMs)
         }
     }
+
+    val brushCache = remember { AuroraBrushCache() }
 
     Canvas(modifier = modifier.fillMaxSize().background(baseBackground)) {
         val width = size.width
         val height = size.height
-        if (width <= 0 || height <= 0) return@Canvas
+        if (width <= 0f || height <= 0f) return@Canvas
 
-        val loud = smoothedLoudnessState.floatValue
+        @Suppress("UNUSED_VARIABLE")
+        val tick = frameTick
+        val currentColor = animatedColorState.value
+        brushCache.updateIfNeeded(currentColor)
+
+        val loud = animState.loudness
         val currentBeat = 1.0f + (loud * 4.0f).coerceIn(0f, 0.6f)
-        val curOffset = offset1
-        val curScale = slowScale
+        val curOffset = animState.offset
+        val curScale = animState.slowScale
 
-        val x1 = width * 0.5f + cos(curOffset) * width * 0.2f
-        val y1 = height * 0.4f + sin(curOffset) * height * 0.1f
+        val cosOffset = cos(curOffset)
+        val sinOffset = sin(curOffset)
+
+        val x1 = width * 0.5f + cosOffset * width * 0.2f
+        val y1 = height * 0.4f + sinOffset * height * 0.1f
         val r1 = ((width * 0.8f * curScale) * currentBeat).coerceAtLeast(1f)
 
-        drawCircle(
-            brush = Brush.radialGradient(listOf(color1, Color.Transparent), center = Offset(x1, y1), radius = r1),
-            center = Offset(x1, y1),
-            radius = r1
-        )
+        withTransform({
+            translate(left = x1, top = y1)
+            scale(scaleX = r1, scaleY = r1, pivot = Offset.Zero)
+        }) {
+            drawCircle(
+                brush = brushCache.brush1,
+                radius = 1f,
+                center = Offset.Zero
+            )
+        }
 
-        val x2 = width * 0.5f + cos(curOffset + 3.14f) * width * 0.3f
-        val y2 = height * 0.6f + sin(curOffset + 3.14f) * height * 0.2f
+        val x2 = width * 0.5f - cosOffset * width * 0.3f
+        val y2 = height * 0.6f - sinOffset * height * 0.2f
         val r2 = ((width * 0.9f * (2f - curScale)) * currentBeat).coerceAtLeast(1f)
 
-        drawCircle(
-            brush = Brush.radialGradient(listOf(color2, Color.Transparent), center = Offset(x2, y2), radius = r2),
-            center = Offset(x2, y2),
-            radius = r2
-        )
+        withTransform({
+            translate(left = x2, top = y2)
+            scale(scaleX = r2, scaleY = r2, pivot = Offset.Zero)
+        }) {
+            drawCircle(
+                brush = brushCache.brush2,
+                radius = 1f,
+                center = Offset.Zero
+            )
+        }
 
-        drawRect(brush = Brush.verticalGradient(bgGradientColors))
+        drawRect(brush = bgGradientBrush)
+    }
+}
+
+@Stable
+private class AuroraAnimState {
+    var offset: Float = 0f
+    var scalePhase: Float = 0f
+    var slowScale: Float = 0.9f
+    var loudness: Float = 0f
+    var fast: Float = 0f
+    var slow: Float = 0f
+}
+
+private class AuroraBrushCache {
+    private var lastColor: Color = Color.Unspecified
+
+    var brush1: Brush = Brush.radialGradient(
+        colors = listOf(Color.Transparent, Color.Transparent),
+        center = Offset.Zero,
+        radius = 1f
+    )
+        private set
+
+    var brush2: Brush = brush1
+        private set
+
+    fun updateIfNeeded(color: Color) {
+        if (color != lastColor) {
+            lastColor = color
+            brush1 = Brush.radialGradient(
+                colors = listOf(color.copy(alpha = 0.6f), Color.Transparent),
+                center = Offset.Zero,
+                radius = 1f
+            )
+            brush2 = Brush.radialGradient(
+                colors = listOf(color.copy(alpha = 0.4f), Color.Transparent),
+                center = Offset.Zero,
+                radius = 1f
+            )
+        }
     }
 }

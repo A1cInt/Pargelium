@@ -16,25 +16,18 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -50,9 +43,11 @@ import com.alcint.pargelium.settings.SettingsScreen
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import kotlin.coroutines.resume
 
 @Composable
 fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
@@ -65,7 +60,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var navBarStyle by remember { mutableIntStateOf(PrefsManager.getNavBarStyle()) }
     val systemDark = isSystemInDarkTheme()
 
-    val hasPlaylists = PrefsManager.getFeaturePlaylists()
+    val hasPlaylists = remember { PrefsManager.getFeaturePlaylists() }
     val tabCount = if (hasPlaylists) 5 else 4
     val pagerState = rememberPagerState { tabCount }
 
@@ -88,7 +83,9 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var hasPermission by remember { mutableStateOf(false) }
 
     var allTracks by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
+    var tracksById by remember { mutableStateOf>(emptyMap()) }
     var allAlbums by remember { mutableStateOf<List<AlbumModel>>(emptyList()) }
+    var allArtists by remember { mutableStateOf<List<ArtistModel>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
 
@@ -99,13 +96,21 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var currentTrack by remember { mutableStateOf<AudioTrack?>(null) }
     var currentPlaylist by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
     var isPlaying by remember { mutableStateOf(false) }
-    var trackDuration by remember { mutableStateOf(1L) }
+    var trackDuration by remember { mutableLongStateOf(1L) } // Без автобоксинга Long
     var trackMetadata by remember { mutableStateOf("") }
     var currentAlbumArt by remember { mutableStateOf<Uri?>(null) }
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
+    var currentQueueIndex by remember { mutableIntStateOf(-1) }
 
     var lastPreviousClickTime by remember { mutableLongStateOf(0L) }
     val unknownArtistStr = stringResource(id = R.string.unknown_artist)
+
+    val currentTracksById by rememberUpdatedState(tracksById)
+    val currentPlaylistState by rememberUpdatedState(currentPlaylist)
+    val currentPlayerState by rememberUpdatedState(playerController)
+    val currentTrackState by rememberUpdatedState(currentTrack)
+    val allTracksState by rememberUpdatedState(allTracks)
+    val updatedAllArtists by rememberUpdatedState(allArtists)
 
     LaunchedEffect(isProfileOpen) {
         if (!isProfileOpen) {
@@ -115,14 +120,18 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     }
 
     LaunchedEffect(currentPlaylist) {
-        if (currentPlaylist.isNotEmpty()) PrefsManager.saveLastQueue(currentPlaylist.map { it.id })
+        if (currentPlaylist.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                PrefsManager.saveLastQueue(currentPlaylist.map { it.id })
+            }
+        }
     }
 
     DisposableEffect(Unit) {
         val sessionToken = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
         controllerFuture.addListener({
-            try { playerController = controllerFuture.get() } catch (e: Exception) {}
+            try { playerController = controllerFuture.get() } catch (_: Exception) {}
         }, MoreExecutors.directExecutor())
 
         onDispose {
@@ -135,8 +144,12 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         val player = playerController ?: return@DisposableEffect onDispose {}
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                currentQueueIndex = player.currentMediaItemIndex
                 val trackId = mediaItem?.mediaId?.toLongOrNull()
-                val found = allTracks.find { it.id == trackId } ?: currentPlaylist.find { it.id == trackId }
+                val found = if (trackId != null) {
+                    currentTracksById[trackId] ?: currentPlaylistState.find { it.id == trackId }
+                } else null
+
                 if (found != null) {
                     currentTrack = found
                     PrefsManager.saveLastTrackId(found.id)
@@ -145,85 +158,92 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                 val currentDuration = player.duration
                 if (currentDuration != C.TIME_UNSET) trackDuration = currentDuration.coerceAtLeast(1L)
             }
+
             override fun onIsPlayingChanged(isPlayingState: Boolean) {
                 isPlaying = isPlayingState
                 if (!isPlayingState) PrefsManager.saveLastPosition(player.currentPosition)
             }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
                     val currentDuration = player.duration
                     if (currentDuration != C.TIME_UNSET) trackDuration = currentDuration.coerceAtLeast(1L)
                 }
             }
+
             override fun onRepeatModeChanged(mode: Int) { repeatMode = mode }
         }
         player.addListener(listener)
         isPlaying = player.isPlaying
         repeatMode = player.repeatMode
+        currentQueueIndex = player.currentMediaItemIndex
 
         val currentDuration = player.duration
         if (currentDuration != C.TIME_UNSET) trackDuration = currentDuration.coerceAtLeast(1L)
 
         val currentId = player.currentMediaItem?.mediaId?.toLongOrNull()
         if (currentId != null) {
-            val found = allTracks.find { it.id == currentId }
-            if (found != null) currentTrack = found
+            currentTracksById[currentId]?.let { currentTrack = it }
         }
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(playerController, allTracks) {
+    LaunchedEffect(playerController, tracksById) {
         val player = playerController ?: return@LaunchedEffect
-        if (allTracks.isEmpty()) return@LaunchedEffect
+        if (tracksById.isEmpty()) return@LaunchedEffect
 
         val currentId = player.currentMediaItem?.mediaId?.toLongOrNull()
         if (currentId != null) {
             if (currentTrack == null || currentTrack?.id != currentId) {
-                val foundTrack = allTracks.find { it.id == currentId }
-                if (foundTrack != null) {
+                tracksById[currentId]?.let { foundTrack ->
                     currentTrack = foundTrack
                     val currentDuration = player.duration
                     if (currentDuration != C.TIME_UNSET) trackDuration = currentDuration.coerceAtLeast(1L)
                     isPlaying = player.isPlaying
+                    currentQueueIndex = player.currentMediaItemIndex
                 }
             }
         } else {
             val lastTrackId = PrefsManager.getLastTrackId()
             if (lastTrackId != -1L && currentTrack == null) {
-                val lastQueueIds = PrefsManager.getLastQueue()
-                val restoredQueue = lastQueueIds.mapNotNull { id -> allTracks.find { it.id == id } }
-
-                val finalQueue = if (restoredQueue.isNotEmpty() && restoredQueue.any { it.id == lastTrackId }) restoredQueue
-                else {
-                    val foundTrack = allTracks.find { it.id == lastTrackId }
-                    if (foundTrack != null) listOf(foundTrack) else emptyList()
+                val finalQueue = withContext(Dispatchers.Default) {
+                    val lastQueueIds = PrefsManager.getLastQueue()
+                    val restoredQueue = lastQueueIds.mapNotNull { id -> tracksById[id] }
+                    if (restoredQueue.isNotEmpty() && restoredQueue.any { it.id == lastTrackId }) {
+                        restoredQueue
+                    } else {
+                        tracksById[lastTrackId]?.let { listOf(it) } ?: emptyList()
+                    }
                 }
 
                 if (finalQueue.isNotEmpty()) {
-                    val targetTrack = finalQueue.find { it.id == lastTrackId } ?: finalQueue.first()
+                    val targetIndex = finalQueue.indexOfFirst { it.id == lastTrackId }.coerceAtLeast(0)
+                    val targetTrack = finalQueue[targetIndex]
                     currentTrack = targetTrack
                     val lastPos = PrefsManager.getLastPosition()
                     currentPlaylist = finalQueue
-                    val mediaItems = finalQueue.map { createMediaItem(it) }
-                    val startIndex = finalQueue.indexOf(targetTrack).coerceAtLeast(0)
-                    player.setMediaItems(mediaItems, startIndex, lastPos)
+                    val mediaItems = withContext(Dispatchers.Default) {
+                        finalQueue.map { createMediaItem(it) }
+                    }
+                    player.setMediaItems(mediaItems, targetIndex, lastPos)
                     player.prepare()
+                    currentQueueIndex = targetIndex
                 }
             }
         }
     }
 
     LaunchedEffect(currentTrack) {
-        if (currentTrack != null) {
-            if (!currentTrack!!.coverUrl.isNullOrEmpty() && currentTrack!!.coverUrl != "null") {
-                currentAlbumArt = Uri.parse(currentTrack!!.coverUrl)
-                val sourceName = if (currentTrack!!.source == "local") "Онлайн Радио" else currentTrack!!.source.uppercase()
+        val track = currentTrack
+        if (track != null) {
+            if (!track.coverUrl.isNullOrEmpty() && track.coverUrl != "null") {
+                currentAlbumArt = Uri.parse(track.coverUrl)
+                val sourceName = if (track.source == "local") "Онлайн Радио" else track.source.uppercase()
                 trackMetadata = "$sourceName • Стриминг"
-            } else if (currentTrack!!.albumId != 0L && currentTrack!!.albumId != -1L) {
-                currentAlbumArt = AudioRepository.getAlbumArtUri(currentTrack!!.albumId)
-                launch(Dispatchers.IO) {
-                    val meta = AudioRepository.getTrackMetadata(context, currentTrack!!.uri)
-                    withContext(Dispatchers.Main) { trackMetadata = meta }
+            } else if (track.albumId != 0L && track.albumId != -1L) {
+                currentAlbumArt = AudioRepository.getAlbumArtUri(track.albumId)
+                trackMetadata = withContext(Dispatchers.IO) {
+                    AudioRepository.getTrackMetadata(context, track.uri)
                 }
             } else {
                 trackMetadata = context.getString(R.string.status_live_broadcast)
@@ -240,15 +260,36 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     fun loadTracks(forceScan: Boolean = false) {
         scope.launch {
             if (forceScan) isRefreshing = true else isLoading = true
-            if (forceScan) withContext(Dispatchers.IO) {
-                val lock = java.util.concurrent.CountDownLatch(1)
-                AudioRepository.forceScan(context) { lock.countDown() }
-                lock.await()
+            if (forceScan) {
+                suspendCancellableCoroutine { cont ->
+                    AudioRepository.forceScan(context) {
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                }
             }
             val loadedTracks = withContext(Dispatchers.IO) { AudioRepository.getAudioTracks(context, forceScan) }
-            val loadedAlbums = withContext(Dispatchers.Default) { AudioRepository.processAlbums(loadedTracks) }
+
+            val (loadedAlbums, loadedArtists, idMap) = withContext(Dispatchers.Default) {
+                val albums = AudioRepository.processAlbums(loadedTracks)
+                val albumsByArtist = albums.groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
+                val artists = loadedTracks
+                    .groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
+                    .map { (name, artistTracks) ->
+                        ArtistModel(
+                            name = name,
+                            tracks = artistTracks.sortedBy { it.title },
+                            albums = albumsByArtist[name]?.sortedBy { it.title } ?: emptyList()
+                        )
+                    }
+                    .sortedBy { it.name.trim().lowercase() }
+                val map = loadedTracks.associateBy { it.id }
+                Triple(albums, artists, map)
+            }
+
             allTracks = loadedTracks
+            tracksById = idMap
             allAlbums = loadedAlbums
+            allArtists = loadedArtists
             isLoading = false
             isRefreshing = false
         }
@@ -261,15 +302,18 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        val permissionsToRequest = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= 33) {
-            permissionsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
-            permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
-        } else { permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE) }
-        if (Build.VERSION.SDK_INT >= 31) {
-            permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
-            permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
-            permissionsToRequest.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+        val permissionsToRequest = buildList {
+            if (Build.VERSION.SDK_INT >= 33) {
+                add(Manifest.permission.READ_MEDIA_AUDIO)
+                add(Manifest.permission.READ_MEDIA_IMAGES)
+            } else {
+                add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            if (Build.VERSION.SDK_INT >= 31) {
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            }
         }
         permissionLauncher.launch(permissionsToRequest.toTypedArray())
     }
@@ -281,82 +325,99 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
             val readyTrack = try {
                 track.copy(uri = StreamingManager.getPlayableUri(context, track))
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Стриминг: Сервер недоступен", Toast.LENGTH_SHORT).show() }
+            } catch (_: Exception) {
+                Toast.makeText(context, "Стриминг: Сервер недоступен", Toast.LENGTH_SHORT).show()
                 return@launch
             } finally {
                 if (isNetwork) isLoading = false
             }
 
-            val player = playerController ?: return@launch
-            if (currentTrack?.id == readyTrack.id && player.mediaItemCount > 0) {
+            val player = currentPlayerState ?: return@launch
+            if (currentTrackState?.id == readyTrack.id && player.mediaItemCount > 0) {
                 if (!player.isPlaying) player.play()
                 return@launch
             }
             currentTrack = readyTrack
             PrefsManager.saveLastTrackId(readyTrack.id)
 
-            val isSamePlaylist = currentPlaylist.size == playlistContext.size && currentPlaylist.map { it.id } == playlistContext.map { it.id }
+            val oldList = currentPlaylistState
+            val isSamePlaylist = oldList === playlistContext || (
+                    oldList.size == playlistContext.size &&
+                            oldList.indices.all { i -> oldList[i].id == playlistContext[i].id }
+                    )
+
+            val startIndex = playlistContext.indexOfFirst { it.id == readyTrack.id }.coerceAtLeast(0)
             if (isSamePlaylist && player.mediaItemCount > 0) {
-                val startIndex = playlistContext.indexOfFirst { it.id == readyTrack.id }.coerceAtLeast(0)
                 player.seekTo(startIndex, 0)
                 player.play()
+                currentQueueIndex = startIndex
             } else {
                 currentPlaylist = playlistContext
-                val mediaItems = playlistContext.map { if (it.id == readyTrack.id) createMediaItem(readyTrack) else createMediaItem(it) }
-                val startIndex = playlistContext.indexOfFirst { it.id == readyTrack.id }.coerceAtLeast(0)
+                val mediaItems = withContext(Dispatchers.Default) {
+                    playlistContext.map { if (it.id == readyTrack.id) createMediaItem(readyTrack) else createMediaItem(it) }
+                }
                 player.setMediaItems(mediaItems, startIndex, 0)
                 player.prepare()
                 player.play()
+                currentQueueIndex = startIndex
             }
         }
     }
 
     fun playNext(track: AudioTrack) {
         scope.launch {
-            val readyTrack = try { track.copy(uri = StreamingManager.getPlayableUri(context, track)) } catch (e: Exception) { track }
-            val player = playerController ?: return@launch
-            val index = player.currentMediaItemIndex + 1
+            val readyTrack = try { track.copy(uri = StreamingManager.getPlayableUri(context, track)) } catch (_: Exception) { track }
+            val player = currentPlayerState ?: return@launch
+            val index = (player.currentMediaItemIndex + 1).coerceAtMost(currentPlaylistState.size)
             player.addMediaItem(index, createMediaItem(readyTrack))
-            val newList = currentPlaylist.toMutableList()
-            if (index <= newList.size) { newList.add(index, readyTrack); currentPlaylist = newList }
-            withContext(Dispatchers.Main) { Toast.makeText(context, context.getString(R.string.play_next_msg), Toast.LENGTH_SHORT).show() }
+            val newList = currentPlaylistState.toMutableList()
+            newList.add(index, readyTrack)
+            currentPlaylist = newList
+            Toast.makeText(context, context.getString(R.string.play_next_msg), Toast.LENGTH_SHORT).show()
         }
     }
 
     fun addToQueue(track: AudioTrack) {
         scope.launch {
-            val readyTrack = try { track.copy(uri = StreamingManager.getPlayableUri(context, track)) } catch (e: Exception) { track }
-            val player = playerController ?: return@launch
+            val readyTrack = try { track.copy(uri = StreamingManager.getPlayableUri(context, track)) } catch (_: Exception) { track }
+            val player = currentPlayerState ?: return@launch
             player.addMediaItem(createMediaItem(readyTrack))
-            currentPlaylist = currentPlaylist + readyTrack
-            withContext(Dispatchers.Main) { Toast.makeText(context, context.getString(R.string.added_to_queue_msg), Toast.LENGTH_SHORT).show() }
+            currentPlaylist = currentPlaylistState + readyTrack
+            Toast.makeText(context, context.getString(R.string.added_to_queue_msg), Toast.LENGTH_SHORT).show()
         }
     }
 
     fun removeFromQueue(index: Int) {
-        val player = playerController ?: return
-        if (index in currentPlaylist.indices) {
+        val player = currentPlayerState ?: return
+        val list = currentPlaylistState
+        if (index in list.indices) {
             player.removeMediaItem(index)
-            val newList = currentPlaylist.toMutableList()
+            val newList = list.toMutableList()
             newList.removeAt(index)
             currentPlaylist = newList
+            currentQueueIndex = player.currentMediaItemIndex
         }
     }
 
-    fun jumpToQueueItem(index: Int) { playerController?.seekTo(index, 0) }
-    fun shuffleAll() { if (allTracks.isNotEmpty()) { val shuffled = allTracks.shuffled(); playTrack(shuffled[0], shuffled) } }
-    fun togglePlayPause() { playerController?.let { if (it.isPlaying) it.pause() else it.play() } }
-    fun seekTo(position: Long) { playerController?.seekTo(position); PrefsManager.saveLastPosition(position) }
+    fun jumpToQueueItem(index: Int) { currentPlayerState?.seekTo(index, 0) }
+    fun shuffleAll() {
+        val tracks = allTracksState
+        if (tracks.isNotEmpty()) {
+            val shuffled = tracks.shuffled()
+            playTrack(shuffled[0], shuffled)
+        }
+    }
+    fun togglePlayPause() { currentPlayerState?.let { if (it.isPlaying) it.pause() else it.play() } }
+    fun seekTo(position: Long) { currentPlayerState?.seekTo(position); PrefsManager.saveLastPosition(position) }
 
     fun skipNext() {
-        val player = playerController ?: return
+        val player = currentPlayerState ?: return
         if (player.repeatMode == Player.REPEAT_MODE_ONE) player.seekTo(0)
         else if (player.hasNextMediaItem()) player.seekToNextMediaItem()
     }
 
     fun skipPrevious() {
-        val player = playerController ?: return
+        val player = currentPlayerState ?: return
         val now = System.currentTimeMillis()
         if (now - lastPreviousClickTime <= 5000L || player.currentPosition < 3000L) {
             if (player.repeatMode == Player.REPEAT_MODE_ONE) player.seekTo(0)
@@ -370,7 +431,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     }
 
     fun toggleRepeat() {
-        val player = playerController ?: return
+        val player = currentPlayerState ?: return
         player.repeatMode = when (player.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
             Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
@@ -378,37 +439,35 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         }
     }
 
-    val filteredAlbums by remember(allAlbums, searchQuery) {
+    val filteredAlbums by remember {
         derivedStateOf {
-            if (searchQuery.isEmpty()) allAlbums
-            else allAlbums.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }.sortedBy { it.title.trim().lowercase() }
+            val query = searchQuery
+            val albums = allAlbums
+            if (query.isEmpty()) albums
+            else albums.filter {
+                it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
+            }.sortedBy { it.title.trim().lowercase() }
         }
     }
 
-    val allArtists by remember(allTracks, allAlbums, unknownArtistStr) {
+    val filteredArtists by remember {
         derivedStateOf {
-            allTracks.groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
-                .map { (name, artistTracks) ->
-                    ArtistModel(
-                        name = name,
-                        tracks = artistTracks.sortedBy { it.title },
-                        albums = allAlbums.filter { getPrimaryArtist(it.artist, unknownArtistStr) == name }.sortedBy { it.title }
-                    )
-                }.sortedBy { it.name.trim().lowercase() }
+            val query = searchQuery
+            val artists = allArtists
+            if (query.isEmpty()) artists
+            else artists.filter {
+                it.name.contains(query, ignoreCase = true)
+            }.sortedBy { it.name.trim().lowercase() }
         }
     }
 
-    val filteredArtists by remember(allArtists, searchQuery) {
+    val filteredTracks by remember {
         derivedStateOf {
-            if (searchQuery.isEmpty()) allArtists
-            else allArtists.filter { it.name.contains(searchQuery, ignoreCase = true) }.sortedBy { it.name.trim().lowercase() }
-        }
-    }
-
-    val filteredTracks by remember(allTracks, searchQuery, sortOption) {
-        derivedStateOf {
-            if (searchQuery.isEmpty()) emptyList() else {
-                val list = allTracks.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
+            val query = searchQuery
+            if (query.isEmpty()) emptyList() else {
+                val list = allTracks.filter {
+                    it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
+                }
                 when (sortOption) {
                     SortOption.TITLE -> list.sortedBy { it.title }
                     SortOption.ARTIST -> list.sortedBy { it.artist }
@@ -432,6 +491,21 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         )
     }
 
+    val onPlayPauseCallback = remember { { togglePlayPause() } }
+    val onSkipNextCallback = remember { { skipNext() } }
+    val onSkipPrevCallback = remember { { skipPrevious() } }
+    val onToggleRepeatCallback = remember { { toggleRepeat() } }
+    val onSeekCallback = remember { { pos: Long -> seekTo(pos) } }
+    val onPlayTrackCallback = remember { { t: AudioTrack, list: List<AudioTrack> -> playTrack(t, list) } }
+    val onAddToQueueCallback = remember { { t: AudioTrack -> addToQueue(t) } }
+    val onPlayNextCallback = remember { { t: AudioTrack -> playNext(t) } }
+    val onAddToPlaylistCallback = remember { { t: AudioTrack -> trackAddingToPlaylist = t; showAddToPlaylistSheet = true } }
+    val onShareTrackCallback = remember { { t: AudioTrack -> trackToShare = t } }
+    val onQueueItemClickCallback = remember { { index: Int -> jumpToQueueItem(index) } }
+    val onRemoveFromQueueCallback = remember { { index: Int -> removeFromQueue(index) } }
+    val onRefreshCallback = remember { { loadTracks(true) } }
+    val onShuffleAllCallback = remember { { shuffleAll() } }
+
     MaterialTheme(colorScheme = targetScheme) {
         SharedTransitionLayout {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -442,6 +516,13 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
                     var isPlayerExpanded by remember { mutableStateOf(false) }
                     val playerOffsetY = remember { Animatable(10000f) }
+
+                    // Проверяем, виден ли полноэкранный плеер на экране (открыт или тянется пальцем)
+                    val isFullPlayerVisible by remember(hiddenOffsetPx) {
+                        derivedStateOf {
+                            isPlayerExpanded || playerOffsetY.value < containerHeightPx - 1f
+                        }
+                    }
 
                     LaunchedEffect(hiddenOffsetPx) {
                         if (!isPlayerExpanded) playerOffsetY.snapTo(hiddenOffsetPx)
@@ -457,9 +538,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         }
                     }
 
-                    val updatedAllArtists by rememberUpdatedState(allArtists)
-
-                    val handleArtistClick: (String) -> Unit = remember {
+                    val handleArtistClick: (String) -> Unit = remember(unknownArtistStr) {
                         { rawArtistName ->
                             val primaryName = getPrimaryArtist(rawArtistName, unknownArtistStr)
                             val foundArtist = updatedAllArtists.find { it.name.equals(primaryName, ignoreCase = true) }
@@ -497,13 +576,16 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         ) {
                             if (isProfileOpen) {
                                 ProfileScreen(
-                                    allTracks = allTracks, seedColor = targetColor,
-                                    onBack = remember {{ isProfileOpen = false }},
+                                    allTracks = allTracks,
+                                    seedColor = targetColor,
+                                    onBack = remember { { isProfileOpen = false } },
                                     onArtistClick = handleArtistClick
                                 )
                             } else {
                                 HorizontalPager(
-                                    state = pagerState, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    beyondViewportPageCount = 0
                                 ) { page ->
                                     val currentScreenIndex = if (!hasPlaylists && page >= 2) page + 1 else page
 
@@ -517,66 +599,106 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
                                             AnimatedContent(
                                                 targetState = currentDetailView,
-                                                transitionSpec = { (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 4 }).togetherWith(fadeOut(animationSpec = tween(200))) },
+                                                transitionSpec = {
+                                                    (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 4 })
+                                                        .togetherWith(fadeOut(animationSpec = tween(200)))
+                                                },
                                                 label = "DetailSwitch"
                                             ) { detailState ->
                                                 when (detailState) {
                                                     1 -> {
                                                         selectedAlbum?.let { album ->
+                                                            val onAlbumTrackSelect = remember(album) {
+                                                                { track: AudioTrack -> playTrack(track, album.tracks) }
+                                                            }
                                                             AlbumDetailView(
-                                                                album = album, animatedVisibilityScope = this@AnimatedContent, currentTrack = currentTrack,
-                                                                isPlaying = isPlaying, onBack = remember {{ selectedAlbum = null }}, onTrackSelect = remember {{ track -> playTrack(track, album.tracks) }},
-                                                                onPlayPause = remember {{ togglePlayPause() }}, onAddToQueue = remember {{ addToQueue(it) }}, onPlayNext = remember {{ playNext(it) }},
-                                                                onAddToPlaylist = remember {{ track -> trackAddingToPlaylist = track; showAddToPlaylistSheet = true }},
-                                                                onShareTrack = remember {{ trackToShare = it }}, onArtistClick = handleArtistClick
+                                                                album = album,
+                                                                animatedVisibilityScope = this@AnimatedContent,
+                                                                currentTrack = currentTrack,
+                                                                isPlaying = isPlaying,
+                                                                onBack = remember { { selectedAlbum = null } },
+                                                                onTrackSelect = onAlbumTrackSelect,
+                                                                onPlayPause = onPlayPauseCallback,
+                                                                onAddToQueue = onAddToQueueCallback,
+                                                                onPlayNext = onPlayNextCallback,
+                                                                onAddToPlaylist = onAddToPlaylistCallback,
+                                                                onShareTrack = onShareTrackCallback,
+                                                                onArtistClick = handleArtistClick
                                                             )
                                                         }
                                                     }
                                                     2 -> {
                                                         selectedArtist?.let { artist ->
                                                             ArtistProfileView(
-                                                                artist = artist, animatedVisibilityScope = this@AnimatedContent, currentTrack = currentTrack,
-                                                                isPlaying = isPlaying, onBack = remember {{ selectedArtist = null }}, onTrackSelect = remember {{ t, list -> playTrack(t, list) }},
-                                                                onAlbumSelect = remember {{ selectedAlbum = it }}, onPlayPause = remember {{ togglePlayPause() }},
-                                                                onAddToQueue = remember {{ addToQueue(it) }}, onPlayNext = remember {{ playNext(it) }},
-                                                                onAddToPlaylist = remember {{ track -> trackAddingToPlaylist = track; showAddToPlaylistSheet = true }},
-                                                                onShareTrack = remember {{ trackToShare = it }}
+                                                                artist = artist,
+                                                                animatedVisibilityScope = this@AnimatedContent,
+                                                                currentTrack = currentTrack,
+                                                                isPlaying = isPlaying,
+                                                                onBack = remember { { selectedArtist = null } },
+                                                                onTrackSelect = onPlayTrackCallback,
+                                                                onAlbumSelect = remember { { selectedAlbum = it } },
+                                                                onPlayPause = onPlayPauseCallback,
+                                                                onAddToQueue = onAddToQueueCallback,
+                                                                onPlayNext = onPlayNextCallback,
+                                                                onAddToPlaylist = onAddToPlaylistCallback,
+                                                                onShareTrack = onShareTrackCallback
                                                             )
                                                         }
                                                     }
                                                     0 -> {
                                                         LibraryDefaultView(
-                                                            isRefreshing = isRefreshing, isLoading = isLoading, onRefresh = remember {{ loadTracks(true) }},
-                                                            isSearchActive = isSearchActive, searchQuery = searchQuery, onSearchQueryChange = { searchQuery = it },
-                                                            onSearchClose = remember {{ isSearchActive = false; searchQuery = ""; focusManager.clearFocus() }},
-                                                            onSearchOpen = remember {{ isSearchActive = true }}, userName = userName, avatarUri = avatarUri,
-                                                            onProfileClick = remember {{ isProfileOpen = true }}, libraryTab = libraryTab, onTabSelected = { libraryTab = it },
-                                                            filteredAlbums = filteredAlbums, filteredArtists = filteredArtists, filteredTracks = filteredTracks,
-                                                            albumGridState = albumGridState, artistGridState = artistGridState,
-                                                            onAlbumClick = remember {{ selectedAlbum = it }}, onArtistClick = remember {{ selectedArtist = it }},
-                                                            currentTrack = currentTrack, isPlaying = isPlaying,
-                                                            onTrackClick = remember {{ t, list -> playTrack(t, list) }}, onPlayNext = remember {{ playNext(it) }},
-                                                            onAddToQueue = remember {{ addToQueue(it) }}, onAddToPlaylist = remember {{ trackAddingToPlaylist = it; showAddToPlaylistSheet = true }},
-                                                            onShare = remember {{ trackToShare = it }}, animatedVisibilityScope = this@AnimatedContent
+                                                            isRefreshing = isRefreshing,
+                                                            isLoading = isLoading,
+                                                            onRefresh = onRefreshCallback,
+                                                            isSearchActive = isSearchActive,
+                                                            searchQuery = searchQuery,
+                                                            onSearchQueryChange = remember { { searchQuery = it } },
+                                                            onSearchClose = remember { { isSearchActive = false; searchQuery = ""; focusManager.clearFocus() } },
+                                                            onSearchOpen = remember { { isSearchActive = true } },
+                                                            userName = userName,
+                                                            avatarUri = avatarUri,
+                                                            onProfileClick = remember { { isProfileOpen = true } },
+                                                            libraryTab = libraryTab,
+                                                            onTabSelected = remember { { libraryTab = it } },
+                                                            filteredAlbums = filteredAlbums,
+                                                            filteredArtists = filteredArtists,
+                                                            filteredTracks = filteredTracks,
+                                                            albumGridState = albumGridState,
+                                                            artistGridState = artistGridState,
+                                                            onAlbumClick = remember { { selectedAlbum = it } },
+                                                            onArtistClick = remember { { selectedArtist = it } },
+                                                            currentTrack = currentTrack,
+                                                            isPlaying = isPlaying,
+                                                            onTrackClick = onPlayTrackCallback,
+                                                            onPlayNext = onPlayNextCallback,
+                                                            onAddToQueue = onAddToQueueCallback,
+                                                            onAddToPlaylist = onAddToPlaylistCallback,
+                                                            onShare = onShareTrackCallback,
+                                                            animatedVisibilityScope = this@AnimatedContent
                                                         )
                                                     }
                                                 }
                                             }
                                         }
-                                        1 -> RadioScreen(onStationSelect = remember {{ playTrack(it, listOf(it)) }})
-                                        2 -> PlaylistScreen(allTracks = allTracks, seedColor = targetColor, onPlayTrack = remember {{ track, list -> playTrack(track, list) }}, onAddToQueue = remember {{ track -> playNext(track) }})
+                                        1 -> RadioScreen(onStationSelect = remember { { playTrack(it, listOf(it)) } })
+                                        2 -> PlaylistScreen(
+                                            allTracks = allTracks,
+                                            seedColor = targetColor,
+                                            onPlayTrack = onPlayTrackCallback,
+                                            onAddToQueue = onPlayNextCallback
+                                        )
                                         3 -> EqualizerScreen(seedColor = targetColor)
                                         4 -> {
                                             if (showAdvancedSettings) {
-                                                AdvancedSettingsScreen(onBackClick = remember {{ showAdvancedSettings = false }})
+                                                AdvancedSettingsScreen(onBackClick = remember { { showAdvancedSettings = false } })
                                             } else {
                                                 SettingsScreen(
                                                     currentThemeMode = themeMode,
-                                                    onThemeChanged = { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) },
-                                                    onNavBarStyleChanged = { newStyle -> navBarStyle = newStyle },
+                                                    onThemeChanged = remember { { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) } },
+                                                    onNavBarStyleChanged = remember { { newStyle -> navBarStyle = newStyle } },
                                                     onSecureChanged = onSecureRequest,
-                                                    onFossWearChanged = { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() },
-                                                    onNavigateToAdvanced = remember {{ showAdvancedSettings = true }}
+                                                    onFossWearChanged = remember { { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() } },
+                                                    onNavigateToAdvanced = remember { { showAdvancedSettings = true } }
                                                 )
                                             }
                                         }
@@ -595,7 +717,6 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             }
                         }
 
-                        // ПАНЕЛЬ ПЛЕЕРА И НАВБАР
                         Column(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -607,65 +728,94 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (pagerState.currentPage == 0 && !isSearchActive && selectedAlbum == null && selectedArtist == null && !isProfileOpen) {
-                                FloatingActionRow(onRefresh = remember {{ loadTracks(true) }}, onShuffleAll = remember {{ shuffleAll() }})
+                                FloatingActionRow(onRefresh = onRefreshCallback, onShuffleAll = onShuffleAllCallback)
                             }
 
-                            // 1. МИНИ-ПЛЕЕР
-                            if (currentTrack != null) {
+                            currentTrack?.let { activeTrack ->
                                 Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                    PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
+                                    PlayerPositionProvider(playerController, isPlaying && !isFullPlayerVisible) { currentPosProvider ->
                                         val currentPos = currentPosProvider()
-                                        val calculatedProgress = if (trackDuration > 0) currentPos.toFloat() / trackDuration else 0f
+                                        val calculatedProgress = if (trackDuration > 0L) currentPos.toFloat() / trackDuration else 0f
 
                                         MiniPlayer(
-                                            track = currentTrack!!,
+                                            track = activeTrack,
                                             isPlaying = isPlaying,
                                             progress = calculatedProgress,
                                             albumArt = currentAlbumArt,
                                             backdrop = backdrop,
-                                            onPlayPause = remember {{ togglePlayPause() }},
-                                            onSkipNext = remember {{ skipNext() }},
-                                            onClick = remember {{ snapPlayer(true) }}
+                                            onPlayPause = onPlayPauseCallback,
+                                            onSkipNext = onSkipNextCallback,
+                                            onClick = remember { { snapPlayer(true) } }
                                         )
                                     }
                                 }
                             }
 
-                            // 2. НАВБАР
                             LibraryBottomNav(
                                 pagerState = pagerState,
                                 navItems = navItems,
                                 backdrop = backdrop,
                                 navBarStyle = navBarStyle,
-                                onTabSelected = { index ->
-                                    selectedAlbum = null
-                                    selectedArtist = null
-                                    isProfileOpen = false
-                                    scope.launch { pagerState.animateScrollToPage(index) }
+                                onTabSelected = remember {
+                                    { index ->
+                                        selectedAlbum = null
+                                        selectedArtist = null
+                                        isProfileOpen = false
+                                        scope.launch { pagerState.animateScrollToPage(index) }
+                                    }
                                 }
                             )
                         }
 
-                        if (currentTrack != null) {
+                        currentTrack?.let { activeTrack ->
                             FullPlayerDraggableWrapper(
-                                playerOffsetY = playerOffsetY, containerHeightPx = containerHeightPx, hiddenOffsetPx = hiddenOffsetPx, snapPlayer = { snapPlayer(it) }
+                                playerOffsetY = playerOffsetY,
+                                containerHeightPx = containerHeightPx,
+                                hiddenOffsetPx = hiddenOffsetPx,
+                                snapPlayer = { snapPlayer(it) }
                             ) {
-                                PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
-                                    FullPlayerScreen(
-                                        track = currentTrack!!, isPlaying = isPlaying, currentPosition = currentPosProvider(), duration = trackDuration, metadata = trackMetadata,
-                                        seedColor = targetColor, repeatMode = repeatMode, playlist = currentPlaylist, currentQueueIndex = if (playerController != null) playerController!!.currentMediaItemIndex else -1,
-                                        onPlayPause = remember {{ togglePlayPause() }}, onSeek = remember {{ pos: Long -> seekTo(pos) }}, onSkipNext = remember {{ skipNext() }},
-                                        onSkipPrevious = remember {{ skipPrevious() }}, onToggleRepeat = remember {{ toggleRepeat() }}, onQueueItemClick = remember {{ index: Int -> jumpToQueueItem(index) }},
-                                        onRemoveFromQueue = remember {{ index: Int -> removeFromQueue(index) }}, onCollapse = remember {{ snapPlayer(false) }}, currentTab = pagerState.currentPage,
-                                        onTabSelected = remember {{ newTab: Int -> scope.launch { pagerState.scrollToPage(newTab) }; snapPlayer(false) }}, onArtistClick = handleArtistClick
-                                    )
+                                if (isFullPlayerVisible) {
+                                    PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
+                                        FullPlayerScreen(
+                                            track = activeTrack,
+                                            isPlaying = isPlaying,
+                                            currentPosition = currentPosProvider(),
+                                            duration = trackDuration,
+                                            metadata = trackMetadata,
+                                            seedColor = targetColor,
+                                            repeatMode = repeatMode,
+                                            playlist = currentPlaylist,
+                                            currentQueueIndex = currentQueueIndex,
+                                            onPlayPause = onPlayPauseCallback,
+                                            onSeek = onSeekCallback,
+                                            onSkipNext = onSkipNextCallback,
+                                            onSkipPrevious = onSkipPrevCallback,
+                                            onToggleRepeat = onToggleRepeatCallback,
+                                            onQueueItemClick = onQueueItemClickCallback,
+                                            onRemoveFromQueue = onRemoveFromQueueCallback,
+                                            onCollapse = remember { { snapPlayer(false) } },
+                                            currentTab = pagerState.currentPage,
+                                            onTabSelected = remember {
+                                                { newTab: Int ->
+                                                    scope.launch { pagerState.scrollToPage(newTab) }
+                                                    snapPlayer(false)
+                                                }
+                                            },
+                                            onArtistClick = handleArtistClick
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        if (trackToShare != null) { ShareTrackSheet(track = trackToShare!!, onDismiss = { trackToShare = null }) }
+                        trackToShare?.let { track ->
+                            ShareTrackSheet(track = track, onDismiss = remember { { trackToShare = null } })
+                        }
                         if (showAddToPlaylistSheet && trackAddingToPlaylist != null) {
-                            AddToPlaylistSheet(trackAddingToPlaylist = trackAddingToPlaylist!!, onDismiss = { showAddToPlaylistSheet = false })
+                            AddToPlaylistSheet(
+                                trackAddingToPlaylist = trackAddingToPlaylist!!,
+                                onDismiss = remember { { showAddToPlaylistSheet = false } }
+                            )
                         }
                     }
                 }
