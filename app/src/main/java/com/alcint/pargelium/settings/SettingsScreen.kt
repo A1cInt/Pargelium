@@ -4,11 +4,11 @@ package com.alcint.pargelium.settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
@@ -36,6 +36,7 @@ enum class SettingsRoute {
 fun SettingsScreen(
     currentThemeMode: Int,
     onThemeChanged: (Int) -> Unit,
+    onNavBarStyleChanged: (Int) -> Unit = {},
     onSecureChanged: (Boolean) -> Unit,
     onFossWearChanged: (Boolean) -> Unit,
     onNavigateToAdvanced: () -> Unit
@@ -134,11 +135,11 @@ fun SettingsScreen(
                         }
                     }
                     SettingsRoute.APPEARANCE -> AppearancePanel(currentThemeMode, onThemeChanged)
-                    SettingsRoute.DESIGN -> DesignPanel()
+                    SettingsRoute.DESIGN -> DesignPanel(onNavBarStyleChanged = onNavBarStyleChanged)
                     SettingsRoute.PLAYBACK -> ContinuousMixSettingsCard(context = context)
                     SettingsRoute.INTEGRATION -> IntegrationPanel(onFossWearChanged)
                     SettingsRoute.DATA -> DataPanel()
-                    SettingsRoute.ADVANCED -> onNavigateToAdvanced() // Or an AdvancedPanel if it existed
+                    SettingsRoute.ADVANCED -> onNavigateToAdvanced()
                     SettingsRoute.ABOUT -> AboutPanel(
                         isAutoUpdateEnabled = isAutoUpdateEnabled,
                         onAutoUpdateChanged = {

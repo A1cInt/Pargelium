@@ -346,4 +346,10 @@
     <string name="setting_postgain">Post Gain</string>
 
     <string name="settings_design">Design</string>
+
+    <string name="settings_nav_style">Navigation Bar Style</string>
+    <string name="choose_nav_style">Choose Navigation Style</string>
+    <string name="nav_style_liquid">Liquid (Floating)</string>
+    <string name="nav_style_material">Material 3 (Expressive)</string>
+    <string name="nav_style_pill">Expressive Pill (Floating)</string>
 </resources>

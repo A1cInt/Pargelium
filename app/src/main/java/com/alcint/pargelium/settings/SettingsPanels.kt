@@ -137,15 +137,70 @@ fun AppearancePanel(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DesignPanel() {
+fun DesignPanel(
+    onNavBarStyleChanged: (Int) -> Unit = {}
+) {
+    var navBarStyle by remember { mutableIntStateOf(PrefsManager.getNavBarStyle()) }
+    var showNavBarStyleSheet by remember { mutableStateOf(false) }
+
+    val navBarStyles = listOf(
+        0 to stringResource(R.string.nav_style_liquid),
+        1 to stringResource(R.string.nav_style_material),
+        2 to stringResource(R.string.nav_style_pill)
+    )
+
+    val currentStyleName = navBarStyles.find { it.first == navBarStyle }?.second ?: navBarStyles[0].second
+
     SettingsGroup {
         ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_design), fontWeight = FontWeight.Bold) },
-            supportingContent = { Text("Здесь будут располагаться параметры кастомизации интерфейса") },
+            headlineContent = { Text(stringResource(R.string.settings_nav_style), fontWeight = FontWeight.Bold) },
+            supportingContent = { Text(currentStyleName) },
             leadingContent = { IconContainer(icon = Icons.Default.Palette, color = MaterialTheme.colorScheme.primary) },
+            modifier = Modifier.clickable { showNavBarStyleSheet = true },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
+    }
+
+    if (showNavBarStyleSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showNavBarStyleSheet = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
+            Column(modifier = Modifier.padding(bottom = 32.dp)) {
+                Text(
+                    text = stringResource(R.string.choose_nav_style),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+                LazyColumn {
+                    items(navBarStyles) { (code, name) ->
+                        val isSelected = navBarStyle == code
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = name,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            trailingContent = {
+                                if (isSelected) Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            modifier = Modifier.clickable {
+                                navBarStyle = code
+                                PrefsManager.saveNavBarStyle(code)
+                                onNavBarStyleChanged(code)
+                                showNavBarStyleSheet = false
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

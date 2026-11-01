@@ -308,4 +308,14 @@ object PrefsManager {
     fun saveLimRelease(rel: Float) = prefs.edit().putFloat("dsp_lim_release", rel).apply()
     fun getPostGain(): Float = prefs.getFloat("dsp_post_gain", 0.0f)
     fun savePostGain(gain: Float) = prefs.edit().putFloat("dsp_post_gain", gain).apply()
+    private const val KEY_NAV_BAR_STYLE = "nav_bar_style"
+
+    fun saveNavBarStyle(style: Int) {
+        prefs.edit().putInt(KEY_NAV_BAR_STYLE, style).apply()
+    }
+
+    fun getNavBarStyle(): Int {
+        // 0 = Liquid (по умолчанию), 1 = Material
+        return prefs.getInt(KEY_NAV_BAR_STYLE, 0)
+    }
 }

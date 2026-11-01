@@ -32,13 +32,16 @@ import androidx.compose.ui.unit.sp
 import com.alcint.pargelium.LyricLine
 import com.alcint.pargelium.R
 import com.alcint.pargelium.SyllableWord
+import kotlinx.coroutines.isActive
 
 @Composable
 fun InstrumentalCountdown(timeUntilMs: Long) {
     val secondsLeft = (timeUntilMs / 1000L).toInt()
 
     Box(
-        modifier = Modifier.fillMaxWidth().height(48.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
         contentAlignment = Alignment.Center
     ) {
         AnimatedContent(
@@ -81,10 +84,14 @@ fun KaraokeLine(
     activeColor: Color = Color.White,
     inactiveColor: Color = Color.White.copy(alpha = 0.35f)
 ) {
+    val isTtml = line.words.isNotEmpty()
+
     val wordsToRender = remember(line, nextLineTimeMs) {
-        if (line.words.isNotEmpty()) {
+        if (isTtml) {
+            // TTML: Используем точные тайминги из парсера
             line.words
         } else {
+            // LRC: Fallback — приблизительный расчет на основе количества слов
             val wordsOnly = line.text.split(" ").filter { it.isNotBlank() }
             val maxDuration = nextLineTimeMs?.let { it - line.timeMs } ?: 4000L
             val estimatedLineDurationMs = maxDuration.coerceIn(500L, 7000L)
@@ -126,14 +133,17 @@ fun KaraokeLine(
             horizontalArrangement = Arrangement.Center
         ) {
             wordsToRender.forEachIndexed { index, word ->
+                // Расчет прогресса закрашивания текущего слова
                 val progress = when {
                     smoothPosition >= word.endMs -> 1f
                     smoothPosition <= word.startMs -> 0f
                     else -> ((smoothPosition - word.startMs).toFloat() / (word.endMs - word.startMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
                 }
 
-                val p1 = (progress - 0.05f).coerceIn(0f, 1f)
-                val p2 = (progress + 0.05f).coerceIn(0f, 1f)
+                // Делаем плавный градиент для LRC и жесткий для TTML (опционально)
+                val blurEdge = if (isTtml) 0.01f else 0.05f
+                val p1 = (progress - blurEdge).coerceIn(0f, 1f)
+                val p2 = (progress + blurEdge).coerceIn(0f, 1f)
 
                 val brush = Brush.horizontalGradient(
                     0.0f to activeColor,
@@ -164,7 +174,9 @@ fun KaraokeLine(
             ),
             color = if (isActive) activeColor else inactiveColor,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
         )
     }
 }
@@ -345,7 +357,9 @@ fun LyricsView(
                                         )
                                     ),
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 32.dp)
                                 )
                             }
                         }

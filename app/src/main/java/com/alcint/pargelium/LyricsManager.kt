@@ -27,19 +27,6 @@ import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-data class SyllableWord(
-    val text: String,
-    val startMs: Long,
-    val endMs: Long
-)
-
-data class LyricLine(
-    val timeMs: Long,
-    val text: String,
-    val translation: String? = null,
-    val words: List<SyllableWord> = emptyList()
-)
-
 data class BetterLyricsWord(
     @SerializedName("text") val text: String?,
     @SerializedName("offset") val offset: Long?,
@@ -189,37 +176,42 @@ object LyricsManager {
 
     suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> {
         return withContext(Dispatchers.IO) {
-            val cachedLyrics = loadFromCache(context, track)
-            if (!cachedLyrics.isNullOrEmpty()) {
-                return@withContext cachedLyrics
-            }
-
-            val betterLyrics = fetchBetterLyricsOnline(track)
-            if (betterLyrics.isNotEmpty()) {
-                saveToCache(context, track, betterLyrics)
-                return@withContext betterLyrics
-            }
-
+            // 1. Приоритет отдаем локальным файлам (.ttml, .lrc) и вшитым тегам (LYRICS-TTML, TTML, USLT)
             val localLrc = AudioRepository.findLrcContentForTrack(context, track)
                 ?: findLocalLrcFile(context, track)
 
             if (!localLrc.isNullOrBlank()) {
-                val parsed = parseLrcOrPlain(localLrc, track.duration)
+                val parsed = AudioRepository.parseLyrics(localLrc)
                 if (parsed.isNotEmpty()) {
                     saveToCache(context, track, parsed)
                     return@withContext parsed
                 }
             }
 
+            // 2. Проверяем кэш только если локальных текстов рядом нет
+            val cachedLyrics = loadFromCache(context, track)
+            if (!cachedLyrics.isNullOrEmpty()) {
+                return@withContext cachedLyrics
+            }
+
+            // 3. Онлайн поиск (пословный)
+            val betterLyrics = fetchBetterLyricsOnline(track)
+            if (betterLyrics.isNotEmpty()) {
+                saveToCache(context, track, betterLyrics)
+                return@withContext betterLyrics
+            }
+
+            // 4. Fallback онлайн поиск (LRC-LIB / Musixmatch / OVH)
             val fallbackOnline = fetchFallbackOnlineLyrics(track)
             if (fallbackOnline.isNotEmpty()) {
                 saveToCache(context, track, fallbackOnline)
                 return@withContext fallbackOnline
             }
 
+            // 5. Попытка прочесть медиа-ритривер (если остался незамеченным)
             val embeddedLyrics = getEmbeddedLyrics(context, track.uri)
             if (!embeddedLyrics.isNullOrBlank()) {
-                val parsed = parseLrcOrPlain(embeddedLyrics, track.duration)
+                val parsed = AudioRepository.parseLyrics(embeddedLyrics)
                 if (parsed.isNotEmpty()) {
                     saveToCache(context, track, parsed)
                     return@withContext parsed
@@ -281,7 +273,7 @@ object LyricsManager {
                     return result.sortedBy { it.timeMs }
                 }
             } else if (!betterResp.lyrics.isNullOrBlank()) {
-                val parsed = parseLrcOrPlain(betterResp.lyrics, track.duration)
+                val parsed = AudioRepository.parseLyrics(betterResp.lyrics)
                 if (parsed.isNotEmpty()) return parsed
             }
         } catch (_: Exception) {}
@@ -360,74 +352,10 @@ object LyricsManager {
         }
 
         if (!rawLyrics.isNullOrBlank()) {
-            return parseLrcOrPlain(rawLyrics, track.duration)
+            return AudioRepository.parseLyrics(rawLyrics)
         }
 
         return emptyList()
-    }
-
-    private fun parseLrcOrPlain(lrcContent: String, trackDuration: Long): List<LyricLine> {
-        val lines = mutableListOf<LyricLine>()
-        var isSynced = false
-
-        lrcContent.lines().forEach { line ->
-            val match = lrcRegex.find(line)
-            if (match != null) {
-                isSynced = true
-                val min = match.groupValues[1]
-                val sec = match.groupValues[2]
-                val msStr = match.groupValues[3]
-                var text = match.groupValues[4]
-
-                val ms = if (msStr.isEmpty()) 0L else if (msStr.length == 2) msStr.toLong() * 10 else msStr.toLong()
-                val timestamp = (min.toLong() * 60 * 1000) + (sec.toLong() * 1000) + ms
-
-                val wordMatches = enhancedRegex.findAll(text).toList()
-                val words = mutableListOf<SyllableWord>()
-
-                if (wordMatches.isNotEmpty()) {
-                    text = ""
-                    for (i in wordMatches.indices) {
-                        val m = wordMatches[i]
-                        val wMin = m.groupValues[1].toLong()
-                        val wSec = m.groupValues[2].toLong()
-                        val wMsStr = m.groupValues[3]
-                        val wMs = if (wMsStr.isEmpty()) 0L else if (wMsStr.length == 2) wMsStr.toLong() * 10 else wMsStr.toLong()
-                        val wStart = wMin * 60_000L + wSec * 1_000L + wMs
-                        val wText = m.groupValues[4]
-
-                        val wEnd = if (i + 1 < wordMatches.size) {
-                            val nm = wordMatches[i + 1]
-                            val nmMin = nm.groupValues[1].toLong()
-                            val nmSec = nm.groupValues[2].toLong()
-                            val nmMsStr = nm.groupValues[3]
-                            val nmMs = if (nmMsStr.isEmpty()) 0L else if (nmMsStr.length == 2) nmMsStr.toLong() * 10 else nmMsStr.toLong()
-                            nmMin * 60_000L + nmSec * 1_000L + nmMs
-                        } else {
-                            wStart + 500L
-                        }
-
-                        if (wText.isNotEmpty()) {
-                            words.add(SyllableWord(wText, wStart, wEnd))
-                            text += wText
-                        }
-                    }
-                }
-
-                lines.add(LyricLine(timestamp, text.trim(), null, words))
-            } else if (line.isNotBlank() && !isSynced) {
-                lines.add(LyricLine(0L, line.trim(), null, emptyList()))
-            }
-        }
-
-        if (isSynced && lines.isNotEmpty()) return lines.sortedBy { it.timeMs }
-
-        val safeDuration = if (trackDuration > 0) trackDuration else 180_000L
-        val timePerLine = safeDuration / lines.size.coerceAtLeast(1)
-
-        return lines.mapIndexed { index, plainText ->
-            LyricLine(index * timePerLine, plainText.text.trim())
-        }
     }
 
     suspend fun translateLyrics(context: Context, track: AudioTrack, lines: List<LyricLine>): List<LyricLine> = withContext(Dispatchers.IO) {
@@ -494,9 +422,13 @@ object LyricsManager {
         val parent = audioFile.parentFile ?: return null
 
         val candidates = listOf(
+            File(parent, "${audioFile.nameWithoutExtension}.ttml"),
+            File(parent, "${audioFile.nameWithoutExtension}.TTML"),
             File(parent, "${audioFile.nameWithoutExtension}.lrc"),
             File(parent, "${audioFile.nameWithoutExtension}.LRC"),
             File(parent, "${audioFile.nameWithoutExtension}.txt"),
+            File(parent, "${track.title}.ttml"),
+            File(parent, "${track.title}.TTML"),
             File(parent, "${track.title}.lrc"),
             File(parent, "${track.title}.LRC"),
             File(parent, "${track.title}.txt")

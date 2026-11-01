@@ -10,8 +10,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
+import java.io.StringReader
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.regex.Pattern
 
 object AudioRepository {
 
@@ -74,20 +78,23 @@ object AudioRepository {
         val audioFile = File(filePath)
         val parentDir = audioFile.parentFile ?: return null
 
-        val sameNameLrc = File(parentDir, "${audioFile.nameWithoutExtension}.lrc")
-        if (sameNameLrc.exists() && sameNameLrc.canRead()) {
-            return sameNameLrc
+        val nameWithoutExt = audioFile.nameWithoutExtension
+        val extensions = listOf("ttml", "lrc")
+
+        for (ext in extensions) {
+            val sameName = File(parentDir, "$nameWithoutExt.$ext")
+            if (sameName.exists() && sameName.canRead()) return sameName
         }
 
-        val titleLrc = File(parentDir, "${track.title}.lrc")
-        if (titleLrc.exists() && titleLrc.canRead()) {
-            return titleLrc
+        for (ext in extensions) {
+            val titleFile = File(parentDir, "${track.title}.$ext")
+            if (titleFile.exists() && titleFile.canRead()) return titleFile
         }
 
         try {
             val matchedFile = parentDir.listFiles { file ->
-                file.isFile && file.extension.equals("lrc", ignoreCase = true) &&
-                        (file.nameWithoutExtension.equals(audioFile.nameWithoutExtension, ignoreCase = true) ||
+                file.isFile && (file.extension.equals("ttml", ignoreCase = true) || file.extension.equals("lrc", ignoreCase = true)) &&
+                        (file.nameWithoutExtension.equals(nameWithoutExt, ignoreCase = true) ||
                                 file.nameWithoutExtension.equals(track.title, ignoreCase = true))
             }?.firstOrNull()
 
@@ -99,7 +106,55 @@ object AudioRepository {
         return null
     }
 
+    fun findEmbeddedLyrics(context: Context, trackUri: Uri): String? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, trackUri)
+            val filePath = getAudioFilePath(context, trackUri)
+            if (filePath != null) {
+                readMetadataTagsFromFile(File(filePath))
+            } else null
+        } catch (e: Exception) {
+            null
+        } finally {
+            try { retriever.release() } catch (e: Exception) {}
+        }
+    }
+
+    private fun readMetadataTagsFromFile(file: File): String? {
+        if (!file.exists() || !file.canRead()) return null
+        return try {
+            val headerBytes = ByteArray(1024 * 512)
+            val read = file.inputStream().use { it.read(headerBytes) }
+            if (read <= 0) return null
+            val content = String(headerBytes, 0, read, Charsets.ISO_8859_1)
+
+            val tagKeys = listOf("LYRICS-TTML", "TTML", "lyrics-ttml", "ttml", "LYRICS", "lyrics", "USLT")
+            for (key in tagKeys) {
+                val index = content.indexOf(key)
+                if (index != -1) {
+                    val xmlStart = content.indexOf("<tt", index)
+                    if (xmlStart != -1 && xmlStart - index < 150) {
+                        val xmlEnd = content.indexOf("</tt>", xmlStart)
+                        if (xmlEnd != -1) {
+                            val rawXml = content.substring(xmlStart, xmlEnd + 5)
+                            return String(rawXml.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+                        }
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun findLrcContentForTrack(context: Context, track: AudioTrack): String? {
+        val embedded = findEmbeddedLyrics(context, track.uri)
+        if (!embedded.isNullOrBlank()) {
+            return embedded
+        }
+
         val file = findLrcFileForTrack(context, track) ?: return null
         return try {
             file.readText(Charsets.UTF_8)
@@ -110,6 +165,171 @@ object AudioRepository {
                 null
             }
         }
+    }
+
+    fun parseLyrics(rawContent: String?): List<LyricLine> {
+        if (rawContent.isNullOrBlank()) return emptyList()
+        val text = rawContent.trim()
+
+        val isTtml = text.contains("<tt", ignoreCase = true) ||
+                text.contains("xmlns=\"http://www.w3.org/ns/ttml\"", ignoreCase = true) ||
+                text.contains("<body", ignoreCase = true)
+
+        return if (isTtml) {
+            parseTtml(text)
+        } else {
+            parseLrc(text)
+        }
+    }
+
+    private fun parseTtmlTime(timeStr: String): Long {
+        val clean = timeStr.trim().removeSuffix("s")
+        return try {
+            if (clean.contains(":")) {
+                val parts = clean.split(":")
+                if (parts.size == 2) {
+                    val min = parts[0].toLong()
+                    val secParts = parts[1].split(".")
+                    val sec = secParts[0].toLong()
+                    val ms = if (secParts.size > 1) {
+                        secParts[1].take(3).padEnd(3, '0').toLong()
+                    } else 0L
+                    (min * 60_000L) + (sec * 1000L) + ms
+                } else if (parts.size == 3) {
+                    val hours = parts[0].toLong()
+                    val min = parts[1].toLong()
+                    val secParts = parts[2].split(".")
+                    val sec = secParts[0].toLong()
+                    val ms = if (secParts.size > 1) {
+                        secParts[1].take(3).padEnd(3, '0').toLong()
+                    } else 0L
+                    (hours * 3_600_000L) + (min * 60_000L) + (sec * 1000L) + ms
+                } else 0L
+            } else {
+                (clean.toDouble() * 1000.0).toLong()
+            }
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun parseTtml(xml: String): List<LyricLine> {
+        val lines = mutableListOf<LyricLine>()
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = true
+            val parser = factory.newPullParser()
+            parser.setInput(StringReader(xml))
+
+            var eventType = parser.eventType
+            var currentLineBeginMs = 0L
+            var currentLineWords = mutableListOf<SyllableWord>()
+            var currentLineTextBuilder = StringBuilder()
+
+            var currentSpanBeginMs = 0L
+            var currentSpanEndMs = 0L
+            var insideSpan = false
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                val tagName = parser.name?.lowercase()
+
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        when (tagName) {
+                            "p" -> {
+                                currentLineWords = mutableListOf()
+                                currentLineTextBuilder = StringBuilder()
+                                val beginAttr = parser.getAttributeValue(null, "begin")
+                                    ?: (0 until parser.attributeCount).firstNotNullOfOrNull { i ->
+                                        if (parser.getAttributeName(i).equals("begin", ignoreCase = true)) parser.getAttributeValue(i) else null
+                                    }
+                                currentLineBeginMs = if (beginAttr != null) parseTtmlTime(beginAttr) else 0L
+                            }
+                            "span" -> {
+                                val beginAttr = parser.getAttributeValue(null, "begin")
+                                    ?: (0 until parser.attributeCount).firstNotNullOfOrNull { i ->
+                                        if (parser.getAttributeName(i).equals("begin", ignoreCase = true)) parser.getAttributeValue(i) else null
+                                    }
+                                val endAttr = parser.getAttributeValue(null, "end")
+                                    ?: (0 until parser.attributeCount).firstNotNullOfOrNull { i ->
+                                        if (parser.getAttributeName(i).equals("end", ignoreCase = true)) parser.getAttributeValue(i) else null
+                                    }
+
+                                currentSpanBeginMs = if (beginAttr != null) parseTtmlTime(beginAttr) else currentLineBeginMs
+                                currentSpanEndMs = if (endAttr != null) parseTtmlTime(endAttr) else (currentSpanBeginMs + 300L)
+                                insideSpan = true
+                            }
+                        }
+                    }
+                    XmlPullParser.TEXT -> {
+                        val text = parser.text?.trim() ?: ""
+                        if (text.isNotEmpty()) {
+                            if (insideSpan) {
+                                currentLineWords.add(
+                                    SyllableWord(
+                                        text = text,
+                                        startMs = currentSpanBeginMs,
+                                        endMs = currentSpanEndMs
+                                    )
+                                )
+                            }
+                            if (currentLineTextBuilder.isNotEmpty()) {
+                                currentLineTextBuilder.append(" ")
+                            }
+                            currentLineTextBuilder.append(text)
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        when (tagName) {
+                            "span" -> {
+                                insideSpan = false
+                            }
+                            "p" -> {
+                                val fullText = currentLineTextBuilder.toString().trim()
+                                if (fullText.isNotEmpty()) {
+                                    val effectiveTime = currentLineWords.firstOrNull()?.startMs ?: currentLineBeginMs
+                                    lines.add(
+                                        LyricLine(
+                                            timeMs = effectiveTime,
+                                            text = fullText,
+                                            words = currentLineWords
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return lines.sortedBy { it.timeMs }
+    }
+
+    private fun parseLrc(content: String): List<LyricLine> {
+        val lines = mutableListOf<LyricLine>()
+        val linePattern = Pattern.compile("\\[(\\d{2}):(\\d{2})[.:](\\d{2,3})\\](.*)")
+
+        content.lines().forEach { rawLine ->
+            val matcher = linePattern.matcher(rawLine.trim())
+            if (matcher.matches()) {
+                val min = matcher.group(1)?.toLongOrNull() ?: 0L
+                val sec = matcher.group(2)?.toLongOrNull() ?: 0L
+                val msStr = matcher.group(3) ?: "0"
+                val ms = if (msStr.length == 2) msStr.toLong() * 10L else msStr.take(3).padEnd(3, '0').toLong()
+                val text = matcher.group(4)?.trim() ?: ""
+
+                val timeMs = (min * 60_000L) + (sec * 1000L) + ms
+                if (text.isNotBlank()) {
+                    lines.add(LyricLine(timeMs = timeMs, text = text, words = emptyList()))
+                }
+            }
+        }
+
+        return lines.sortedBy { it.timeMs }
     }
 
     fun findCanvasForTrack(context: Context, trackUri: Uri): Uri? {
@@ -246,7 +466,7 @@ object AudioRepository {
 
     fun forceScan(context: Context, onComplete: () -> Unit) {
         val pathsToScan = mutableListOf<String>()
-        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc")
+        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc", "ttml")
 
         val folders = listOf(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),

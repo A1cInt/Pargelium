@@ -331,4 +331,10 @@
     </string-array>
 
     <string name="settings_design">Дизайн</string>
+
+    <string name="settings_nav_style">Стиль панели навигации</string>
+    <string name="choose_nav_style">Выберите стиль навигации</string>
+    <string name="nav_style_liquid">Liquid (Плавающая)</string>
+    <string name="nav_style_material">Material 3 (Expressive)</string>
+    <string name="nav_style_pill">Expressive Pill (Капсула)</string>
 </resources>

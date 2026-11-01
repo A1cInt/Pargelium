@@ -51,10 +51,28 @@ import com.alcint.pargelium.*
 import com.alcint.pargelium.R
 import com.alcint.pargelium.liquid.FloatingBottomBar
 import com.alcint.pargelium.liquid.FloatingBottomBarItem
+import com.alcint.pargelium.material.MaterialBottomNavStyle
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import com.alcint.pargelium.material.PillBottomNavStyle
 
 @Composable
 fun LibraryBottomNav(
+    pagerState: PagerState,
+    navItems: List<NavItem>,
+    backdrop: LayerBackdrop,
+    navBarStyle: Int = 0,
+    onTabSelected: (Int) -> Unit
+) {
+    when (navBarStyle) {
+        0 -> LiquidBottomNavStyle(pagerState, navItems, backdrop, onTabSelected)
+        1 -> MaterialBottomNavStyle(pagerState, navItems, onTabSelected)
+        2 -> PillBottomNavStyle(pagerState, navItems, onTabSelected)
+        else -> LiquidBottomNavStyle(pagerState, navItems, backdrop, onTabSelected)
+    }
+}
+
+@Composable
+fun LiquidBottomNavStyle(
     pagerState: PagerState,
     navItems: List<NavItem>,
     backdrop: LayerBackdrop,
@@ -71,7 +89,6 @@ fun LibraryBottomNav(
             FloatingBottomBarItem(
                 selected = isSelected,
                 onClick = { activateTab(index) },
-                // Этот паддинг аккуратно расширяет вкладки под пальцы
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
                 Icon(

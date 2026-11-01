@@ -46,13 +46,13 @@ import androidx.media3.session.SessionToken
 import com.alcint.pargelium.*
 import com.alcint.pargelium.R
 import com.alcint.pargelium.player.FullPlayerScreen
+import com.alcint.pargelium.settings.SettingsScreen
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import com.alcint.pargelium.settings.SettingsScreen
 
 @Composable
 fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
@@ -62,6 +62,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val backdrop = rememberLayerBackdrop()
 
     var themeMode by remember { mutableIntStateOf(PrefsManager.getThemeMode()) }
+    var navBarStyle by remember { mutableIntStateOf(PrefsManager.getNavBarStyle()) }
     val systemDark = isSystemInDarkTheme()
 
     val hasPlaylists = PrefsManager.getFeaturePlaylists()
@@ -572,6 +573,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                 SettingsScreen(
                                                     currentThemeMode = themeMode,
                                                     onThemeChanged = { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) },
+                                                    onNavBarStyleChanged = { newStyle -> navBarStyle = newStyle },
                                                     onSecureChanged = onSecureRequest,
                                                     onFossWearChanged = { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() },
                                                     onNavigateToAdvanced = remember {{ showAdvancedSettings = true }}
@@ -634,6 +636,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                 pagerState = pagerState,
                                 navItems = navItems,
                                 backdrop = backdrop,
+                                navBarStyle = navBarStyle,
                                 onTabSelected = { index ->
                                     selectedAlbum = null
                                     selectedArtist = null
