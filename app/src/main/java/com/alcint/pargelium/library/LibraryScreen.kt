@@ -52,6 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import com.alcint.pargelium.settings.SettingsScreen
 
 @Composable
 fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
@@ -569,7 +570,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                 AdvancedSettingsScreen(onBackClick = remember {{ showAdvancedSettings = false }})
                                             } else {
                                                 SettingsScreen(
-                                                    currentThemeMode = Int,
+                                                    currentThemeMode = themeMode,
                                                     onThemeChanged = { newMode -> themeMode = newMode; PrefsManager.saveThemeMode(newMode) },
                                                     onSecureChanged = onSecureRequest,
                                                     onFossWearChanged = { Toast.makeText(context, context.getString(R.string.watch_settings_saved), Toast.LENGTH_SHORT).show() },
