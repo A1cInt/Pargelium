@@ -3,13 +3,14 @@ package com.alcint.pargelium
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.provider.MediaStore
 import android.util.Log
+import android.util.LruCache
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -22,7 +23,6 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Url
 import java.io.File
-import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -147,16 +147,20 @@ object LyricsManager {
         }
         .build()
 
+    private val gson = Gson()
+    private val lyricListType = object : TypeToken<List<LyricLine>>() {}.type
+    private val memoryCache = LruCache<String, List<LyricLine>>(32)
+
     private val api = Retrofit.Builder()
         .baseUrl("http://localhost/")
         .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
+        .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
         .create(LyricsNetworkApi::class.java)
 
-    private val gson = Gson()
-    private val lrcRegex = Regex("\\[(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?](.*)")
-    private val enhancedRegex = Regex("<(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?>([^<]*)")
+    private val parenCleanupRegex = Regex("(?i)\\s*\\(?(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?\\)?")
+    private val bracketCleanupRegex = Regex("(?i)\\s*\\[(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?]")
+    private val dashCleanupRegex = Regex("(?i)\\s*-.*?(Remaster|Edit|Mix|Version).*")
 
     private fun getCurrentAppLanguage(): String {
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -168,76 +172,68 @@ object LyricsManager {
     }
 
     private fun cleanMetadata(text: String): String {
-        return text.replace(Regex("(?i)\\s*\\(?(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?\\)?"), "")
-            .replace(Regex("(?i)\\s*\\[(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?]"), "")
-            .replace(Regex("\\s*-.*?(Remaster|Edit|Mix|Version).*"), "")
+        return text
+            .replace(parenCleanupRegex, "")
+            .replace(bracketCleanupRegex, "")
+            .replace(dashCleanupRegex, "")
             .trim()
     }
 
-    suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> {
-        return withContext(Dispatchers.IO) {
-            // 1. Приоритет отдаем локальным файлам (.ttml, .lrc) и вшитым тегам (LYRICS-TTML, TTML, USLT)
-            val localLrc = AudioRepository.findLrcContentForTrack(context, track)
-                ?: findLocalLrcFile(context, track)
+    suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> = withContext(Dispatchers.IO) {
+        val localLrc = AudioRepository.findLrcContentForTrack(context, track)
+            ?: findLocalLrcFile(context, track)
 
-            if (!localLrc.isNullOrBlank()) {
-                val parsed = AudioRepository.parseLyrics(localLrc)
-                if (parsed.isNotEmpty()) {
-                    saveToCache(context, track, parsed)
-                    return@withContext parsed
-                }
+        if (!localLrc.isNullOrBlank()) {
+            val parsed = AudioRepository.parseLyrics(localLrc)
+            if (parsed.isNotEmpty()) {
+                saveToCache(context, track, parsed)
+                return@withContext parsed
             }
-
-            // 2. Проверяем кэш только если локальных текстов рядом нет
-            val cachedLyrics = loadFromCache(context, track)
-            if (!cachedLyrics.isNullOrEmpty()) {
-                return@withContext cachedLyrics
-            }
-
-            // 3. Онлайн поиск (пословный)
-            val betterLyrics = fetchBetterLyricsOnline(track)
-            if (betterLyrics.isNotEmpty()) {
-                saveToCache(context, track, betterLyrics)
-                return@withContext betterLyrics
-            }
-
-            // 4. Fallback онлайн поиск (LRC-LIB / Musixmatch / OVH)
-            val fallbackOnline = fetchFallbackOnlineLyrics(track)
-            if (fallbackOnline.isNotEmpty()) {
-                saveToCache(context, track, fallbackOnline)
-                return@withContext fallbackOnline
-            }
-
-            // 5. Попытка прочесть медиа-ритривер (если остался незамеченным)
-            val embeddedLyrics = getEmbeddedLyrics(context, track.uri)
-            if (!embeddedLyrics.isNullOrBlank()) {
-                val parsed = AudioRepository.parseLyrics(embeddedLyrics)
-                if (parsed.isNotEmpty()) {
-                    saveToCache(context, track, parsed)
-                    return@withContext parsed
-                }
-            }
-
-            return@withContext emptyList()
         }
+
+        val cachedLyrics = loadFromCache(context, track)
+        if (!cachedLyrics.isNullOrEmpty()) {
+            return@withContext cachedLyrics
+        }
+
+        val betterLyrics = fetchBetterLyricsOnline(track)
+        if (betterLyrics.isNotEmpty()) {
+            saveToCache(context, track, betterLyrics)
+            return@withContext betterLyrics
+        }
+
+        val fallbackOnline = fetchFallbackOnlineLyrics(track)
+        if (fallbackOnline.isNotEmpty()) {
+            saveToCache(context, track, fallbackOnline)
+            return@withContext fallbackOnline
+        }
+
+        val embeddedLyrics = getEmbeddedLyrics(context, track.uri)
+        if (!embeddedLyrics.isNullOrBlank()) {
+            val parsed = AudioRepository.parseLyrics(embeddedLyrics)
+            if (parsed.isNotEmpty()) {
+                saveToCache(context, track, parsed)
+                return@withContext parsed
+            }
+        }
+
+        return@withContext emptyList()
     }
 
-    suspend fun searchLyricsOnline(context: Context, track: AudioTrack): List<LyricLine> {
-        return withContext(Dispatchers.IO) {
-            val betterLyrics = fetchBetterLyricsOnline(track)
-            if (betterLyrics.isNotEmpty()) {
-                saveToCache(context, track, betterLyrics)
-                return@withContext betterLyrics
-            }
-
-            val fallback = fetchFallbackOnlineLyrics(track)
-            if (fallback.isNotEmpty()) {
-                saveToCache(context, track, fallback)
-                return@withContext fallback
-            }
-
-            return@withContext emptyList()
+    suspend fun searchLyricsOnline(context: Context, track: AudioTrack): List<LyricLine> = withContext(Dispatchers.IO) {
+        val betterLyrics = fetchBetterLyricsOnline(track)
+        if (betterLyrics.isNotEmpty()) {
+            saveToCache(context, track, betterLyrics)
+            return@withContext betterLyrics
         }
+
+        val fallback = fetchFallbackOnlineLyrics(track)
+        if (fallback.isNotEmpty()) {
+            saveToCache(context, track, fallback)
+            return@withContext fallback
+        }
+
+        return@withContext emptyList()
     }
 
     private suspend fun fetchBetterLyricsOnline(track: AudioTrack): List<LyricLine> {
@@ -251,23 +247,28 @@ object LyricsManager {
         try {
             val betterResp = api.getBetterLyrics(cleanTitle, cleanArtist, durationSec)
             if (!betterResp.lines.isNullOrEmpty()) {
-                val result = mutableListOf<LyricLine>()
+                val result = ArrayList<LyricLine>(betterResp.lines.size)
                 for (line in betterResp.lines) {
                     val lineStart = line.offset ?: 0L
                     val text = line.text ?: ""
-                    val wordsList = mutableListOf<SyllableWord>()
+                    val wordsList = ArrayList<SyllableWord>(line.words?.size ?: 0)
 
                     if (!line.words.isNullOrEmpty()) {
                         for (w in line.words) {
                             val wStart = lineStart + (w.offset ?: 0L)
-                            val wEnd = wStart + (w.duration ?: 300L)
-                            val wText = w.text ?: ""
+                            val wEnd = wStart + (w.duration ?: 300L).coerceAtLeast(1L)
+                            val wText = w.text?.trim() ?: ""
                             if (wText.isNotEmpty()) {
                                 wordsList.add(SyllableWord(wText, wStart, wEnd))
                             }
                         }
                     }
-                    result.add(LyricLine(lineStart, text.trim(), null, wordsList))
+                    val finalText = text.trim().ifEmpty {
+                        wordsList.joinToString(" ") { it.text }
+                    }
+                    if (finalText.isNotEmpty()) {
+                        result.add(LyricLine(lineStart, finalText, null, wordsList))
+                    }
                 }
                 if (result.isNotEmpty()) {
                     return result.sortedBy { it.timeMs }
@@ -276,36 +277,45 @@ object LyricsManager {
                 val parsed = AudioRepository.parseLyrics(betterResp.lyrics)
                 if (parsed.isNotEmpty()) return parsed
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {}
 
         try {
             val lpResp = api.getLyricsPlus(cleanTitle, cleanArtist, durationSec)
             if (!lpResp.lines.isNullOrEmpty()) {
-                val result = mutableListOf<LyricLine>()
+                val result = ArrayList<LyricLine>(lpResp.lines.size)
                 for (line in lpResp.lines) {
                     val lineStart = line.time ?: 0L
-                    val wordsList = mutableListOf<SyllableWord>()
-                    var fullText = ""
+                    val wordsList = ArrayList<SyllableWord>(line.words?.size ?: 0)
+                    val fullTextBuilder = StringBuilder()
 
                     if (!line.words.isNullOrEmpty()) {
                         for (w in line.words) {
                             val wStart = w.time ?: lineStart
-                            val wEnd = wStart + (w.duration ?: 300L)
-                            val wText = w.string ?: ""
-                            if (wText.isNotEmpty()) {
-                                wordsList.add(SyllableWord(wText, wStart, wEnd))
-                                fullText += wText
+                            val wEnd = wStart + (w.duration ?: 300L).coerceAtLeast(1L)
+                            val rawWord = w.string ?: ""
+                            val trimmedWord = rawWord.trim()
+                            if (trimmedWord.isNotEmpty()) {
+                                wordsList.add(SyllableWord(trimmedWord, wStart, wEnd))
+                                if (fullTextBuilder.isNotEmpty()) {
+                                    fullTextBuilder.append(' ')
+                                }
+                                fullTextBuilder.append(trimmedWord)
                             }
                         }
                     }
+                    val fullText = fullTextBuilder.toString().trim()
                     if (fullText.isNotBlank()) {
-                        result.add(LyricLine(lineStart, fullText.trim(), null, wordsList))
+                        result.add(LyricLine(lineStart, fullText, null, wordsList))
                     }
                 }
                 if (result.isNotEmpty()) {
                     return result.sortedBy { it.timeMs }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {}
 
         return emptyList()
@@ -324,20 +334,26 @@ object LyricsManager {
         try {
             val response = api.getLrcLib(cleanArtist, cleanTitle, track.album.takeIf { it.isNotBlank() }, durationSec)
             rawLyrics = response.syncedLyrics ?: response.plainLyrics
-        } catch (e: Exception) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
             try {
                 val searchResponse = api.searchLrcLib("$cleanArtist $cleanTitle")
                 if (searchResponse.isNotEmpty()) {
                     rawLyrics = searchResponse[0].syncedLyrics ?: searchResponse[0].plainLyrics
                 }
-            } catch (ex: Exception) {}
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (_: Exception) {}
         }
 
         if (rawLyrics.isNullOrBlank()) {
             try {
                 val response = api.getMusixmatch(cleanArtist, cleanTitle)
                 rawLyrics = response.message?.body?.lyrics?.lyrics_body
-            } catch (e: Exception) {}
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {}
         }
 
         if (rawLyrics.isNullOrBlank()) {
@@ -348,7 +364,9 @@ object LyricsManager {
 
                 val response = api.getOvh(ovhUrl)
                 rawLyrics = response.lyrics
-            } catch (e: Exception) {}
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {}
         }
 
         if (!rawLyrics.isNullOrBlank()) {
@@ -364,7 +382,7 @@ object LyricsManager {
         try {
             val targetLang = getCurrentAppLanguage()
             val chunkedLines = lines.chunked(25)
-            val translatedLines = mutableListOf<String>()
+            val translatedLines = ArrayList<String>(lines.size)
 
             for (chunk in chunkedLines) {
                 val originalText = chunk.joinToString("\n") { it.text.ifBlank { " " } }
@@ -392,9 +410,11 @@ object LyricsManager {
                         val trans = translatedChunk.getOrNull(i)?.trim() ?: ""
                         translatedLines.add(trans)
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("LyricsManager", "Translation chunk error", e)
-                    translatedLines.addAll(List(chunk.size) { "" })
+                    repeat(chunk.size) { translatedLines.add("") }
                 }
             }
 
@@ -410,6 +430,8 @@ object LyricsManager {
             saveToCache(context, track, finalLines)
             return@withContext finalLines
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("LyricsManager", "Translation general error", e)
         }
@@ -420,13 +442,14 @@ object LyricsManager {
         val path = AudioRepository.getAudioFilePath(context, track.uri) ?: return null
         val audioFile = File(path)
         val parent = audioFile.parentFile ?: return null
+        val baseName = audioFile.nameWithoutExtension
 
         val candidates = listOf(
-            File(parent, "${audioFile.nameWithoutExtension}.ttml"),
-            File(parent, "${audioFile.nameWithoutExtension}.TTML"),
-            File(parent, "${audioFile.nameWithoutExtension}.lrc"),
-            File(parent, "${audioFile.nameWithoutExtension}.LRC"),
-            File(parent, "${audioFile.nameWithoutExtension}.txt"),
+            File(parent, "$baseName.ttml"),
+            File(parent, "$baseName.TTML"),
+            File(parent, "$baseName.lrc"),
+            File(parent, "$baseName.LRC"),
+            File(parent, "$baseName.txt"),
             File(parent, "${track.title}.ttml"),
             File(parent, "${track.title}.TTML"),
             File(parent, "${track.title}.lrc"),
@@ -438,8 +461,12 @@ object LyricsManager {
             if (candidate.exists() && candidate.canRead() && candidate.length() > 0) {
                 return try {
                     candidate.readText(Charsets.UTF_8)
-                } catch (e: Exception) {
-                    try { candidate.readText(charset("windows-1251")) } catch (e2: Exception) { null }
+                } catch (_: Exception) {
+                    try {
+                        candidate.readText(charset("windows-1251"))
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
             }
         }
@@ -452,7 +479,7 @@ object LyricsManager {
         return try {
             retriever.setDataSource(context, uri)
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_WRITER)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         } finally {
             try {
@@ -461,33 +488,45 @@ object LyricsManager {
         }
     }
 
-    private fun getCacheFile(context: Context, track: AudioTrack): File {
-        val dir = context.getDir("lyrics_persistent_cache", Context.MODE_PRIVATE)
+    private fun getCacheKey(track: AudioTrack): String {
         val currentLang = getCurrentAppLanguage()
-        val safeHash = "${track.artist}_${track.title}_$currentLang".hashCode()
-        return File(dir, "lyrics_$safeHash.json")
+        return "${track.artist}_${track.title}_${track.duration}_$currentLang"
+    }
+
+    private fun getCacheFile(context: Context, cacheKey: String): File {
+        val dir = context.getDir("lyrics_persistent_cache", Context.MODE_PRIVATE)
+        return File(dir, "lyrics_${cacheKey.hashCode()}.json")
     }
 
     private fun saveToCache(context: Context, track: AudioTrack, lines: List<LyricLine>) {
+        val key = getCacheKey(track)
+        memoryCache.put(key, lines)
         try {
-            val json = gson.toJson(lines)
-            getCacheFile(context, track).writeText(json)
+            val json = gson.toJson(lines, lyricListType)
+            getCacheFile(context, key).writeText(json)
         } catch (_: Exception) {}
     }
 
     private fun loadFromCache(context: Context, track: AudioTrack): List<LyricLine>? {
-        val file = getCacheFile(context, track)
+        val key = getCacheKey(track)
+        memoryCache.get(key)?.let { return it }
+
+        val file = getCacheFile(context, key)
         if (file.exists() && file.length() > 0) {
             try {
                 val json = file.readText()
-                val type = object : TypeToken<List<LyricLine>>() {}.type
-                return gson.fromJson(json, type)
+                val parsed: List<LyricLine>? = gson.fromJson(json, lyricListType)
+                if (!parsed.isNullOrEmpty()) {
+                    memoryCache.put(key, parsed)
+                    return parsed
+                }
             } catch (_: Exception) {}
         }
         return null
     }
 
     fun clearCache(context: Context): Int {
+        memoryCache.evictAll()
         var deletedCount = 0
         try {
             val dir = context.getDir("lyrics_persistent_cache", Context.MODE_PRIVATE)

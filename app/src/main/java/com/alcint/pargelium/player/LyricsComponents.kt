@@ -3,6 +3,7 @@ package com.alcint.pargelium.player
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -18,25 +19,31 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alcint.pargelium.LyricLine
 import com.alcint.pargelium.R
 import com.alcint.pargelium.SyllableWord
-import kotlinx.coroutines.isActive
+import kotlin.math.abs
 
 @Composable
-fun InstrumentalCountdown(timeUntilMs: Long) {
-    val secondsLeft = (timeUntilMs / 1000L).toInt()
+fun InstrumentalCountdown(timeUntilMs: () -> Long) {
+    val secondsLeft by remember {
+        derivedStateOf { (timeUntilMs() / 1000L).toInt().coerceAtLeast(0) }
+    }
 
     Box(
         modifier = Modifier
@@ -52,47 +59,51 @@ fun InstrumentalCountdown(timeUntilMs: Long) {
             if (state > 3) {
                 val infiniteTransition = rememberInfiniteTransition(label = "pulse")
                 val alpha by infiniteTransition.animateFloat(
-                    initialValue = 0.2f,
-                    targetValue = 0.8f,
-                    animationSpec = infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                    initialValue = 0.25f,
+                    targetValue = 0.85f,
+                    animationSpec = infiniteRepeatable(
+                        tween(800, easing = FastOutSlowInEasing),
+                        RepeatMode.Reverse
+                    ),
                     label = "alpha"
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White.copy(alpha = alpha)))
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White.copy(alpha = alpha)))
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White.copy(alpha = alpha)))
+                    repeat(3) {
+                        Box(
+                            Modifier
+                                .size(10.dp)
+                                .graphicsLayer { this.alpha = alpha }
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                    }
                 }
             } else if (state > 0) {
                 Text(
                     text = state.toString(),
                     style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Black),
-                    color = Color.White.copy(alpha = 0.8f)
+                    color = Color.White.copy(alpha = 0.85f)
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun KaraokeLine(
     line: LyricLine,
     isActive: Boolean,
-    currentPosition: Long,
+    currentPositionProvider: () -> Long,
     isPlaying: Boolean,
     nextLineTimeMs: Long?,
     activeColor: Color = Color.White,
     inactiveColor: Color = Color.White.copy(alpha = 0.35f)
 ) {
-    val isTtml = line.words.isNotEmpty()
-
     val wordsToRender = remember(line, nextLineTimeMs) {
-        if (isTtml) {
-            // TTML: Используем точные тайминги из парсера
+        if (line.words.isNotEmpty()) {
             line.words
         } else {
-            // LRC: Fallback — приблизительный расчет на основе количества слов
-            val wordsOnly = line.text.split(" ").filter { it.isNotBlank() }
+            val wordsOnly = line.text.split(Regex("\\s+")).filter { it.isNotEmpty() }
             val maxDuration = nextLineTimeMs?.let { it - line.timeMs } ?: 4000L
             val estimatedLineDurationMs = maxDuration.coerceIn(500L, 7000L)
             val step = estimatedLineDurationMs / wordsOnly.size.coerceAtLeast(1)
@@ -107,76 +118,168 @@ fun KaraokeLine(
         }
     }
 
-    if (isActive && wordsToRender.isNotEmpty()) {
-        var smoothPosition by remember { mutableLongStateOf(currentPosition) }
+    val fullNormalizedText = remember(wordsToRender, line.text) {
+        if (wordsToRender.isEmpty()) {
+            line.text
+        } else {
+            buildString {
+                wordsToRender.forEachIndexed { index, word ->
+                    append(word.text)
+                    if (index < wordsToRender.lastIndex && !word.text.endsWith(" ")) {
+                        append(" ")
+                    }
+                }
+            }
+        }
+    }
 
-        LaunchedEffect(currentPosition) {
-            if (kotlin.math.abs(smoothPosition - currentPosition) > 800) {
-                smoothPosition = currentPosition
+    val baseTextStyle = MaterialTheme.typography.headlineSmall.copy(
+        fontWeight = FontWeight.Bold,
+        lineHeight = 36.sp,
+        textAlign = TextAlign.Center
+    )
+
+    val activeShadow = remember(activeColor) {
+        Shadow(
+            color = activeColor.copy(alpha = 0.25f),
+            blurRadius = 8f
+        )
+    }
+
+    if (isActive && wordsToRender.isNotEmpty()) {
+        val lastWordEndMs = remember(wordsToRender) {
+            wordsToRender.maxOfOrNull { it.endMs } ?: (line.timeMs + 4000L)
+        }
+
+        var smoothPosition by remember(line.timeMs) { mutableLongStateOf(currentPositionProvider()) }
+        val latestExternalPos by rememberUpdatedState(currentPositionProvider())
+
+        LaunchedEffect(latestExternalPos) {
+            if (abs(smoothPosition - latestExternalPos) > 500L) {
+                smoothPosition = latestExternalPos
             }
         }
 
-        LaunchedEffect(isActive, isPlaying) {
+        LaunchedEffect(isActive, isPlaying, lastWordEndMs) {
             if (isActive && isPlaying) {
                 var lastFrameTime = withFrameNanos { it }
-                while (isActive) {
+                while (isActive && isPlaying) {
                     val frameTime = withFrameNanos { it }
-                    val deltaMs = (frameTime - lastFrameTime) / 1_000_000
+                    val deltaMs = (frameTime - lastFrameTime) / 1_000_000L
                     lastFrameTime = frameTime
-                    smoothPosition += deltaMs
+                    if (smoothPosition <= lastWordEndMs + 200L) {
+                        smoothPosition += deltaMs
+                    } else {
+                        kotlinx.coroutines.delay(100L)
+                        lastFrameTime = withFrameNanos { it }
+                    }
                 }
             }
         }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
+        val annotatedText = buildAnnotatedString {
             wordsToRender.forEachIndexed { index, word ->
-                // Расчет прогресса закрашивания текущего слова
+                val wordText = if (index < wordsToRender.lastIndex && !word.text.endsWith(" ")) {
+                    word.text + " "
+                } else {
+                    word.text
+                }
+
+                val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
                 val progress = when {
                     smoothPosition >= word.endMs -> 1f
                     smoothPosition <= word.startMs -> 0f
-                    else -> ((smoothPosition - word.startMs).toFloat() / (word.endMs - word.startMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                    else -> ((smoothPosition - word.startMs).toFloat() / duration).coerceIn(0f, 1f)
                 }
 
-                // Делаем плавный градиент для LRC и жесткий для TTML (опционально)
-                val blurEdge = if (isTtml) 0.01f else 0.05f
-                val p1 = (progress - blurEdge).coerceIn(0f, 1f)
-                val p2 = (progress + blurEdge).coerceIn(0f, 1f)
-
-                val brush = Brush.horizontalGradient(
-                    0.0f to activeColor,
-                    p1 to activeColor,
-                    p2 to inactiveColor,
-                    1.0f to inactiveColor
-                )
-
-                Text(
-                    text = word.text + if (index < wordsToRender.lastIndex) " " else "",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 36.sp,
-                        shadow = androidx.compose.ui.graphics.Shadow(
-                            color = activeColor.copy(alpha = 0.25f),
-                            blurRadius = 8f
+                val spanStyle = when {
+                    progress >= 1f -> SpanStyle(color = activeColor, shadow = activeShadow)
+                    progress <= 0f -> SpanStyle(color = inactiveColor)
+                    else -> {
+                        val p1 = (progress - 0.08f).coerceIn(0f, 1f)
+                        val p2 = (progress + 0.08f).coerceIn(0f, 1f)
+                        SpanStyle(
+                            brush = Brush.horizontalGradient(
+                                0.0f to activeColor,
+                                p1 to activeColor,
+                                p2 to inactiveColor,
+                                1.0f to inactiveColor
+                            ),
+                            shadow = activeShadow
                         )
-                    ).merge(androidx.compose.ui.text.TextStyle(brush = brush))
-                )
+                    }
+                }
+
+                withStyle(spanStyle) {
+                    append(wordText)
+                }
             }
         }
-    } else {
+
         Text(
-            text = line.text,
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                lineHeight = 36.sp
-            ),
-            color = if (isActive) activeColor else inactiveColor,
-            textAlign = TextAlign.Center,
+            text = annotatedText,
+            style = baseTextStyle,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
+        )
+    } else {
+        Text(
+            text = fullNormalizedText,
+            style = baseTextStyle,
+            color = if (isActive) activeColor else inactiveColor,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+        )
+    }
+}
+
+@Composable
+private fun TranslationLine(
+    translation: String,
+    lineTimeMs: Long,
+    nextLineTimeMs: Long?,
+    isActive: Boolean,
+    isPast: Boolean,
+    currentPositionProvider: () -> Long
+) {
+    val activeColor = remember { Color.White.copy(alpha = 0.8f) }
+    val inactiveColor = remember { Color.White.copy(alpha = 0.3f) }
+    val baseStyle = MaterialTheme.typography.titleMedium.copy(
+        fontStyle = FontStyle.Italic,
+        textAlign = TextAlign.Center
+    )
+
+    if (isActive) {
+        val pos = currentPositionProvider()
+        val lineDuration = (nextLineTimeMs?.let { it - lineTimeMs } ?: 4000L).coerceAtLeast(1L)
+        val transProgress = ((pos - lineTimeMs).toFloat() / lineDuration).coerceIn(0f, 1f)
+        val p1 = (transProgress - 0.05f).coerceIn(0f, 1f)
+        val p2 = (transProgress + 0.05f).coerceIn(0f, 1f)
+
+        val transBrush = Brush.horizontalGradient(
+            0.0f to activeColor,
+            p1 to activeColor,
+            p2 to inactiveColor,
+            1.0f to inactiveColor
+        )
+
+        Text(
+            text = translation,
+            style = baseStyle.merge(TextStyle(brush = transBrush)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
+        )
+    } else {
+        Text(
+            text = translation,
+            style = baseStyle,
+            color = if (isPast) activeColor.copy(alpha = 0.45f) else inactiveColor,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
         )
     }
 }
@@ -192,13 +295,17 @@ fun LyricsView(
     contentPadding: PaddingValues
 ) {
     val listState = rememberLazyListState()
+    val currentPositionState = rememberUpdatedState(currentPosition)
 
-    val activeIndex by remember(lyrics, currentPosition) {
-        derivedStateOf { lyrics.indexOfLast { it.timeMs <= currentPosition } }
+    val activeIndex by remember(lyrics) {
+        derivedStateOf {
+            val pos = currentPositionState.value
+            lyrics.indexOfLast { it.timeMs <= pos }
+        }
     }
 
-    LaunchedEffect(activeIndex) {
-        if (activeIndex >= 0 && lyrics.isNotEmpty()) {
+    LaunchedEffect(activeIndex, lyrics.size) {
+        if (activeIndex >= 0 && lyrics.isNotEmpty() && !listState.isScrollInProgress) {
             val layoutInfo = listState.layoutInfo
             val itemInfo = layoutInfo.visibleItemsInfo.find { it.index == activeIndex }
 
@@ -208,15 +315,18 @@ fun LyricsView(
                 val itemCenter = itemInfo.offset + (itemInfo.size / 2)
                 val scrollDistance = itemCenter - targetY
 
-                if (kotlin.math.abs(scrollDistance) > 5) {
+                if (abs(scrollDistance) > 8) {
                     listState.animateScrollBy(
                         value = scrollDistance.toFloat(),
-                        animationSpec = spring(dampingRatio = 0.8f, stiffness = 50f)
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
                     )
                 }
             } else {
                 val safeTarget = (activeIndex - 1).coerceIn(0, lyrics.lastIndex)
-                listState.animateScrollToItem(safeTarget, scrollOffset = -200)
+                listState.animateScrollToItem(safeTarget, scrollOffset = -180)
             }
         }
     }
@@ -240,7 +350,7 @@ fun LyricsView(
                 OutlinedButton(
                     onClick = onSearchOnline,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
                 ) {
                     Icon(Icons.Default.Search, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -249,117 +359,102 @@ fun LyricsView(
             }
         }
     } else {
-        LazyColumn(state = listState, contentPadding = contentPadding, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = contentPadding,
+            modifier = Modifier.fillMaxSize()
+        ) {
             itemsIndexed(
                 items = lyrics,
-                key = { _, line -> "${line.timeMs}_${line.text.take(10)}" }
+                key = { index, line -> "${index}_${line.timeMs}" },
+                contentType = { _, line -> if (line.translation.isNullOrBlank()) 0 else 1 }
             ) { index, line ->
                 val isActive = index == activeIndex
                 val isPast = index < activeIndex
 
                 val scale by animateFloatAsState(
-                    targetValue = if (isActive) 1.1f else 0.9f,
-                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 100f),
+                    targetValue = if (isActive) 1.05f else 0.94f,
+                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
                     label = "scale"
                 )
                 val alpha by animateFloatAsState(
-                    targetValue = if (isActive) 1f else if (isPast) 0.3f else 0.5f,
-                    animationSpec = tween(500),
+                    targetValue = if (isActive) 1f else if (isPast) 0.32f else 0.52f,
+                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
                     label = "alpha"
-                )
-                val blurRadius by animateDpAsState(
-                    targetValue = if (isActive) 0.dp else 1.5.dp,
-                    animationSpec = tween(500),
-                    label = "blur"
                 )
 
                 val nextLineTimeMs = lyrics.getOrNull(index + 1)?.timeMs
-                val prevLineEnd = if (index > 0) {
-                    val pLine = lyrics[index - 1]
-                    pLine.words.lastOrNull()?.endMs ?: (pLine.timeMs + 3000L)
-                } else {
-                    0L
+                val prevLineEnd = remember(index, lyrics) {
+                    if (index > 0) {
+                        val pLine = lyrics[index - 1]
+                        pLine.words.lastOrNull()?.endMs ?: (pLine.timeMs + 3000L)
+                    } else {
+                        0L
+                    }
+                }
+
+                val isBigGap = remember(line.timeMs, prevLineEnd, index) {
+                    (line.timeMs - prevLineEnd) > 4000L || (index == 0 && line.timeMs > 4000L)
+                }
+
+                val isNextToBecomeActive = (index == activeIndex + 1) || (index == 0 && activeIndex == -1)
+
+                val showCountdown by remember(isNextToBecomeActive, isBigGap, line.timeMs) {
+                    derivedStateOf {
+                        isNextToBecomeActive && isBigGap && (line.timeMs - currentPositionState.value) > 0L
+                    }
                 }
 
                 val interactionSource = remember { MutableInteractionSource() }
 
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 14.dp)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            this.alpha = alpha
-                        }
-                        .blur(blurRadius)
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
-                        ) { onLineClick(line.timeMs) },
-                    contentAlignment = Alignment.Center
+                        ) { onLineClick(line.timeMs) }
+                        .padding(vertical = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (line.text.isNotBlank()) {
-                            val timeUntilStart = line.timeMs - currentPosition
-                            val gapDuration = line.timeMs - prevLineEnd
-                            val isBigGap = gapDuration > 4000L || (index == 0 && line.timeMs > 4000L)
+                    if (line.text.isNotBlank()) {
+                        AnimatedVisibility(
+                            visible = showCountdown,
+                            enter = expandVertically(tween(300)) + fadeIn(tween(300)),
+                            exit = fadeOut(tween(250)) + shrinkVertically(tween(300))
+                        ) {
+                            InstrumentalCountdown(
+                                timeUntilMs = { line.timeMs - currentPositionState.value }
+                            )
+                        }
 
-                            val isNextOrActive = (index == activeIndex + 1) || (index == 0 && activeIndex == -1)
-                            val showCountdown = isNextOrActive && isBigGap && timeUntilStart > 0L
-
-                            AnimatedVisibility(
-                                visible = showCountdown,
-                                enter = expandVertically(tween(400)) + fadeIn(tween(400)),
-                                exit = fadeOut(tween(400)) + shrinkVertically(tween(400, delayMillis = 400))
-                            ) {
-                                InstrumentalCountdown(timeUntilMs = timeUntilStart)
-                            }
-
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    this.alpha = alpha
+                                }
+                        ) {
                             KaraokeLine(
                                 line = line,
                                 isActive = isActive,
-                                currentPosition = currentPosition,
+                                currentPositionProvider = { currentPositionState.value },
                                 isPlaying = isPlaying,
                                 nextLineTimeMs = nextLineTimeMs
                             )
 
                             if (!line.translation.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(8.dp))
-
-                                val lineDuration = nextLineTimeMs?.let { it - line.timeMs } ?: 4000L
-                                val transProgress = if (isActive) {
-                                    ((currentPosition - line.timeMs).toFloat() / lineDuration.coerceAtLeast(1L)).coerceIn(0f, 1f)
-                                } else {
-                                    if (isPast) 1f else 0f
-                                }
-
-                                val p1 = (transProgress - 0.05f).coerceIn(0f, 1f)
-                                val p2 = (transProgress + 0.05f).coerceIn(0f, 1f)
-
-                                val activeColor = Color.White.copy(alpha = 0.8f)
-                                val inactiveColor = Color.White.copy(alpha = 0.3f)
-
-                                val transBrush = Brush.horizontalGradient(
-                                    0.0f to activeColor,
-                                    p1 to activeColor,
-                                    p2 to inactiveColor,
-                                    1.0f to inactiveColor
-                                )
-
-                                Text(
-                                    text = line.translation,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontStyle = FontStyle.Italic
-                                    ).merge(
-                                        androidx.compose.ui.text.TextStyle(
-                                            brush = if (isActive) transBrush else Brush.horizontalGradient(listOf(inactiveColor, inactiveColor))
-                                        )
-                                    ),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 32.dp)
+                                TranslationLine(
+                                    translation = line.translation,
+                                    lineTimeMs = line.timeMs,
+                                    nextLineTimeMs = nextLineTimeMs,
+                                    isActive = isActive,
+                                    isPast = isPast,
+                                    currentPositionProvider = { currentPositionState.value }
                                 )
                             }
                         }

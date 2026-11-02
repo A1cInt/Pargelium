@@ -46,6 +46,7 @@ import com.alcint.pargelium.liquid.LiquidGlassSwitch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+import androidx.compose.material.icons.filled.PlayArrow
 
 @Composable
 fun AppearancePanel(
@@ -145,24 +146,39 @@ fun DesignPanel(
     var navBarStyle by remember { mutableIntStateOf(PrefsManager.getNavBarStyle()) }
     var showNavBarStyleSheet by remember { mutableStateOf(false) }
 
-    val navBarStyles = listOf(
-        0 to stringResource(R.string.nav_style_liquid),
-        1 to stringResource(R.string.nav_style_material),
-        2 to stringResource(R.string.nav_style_pill)
+    var playerBtnStyle by remember { mutableIntStateOf(PrefsManager.getPlayerButtonStyle()) }
+    var showPlayerBtnStyleSheet by remember { mutableStateOf(false) }
+
+    val styles = listOf(
+        0 to stringResource(R.string.nav_style_liquid), // Замени строковые ресурсы на подходящие, если нужно
+        1 to "Expressive",
+        2 to "Default"
     )
 
-    val currentStyleName = navBarStyles.find { it.first == navBarStyle }?.second ?: navBarStyles[0].second
+    val currentNavStyleName = styles.find { it.first == navBarStyle }?.second ?: styles[0].second
+    val currentPlayerStyleName = styles.find { it.first == playerBtnStyle }?.second ?: styles[0].second
 
     SettingsGroup {
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_nav_style), fontWeight = FontWeight.Bold) },
-            supportingContent = { Text(currentStyleName) },
+            supportingContent = { Text(currentNavStyleName) },
             leadingContent = { IconContainer(icon = Icons.Default.Palette, color = MaterialTheme.colorScheme.primary) },
             modifier = Modifier.clickable { showNavBarStyleSheet = true },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         )
+
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+        ListItem(
+            headlineContent = { Text("Стиль кнопок плеера", fontWeight = FontWeight.Bold) },
+            supportingContent = { Text(currentPlayerStyleName) },
+            leadingContent = { IconContainer(icon = Icons.Default.PlayArrow, color = MaterialTheme.colorScheme.secondary) },
+            modifier = Modifier.clickable { showPlayerBtnStyleSheet = true },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
     }
 
+    // Sheet для Навбара
     if (showNavBarStyleSheet) {
         ModalBottomSheet(
             onDismissRequest = { showNavBarStyleSheet = false },
@@ -176,7 +192,7 @@ fun DesignPanel(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
                 )
                 LazyColumn {
-                    items(navBarStyles) { (code, name) ->
+                    items(styles) { (code, name) ->
                         val isSelected = navBarStyle == code
                         ListItem(
                             headlineContent = {
@@ -194,6 +210,46 @@ fun DesignPanel(
                                 PrefsManager.saveNavBarStyle(code)
                                 onNavBarStyleChanged(code)
                                 showNavBarStyleSheet = false
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Sheet для Кнопок плеера
+    if (showPlayerBtnStyleSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showPlayerBtnStyleSheet = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
+            Column(modifier = Modifier.padding(bottom = 32.dp)) {
+                Text(
+                    text = "Выберите стиль кнопок", // Замени на stringResource
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+                LazyColumn {
+                    items(styles) { (code, name) ->
+                        val isSelected = playerBtnStyle == code
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = name,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            trailingContent = {
+                                if (isSelected) Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            modifier = Modifier.clickable {
+                                playerBtnStyle = code
+                                PrefsManager.savePlayerButtonStyle(code)
+                                showPlayerBtnStyleSheet = false
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )

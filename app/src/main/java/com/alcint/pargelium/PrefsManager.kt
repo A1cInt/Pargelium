@@ -318,4 +318,15 @@ object PrefsManager {
         // 0 = Liquid (по умолчанию), 1 = Material
         return prefs.getInt(KEY_NAV_BAR_STYLE, 0)
     }
+
+    private const val KEY_PLAYER_BUTTON_STYLE = "player_button_style"
+
+    fun savePlayerButtonStyle(style: Int) {
+        prefs.edit().putInt(KEY_PLAYER_BUTTON_STYLE, style).apply()
+    }
+
+    fun getPlayerButtonStyle(): Int {
+        // 0 = Liquid Glass (по умолчанию), 1 = Expressive/Material, 2 = Default
+        return prefs.getInt(KEY_PLAYER_BUTTON_STYLE, 0)
+    }
 }

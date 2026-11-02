@@ -48,6 +48,8 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import kotlin.coroutines.resume
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 @Composable
 fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
@@ -77,28 +79,31 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
     var userName by remember { mutableStateOf(PrefsManager.getUserName()) }
     var avatarUri by remember { mutableStateOf(PrefsManager.getAvatarUri()) }
+
+    // ИСПРАВЛЕННЫЕ ПЕРЕМЕННЫЕ С ЯВНЫМ УКАЗАНИЕМ ТИПА ДО by
     var showAddToPlaylistSheet by remember { mutableStateOf(false) }
-    var trackAddingToPlaylist by remember { mutableStateOf<AudioTrack?>(null) }
-    var trackToShare by remember { mutableStateOf<AudioTrack?>(null) }
+    var trackAddingToPlaylist: AudioTrack? by remember { mutableStateOf(null) }
+    var trackToShare: AudioTrack? by remember { mutableStateOf(null) }
     var hasPermission by remember { mutableStateOf(false) }
 
-    var allTracks by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
-    var tracksById by remember { mutableStateOf>(emptyMap()) }
-    var allAlbums by remember { mutableStateOf<List<AlbumModel>>(emptyList()) }
-    var allArtists by remember { mutableStateOf<List<ArtistModel>>(emptyList()) }
+    var allTracks: List<AudioTrack> by remember { mutableStateOf(emptyList()) }
+    var tracksById: Map<Long, AudioTrack> by remember { mutableStateOf(emptyMap()) }
+    var allAlbums: List<AlbumModel> by remember { mutableStateOf(emptyList()) }
+    var allArtists: List<ArtistModel> by remember { mutableStateOf(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    var selectedAlbum by remember { mutableStateOf<AlbumModel?>(null) }
-    var selectedArtist by remember { mutableStateOf<ArtistModel?>(null) }
+    var selectedAlbum: AlbumModel? by remember { mutableStateOf(null) }
+    var selectedArtist: ArtistModel? by remember { mutableStateOf(null) }
 
-    var playerController by remember { mutableStateOf<MediaController?>(null) }
-    var currentTrack by remember { mutableStateOf<AudioTrack?>(null) }
-    var currentPlaylist by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
+    var playerController: MediaController? by remember { mutableStateOf(null) }
+    var currentTrack: AudioTrack? by remember { mutableStateOf(null) }
+    var currentPlaylist: List<AudioTrack> by remember { mutableStateOf(emptyList()) }
+
     var isPlaying by remember { mutableStateOf(false) }
-    var trackDuration by remember { mutableLongStateOf(1L) } // Без автобоксинга Long
+    var trackDuration by remember { mutableLongStateOf(1L) }
     var trackMetadata by remember { mutableStateOf("") }
-    var currentAlbumArt by remember { mutableStateOf<Uri?>(null) }
+    var currentAlbumArt: Uri? by remember { mutableStateOf(null) }
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     var currentQueueIndex by remember { mutableIntStateOf(-1) }
 
@@ -517,7 +522,6 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                     var isPlayerExpanded by remember { mutableStateOf(false) }
                     val playerOffsetY = remember { Animatable(10000f) }
 
-                    // Проверяем, виден ли полноэкранный плеер на экране (открыт или тянется пальцем)
                     val isFullPlayerVisible by remember(hiddenOffsetPx) {
                         derivedStateOf {
                             isPlayerExpanded || playerOffsetY.value < containerHeightPx - 1f

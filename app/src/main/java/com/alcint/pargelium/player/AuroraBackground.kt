@@ -18,7 +18,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.alcint.pargelium.globalAudioLoudness
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.PI
 import kotlin.math.cos
@@ -52,7 +51,9 @@ fun AuroraBackground(seedColor: Color, isPlaying: Boolean, modifier: Modifier = 
     val animState = remember { AuroraAnimState() }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    var isAppResumed by remember { mutableStateOf(false) }
+    var isAppResumed by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -66,40 +67,46 @@ fun AuroraBackground(seedColor: Color, isPlaying: Boolean, modifier: Modifier = 
         if (!isAppResumed) return@LaunchedEffect
 
         var lastNanos = withFrameNanos { it }
-        while (isActive) {
-            withFrameNanos { frameNanos ->
-                val dt = ((frameNanos - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.1f)
-                lastNanos = frameNanos
+        var skipFrame = false
 
-                val rotationSpeed = if (isPlaying) TWO_PI / 15f else TWO_PI / 45f
-                animState.offset = (animState.offset + rotationSpeed * dt) % TWO_PI
+        while (isActive && (isPlaying || animState.loudness > 0.002f)) {
+            val frameNanos = withFrameNanos { it }
+            skipFrame = !skipFrame
+            if (skipFrame) continue
 
-                animState.scalePhase = (animState.scalePhase + (TWO_PI / 16f) * dt) % TWO_PI
-                animState.slowScale = 1.0f - 0.1f * cos(animState.scalePhase)
+            val dt = ((frameNanos - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.25f)
+            lastNanos = frameNanos
 
-                if (isPlaying) {
-                    val target = globalAudioLoudness
-                    val safeTarget = if (target.isNaN() || target.isInfinite()) 0f else target
+            val rotationSpeed = if (isPlaying) TWO_PI / 15f else TWO_PI / 45f
+            animState.offset = (animState.offset + rotationSpeed * dt) % TWO_PI
 
-                    val stepFactor = (dt * 30f).coerceIn(0.5f, 3f)
-                    animState.fast += (safeTarget - animState.fast) * (0.15f * stepFactor).coerceAtMost(1f)
-                    animState.slow += (safeTarget - animState.slow) * (0.02f * stepFactor).coerceAtMost(1f)
-                    val peak = (animState.fast - animState.slow).coerceAtLeast(0f)
+            animState.scalePhase = (animState.scalePhase + (TWO_PI / 16f) * dt) % TWO_PI
+            animState.slowScale = 1.0f - 0.1f * cos(animState.scalePhase)
 
-                    if (peak > animState.loudness) {
-                        animState.loudness = animState.loudness * 0.5f + peak * 0.5f
-                    } else {
-                        animState.loudness *= 0.94f
-                    }
-                } else if (animState.loudness > 0.001f) {
-                    animState.loudness *= 0.9f
-                    if (animState.loudness <= 0.001f) animState.loudness = 0f
+            if (isPlaying) {
+                val target = globalAudioLoudness
+                val safeTarget = if (target.isNaN() || target.isInfinite()) 0f else target
+
+                val stepFactor = (dt * 30f).coerceIn(0.5f, 3f)
+                animState.fast += (safeTarget - animState.fast) * (0.15f * stepFactor).coerceAtMost(1f)
+                animState.slow += (safeTarget - animState.slow) * (0.02f * stepFactor).coerceAtMost(1f)
+                val peak = (animState.fast - animState.slow).coerceAtLeast(0f)
+
+                if (peak > animState.loudness) {
+                    animState.loudness = animState.loudness * 0.5f + peak * 0.5f
+                } else {
+                    animState.loudness *= 0.94f
                 }
-
-                frameTick++
+            } else {
+                animState.loudness *= 0.88f
+                if (animState.loudness <= 0.002f) {
+                    animState.loudness = 0f
+                    animState.fast = 0f
+                    animState.slow = 0f
+                }
             }
-            val sleepMs = if (isPlaying || animState.loudness > 0.01f) 30L else 64L
-            delay(sleepMs)
+
+            frameTick++
         }
     }
 

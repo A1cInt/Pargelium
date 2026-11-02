@@ -36,7 +36,6 @@ fun ExpressiveMiniPlayer(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // HorizontalFloatingToolbar — официальный нативный компонент Material 3 Expressive
     HorizontalFloatingToolbar(
         expanded = true,
         modifier = modifier
@@ -49,11 +48,10 @@ fun ExpressiveMiniPlayer(
             ),
         shape = RoundedCornerShape(28.dp),
         colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Линейный индикатор прогресса M3 с круглыми окончаниями капсулы
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier
