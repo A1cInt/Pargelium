@@ -19,20 +19,47 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
 
-        // Параметры сборки C/C++ через CMake
         externalNativeBuild {
             cmake {
-                arguments("-DANDROID_STL=c++_shared")
-                cFlags("-O3", "-ffast-math", "-funroll-loops")
-                cppFlags("-O3", "-ffast-math", "-std=c++17")
+                arguments(
+                    "-DANDROID_STL=c++_shared",
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-flto=thin -O3 -Wl,--lto-O3 -Wl,--gc-sections -Wl,--as-needed"
+                )
+                cFlags(
+                    "-O3",
+                    "-flto=thin",
+                    "-ffast-math",
+                    "-funroll-loops",
+                    "-fomit-frame-pointer",
+                    "-ftree-vectorize",
+                    "-fstrict-aliasing",
+                    "-ffunction-sections",
+                    "-fdata-sections",
+                    "-march=armv8-a",
+                    "-mpoint-guard"
+                )
+                cppFlags(
+                    "-O3",
+                    "-flto=thin",
+                    "-ffast-math",
+                    "-funroll-loops",
+                    "-std=c++17",
+                    "-fomit-frame-pointer",
+                    "-ftree-vectorize",
+                    "-fstrict-aliasing",
+                    "-ffunction-sections",
+                    "-fdata-sections",
+                    "-march=armv8-a",
+                    "-fvisibility=hidden",
+                    "-fvisibility-inlines-hidden"
+                )
             }
         }
     }
 
-    // Подключаем CMakeLists.txt из папки cpp
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
