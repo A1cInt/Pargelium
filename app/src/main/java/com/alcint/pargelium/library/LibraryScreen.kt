@@ -12,17 +12,43 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,9 +62,26 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
-import com.alcint.pargelium.*
+import com.alcint.pargelium.AdvancedSettingsScreen
+import com.alcint.pargelium.AlbumModel
+import com.alcint.pargelium.AudioRepository
+import com.alcint.pargelium.AudioTrack
+import com.alcint.pargelium.EqualizerScreen
+import com.alcint.pargelium.FloatingActionRow
+import com.alcint.pargelium.MiniPlayer
+import com.alcint.pargelium.MorphingPillIndicator
+import com.alcint.pargelium.PlaybackService
+import com.alcint.pargelium.PlaylistScreen
+import com.alcint.pargelium.PrefsManager
+import com.alcint.pargelium.ProfileScreen
 import com.alcint.pargelium.R
+import com.alcint.pargelium.RadioScreen
+import com.alcint.pargelium.ShareTrackSheet
+import com.alcint.pargelium.SortOption
+import com.alcint.pargelium.StreamingManager
 import com.alcint.pargelium.player.FullPlayerScreen
+import com.alcint.pargelium.rememberDominantColor
+import com.alcint.pargelium.rememberPargeliumScheme
 import com.alcint.pargelium.settings.SettingsScreen
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
@@ -48,8 +91,6 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import kotlin.coroutines.resume
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 @Composable
 fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
@@ -80,7 +121,6 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var userName by remember { mutableStateOf(PrefsManager.getUserName()) }
     var avatarUri by remember { mutableStateOf(PrefsManager.getAvatarUri()) }
 
-    // ИСПРАВЛЕННЫЕ ПЕРЕМЕННЫЕ С ЯВНЫМ УКАЗАНИЕМ ТИПА ДО by
     var showAddToPlaylistSheet by remember { mutableStateOf(false) }
     var trackAddingToPlaylist: AudioTrack? by remember { mutableStateOf(null) }
     var trackToShare: AudioTrack? by remember { mutableStateOf(null) }
@@ -277,13 +317,25 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             val (loadedAlbums, loadedArtists, idMap) = withContext(Dispatchers.Default) {
                 val albums = AudioRepository.processAlbums(loadedTracks)
                 val albumsByArtist = albums.groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
+                // Предзагрузка метаданных артистов в фоне, чтобы убрать фризы при скролле LazyVerticalGrid
                 val artists = loadedTracks
                     .groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
                     .map { (name, artistTracks) ->
+                        val artistAlbums = albumsByArtist[name]?.sortedBy { it.title } ?: emptyList()
+                        val customAvatar = try {
+                            PrefsManager.getArtistMetadata(name).avatarUri
+                        } catch (_: Exception) { null }
+                        val firstAlbumId = artistAlbums.firstOrNull()?.id ?: artistTracks.firstOrNull()?.albumId
+                        val fallbackCover = if (firstAlbumId != null && firstAlbumId > 0L) {
+                            AudioRepository.getAlbumArtUri(firstAlbumId)
+                        } else null
+
                         ArtistModel(
                             name = name,
                             tracks = artistTracks.sortedBy { it.title },
-                            albums = albumsByArtist[name]?.sortedBy { it.title } ?: emptyList()
+                            albums = artistAlbums,
+                            customAvatarUri = customAvatar,
+                            fallbackCoverUri = fallbackCover
                         )
                     }
                     .sortedBy { it.name.trim().lowercase() }
@@ -447,22 +499,39 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val filteredAlbums by remember {
         derivedStateOf {
             val query = searchQuery
-            val albums = allAlbums
-            if (query.isEmpty()) albums
-            else albums.filter {
+            val base = if (query.isEmpty()) allAlbums
+            else allAlbums.filter {
                 it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
-            }.sortedBy { it.title.trim().lowercase() }
+            }
+            when (sortOption) {
+                SortOption.TITLE -> base.sortedBy { it.title.trim().lowercase() }
+                SortOption.ARTIST -> base.sortedBy { it.artist.trim().lowercase() }
+                SortOption.DURATION -> base.sortedByDescending { it.tracks.size }
+            }
         }
     }
 
     val filteredArtists by remember {
         derivedStateOf {
             val query = searchQuery
-            val artists = allArtists
-            if (query.isEmpty()) artists
-            else artists.filter {
+            val base = if (query.isEmpty()) allArtists
+            else allArtists.filter {
                 it.name.contains(query, ignoreCase = true)
-            }.sortedBy { it.name.trim().lowercase() }
+            }
+            when (sortOption) {
+                SortOption.TITLE, SortOption.ARTIST -> base.sortedBy { it.name.trim().lowercase() }
+                SortOption.DURATION -> base.sortedByDescending { it.tracks.size }
+            }
+        }
+    }
+
+    val sortedAllTracks by remember {
+        derivedStateOf {
+            when (sortOption) {
+                SortOption.TITLE -> allTracks.sortedBy { it.title.lowercase() }
+                SortOption.ARTIST -> allTracks.sortedBy { it.artist.lowercase() }
+                SortOption.DURATION -> allTracks.sortedByDescending { it.duration }
+            }
         }
     }
 
@@ -470,13 +539,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         derivedStateOf {
             val query = searchQuery
             if (query.isEmpty()) emptyList() else {
-                val list = allTracks.filter {
+                sortedAllTracks.filter {
                     it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
-                }
-                when (sortOption) {
-                    SortOption.TITLE -> list.sortedBy { it.title }
-                    SortOption.ARTIST -> list.sortedBy { it.artist }
-                    SortOption.DURATION -> list.sortedBy { it.duration }
                 }
             }
         }
@@ -537,7 +601,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         scope.launch {
                             playerOffsetY.animateTo(
                                 targetValue = if (toExpanded) 0f else hiddenOffsetPx,
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 200f)
+                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 220f)
                             )
                         }
                     }
@@ -604,8 +668,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                             AnimatedContent(
                                                 targetState = currentDetailView,
                                                 transitionSpec = {
-                                                    (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 4 })
-                                                        .togetherWith(fadeOut(animationSpec = tween(200)))
+                                                    (fadeIn(animationSpec = tween(280)) + slideInVertically { it / 5 })
+                                                        .togetherWith(fadeOut(animationSpec = tween(180)))
                                                 },
                                                 label = "DetailSwitch"
                                             ) { detailState ->
@@ -667,6 +731,9 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                             filteredAlbums = filteredAlbums,
                                                             filteredArtists = filteredArtists,
                                                             filteredTracks = filteredTracks,
+                                                            allTracks = sortedAllTracks,
+                                                            sortOption = sortOption,
+                                                            onSortOptionChange = remember { { sortOption = it } },
                                                             albumGridState = albumGridState,
                                                             artistGridState = artistGridState,
                                                             onAlbumClick = remember { { selectedAlbum = it } },
