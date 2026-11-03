@@ -5,18 +5,25 @@
 )
 package com.alcint.pargelium.library
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -31,8 +38,16 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +57,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,6 +87,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Collections
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.HighQuality
@@ -114,12 +131,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -127,17 +145,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -151,9 +177,13 @@ import com.alcint.pargelium.AudioTrack
 import com.alcint.pargelium.R as AppR
 import com.alcint.pargelium.rememberDominantColor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun SharedTransitionScope.AlbumDetailView(
@@ -172,6 +202,7 @@ fun SharedTransitionScope.AlbumDetailView(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
     val listState = rememberLazyListState()
 
     val mainCoverUri = remember(album.id) { AudioRepository.getAlbumArtUri(album.id) }
@@ -191,10 +222,10 @@ fun SharedTransitionScope.AlbumDetailView(
     var albumFolderPath by remember(album.id) { mutableStateOf<String?>(null) }
     var lightboxInitialIndex by remember { mutableStateOf<Int?>(null) }
 
-    val isAlbumCurrentlyPlaying = remember(currentTrack, album.id, isPlaying) {
+    val isAlbumCurrentlyPlaying = remember(currentTrack?.albumId, album.id, isPlaying) {
         currentTrack?.albumId == album.id && isPlaying
     }
-    val isAlbumLoadedInPlayer = remember(currentTrack, album.id) {
+    val isAlbumLoadedInPlayer = remember(currentTrack?.albumId, album.id) {
         currentTrack?.albumId == album.id
     }
 
@@ -205,12 +236,10 @@ fun SharedTransitionScope.AlbumDetailView(
             val firstUri = album.tracks.firstOrNull()?.uri
             val techMeta = if (firstUri != null) AudioRepository.getTrackMetadata(context, firstUri) else ""
             val folder = AudioRepository.getAlbumFolderPath(context, album)
-            withContext(Dispatchers.Main) {
-                artworksList = loadedArt
-                albumTechMetadata = techMeta
-                albumFolderPath = folder
-                isScanningArtworks = false
-            }
+            artworksList = loadedArt
+            albumTechMetadata = techMeta
+            albumFolderPath = folder
+            isScanningArtworks = false
         }
     }
 
@@ -238,6 +267,10 @@ fun SharedTransitionScope.AlbumDetailView(
         else artworksList.filter { it.category == selectedCategory }
     }
 
+    val galleryRows = remember(filteredArtworks) {
+        filteredArtworks.chunked(2)
+    }
+
     val discArtworkUri = remember(artworksList, mainCoverUri) {
         artworksList.firstOrNull { it.category == ArtworkCategory.DISC }?.uri ?: mainCoverUri
     }
@@ -249,7 +282,7 @@ fun SharedTransitionScope.AlbumDetailView(
     val collapsedHeaderAlpha by remember {
         derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) 1f
-            else (listState.firstVisibleItemScrollOffset / 500f).coerceIn(0f, 1f)
+            else (listState.firstVisibleItemScrollOffset / 520f).coerceIn(0f, 1f)
         }
     }
 
@@ -270,27 +303,30 @@ fun SharedTransitionScope.AlbumDetailView(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // Легкий статический градиент фона без перерисовки при скролле
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(420.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            accentColor.copy(alpha = 0.38f),
-                            accentColor.copy(alpha = 0.12f),
-                            Color.Transparent
+                .height(440.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                accentColor.copy(alpha = 0.35f),
+                                accentColor.copy(alpha = 0.10f),
+                                Color.Transparent
+                            )
                         )
                     )
-                )
+                }
         )
 
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 250.dp)
+            contentPadding = PaddingValues(bottom = 240.dp)
         ) {
-            item(key = "album_hero_header") {
+            item(key = "album_hero_header", contentType = "hero") {
                 AlbumHeroSection(
                     album = album,
                     mainCoverUri = mainCoverUri,
@@ -305,10 +341,14 @@ fun SharedTransitionScope.AlbumDetailView(
                     onSectionChange = { activeSection = it },
                     onArtistClick = { onArtistClick(album.artist) },
                     onCoverClick = {
-                        activeSection = 1
-                        if (artworksList.isNotEmpty()) lightboxInitialIndex = 0
+                        if (artworksList.isNotEmpty()) {
+                            lightboxInitialIndex = 0
+                        } else {
+                            activeSection = 1
+                        }
                     },
                     onPlayAlbumClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (isAlbumLoadedInPlayer) {
                             onPlayPause()
                         } else if (displayedTracks.isNotEmpty()) {
@@ -316,16 +356,30 @@ fun SharedTransitionScope.AlbumDetailView(
                         }
                     },
                     onShuffleAlbumClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (displayedTracks.isNotEmpty()) {
-                            val randomTrack = displayedTracks.random()
-                            onTrackSelect(randomTrack)
+                            onTrackSelect(displayedTracks.random())
                         }
                     }
                 )
             }
 
             if (activeSection == 0) {
-                item(key = "album_track_controls") {
+                if (displayedTracks.size > 1 && totalDurationMs > 0L) {
+                    item(key = "album_flow_timeline", contentType = "timeline") {
+                        AlbumDurationSpectrumBar(
+                            tracks = displayedTracks,
+                            currentTrackId = currentTrack?.id,
+                            accentColor = accentColor,
+                            onTrackClick = { track ->
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onTrackSelect(track)
+                            }
+                        )
+                    }
+                }
+
+                item(key = "album_track_controls", contentType = "controls") {
                     AlbumTrackControlsBar(
                         isMultiDisc = isMultiDisc,
                         discNumbers = discNumbers,
@@ -345,7 +399,7 @@ fun SharedTransitionScope.AlbumDetailView(
                 }
 
                 if (displayedTracks.isEmpty()) {
-                    item(key = "empty_tracks") {
+                    item(key = "empty_tracks", contentType = "empty") {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -362,10 +416,11 @@ fun SharedTransitionScope.AlbumDetailView(
                 } else {
                     groupedTracks.forEach { (discNum, tracksInDisc) ->
                         if (isMultiDisc && selectedDisc == 0) {
-                            item(key = "disc_header_$discNum") {
+                            item(key = "disc_header_$discNum", contentType = "disc_header") {
                                 DiscDividerHeader(
                                     discNumber = discNum,
                                     trackCount = tracksInDisc.size,
+                                    discDurationMs = tracksInDisc.sumOf { it.duration },
                                     accentColor = accentColor,
                                     onPlayDisc = {
                                         tracksInDisc.firstOrNull()?.let { onTrackSelect(it) }
@@ -376,7 +431,8 @@ fun SharedTransitionScope.AlbumDetailView(
 
                         items(
                             items = tracksInDisc,
-                            key = { it.id }
+                            key = { it.id },
+                            contentType = { "track_item" }
                         ) { track ->
                             AlbumTrackItem(
                                 track = track,
@@ -394,9 +450,10 @@ fun SharedTransitionScope.AlbumDetailView(
                     }
                 }
 
-                item(key = "album_footer_specs") {
+                item(key = "album_footer_specs", contentType = "specs") {
                     AlbumReleaseSpecsCard(
                         totalDurationMs = totalDurationMs,
+                        tracksCount = album.tracks.size,
                         techMetadata = albumTechMetadata,
                         artworksCount = artworksList.size,
                         folderPath = albumFolderPath,
@@ -405,19 +462,62 @@ fun SharedTransitionScope.AlbumDetailView(
                     )
                 }
             } else {
-                item(key = "gallery_section") {
-                    AlbumGallerySection(
+                item(key = "gallery_header", contentType = "gallery_header") {
+                    AlbumGalleryHeader(
                         allArtworks = artworksList,
-                        filteredArtworks = filteredArtworks,
-                        isScanning = isScanningArtworks,
                         selectedCategory = selectedCategory,
-                        accentColor = accentColor,
-                        onSelectCategory = { selectedCategory = it },
-                        onArtworkClick = { clickedItem ->
-                            val idx = artworksList.indexOfFirst { it.uri == clickedItem.uri }.coerceAtLeast(0)
-                            lightboxInitialIndex = idx
-                        }
+                        onSelectCategory = { selectedCategory = it }
                     )
+                }
+
+                when {
+                    isScanningArtworks -> {
+                        item(key = "gallery_loading", contentType = "loading") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 48.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = accentColor)
+                            }
+                        }
+                    }
+                    filteredArtworks.isEmpty() -> {
+                        item(key = "gallery_empty", contentType = "empty") {
+                            AlbumGalleryEmptyState()
+                        }
+                    }
+                    else -> {
+                        items(
+                            items = galleryRows,
+                            key = { row -> row.first().uri.toString() },
+                            contentType = { "gallery_row" }
+                        ) { rowItems ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowItems.forEach { item ->
+                                    AlbumGalleryCard(
+                                        item = item,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            val idx = artworksList
+                                                .indexOfFirst { it.uri == item.uri }
+                                                .coerceAtLeast(0)
+                                            lightboxInitialIndex = idx
+                                        }
+                                    )
+                                }
+                                if (rowItems.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -426,7 +526,7 @@ fun SharedTransitionScope.AlbumDetailView(
             title = album.title,
             artist = album.artist,
             coverUri = mainCoverUri,
-            collapsedAlpha = collapsedHeaderAlpha,
+            collapsedAlphaProvider = { collapsedHeaderAlpha },
             activeSection = activeSection,
             artworksCount = artworksList.size,
             showBatchMenu = showBatchMenu,
@@ -465,7 +565,7 @@ private fun AlbumTopCollapsedBar(
     title: String,
     artist: String,
     coverUri: Uri,
-    collapsedAlpha: Float,
+    collapsedAlphaProvider: () -> Float,
     activeSection: Int,
     artworksCount: Int,
     showBatchMenu: Boolean,
@@ -475,14 +575,25 @@ private fun AlbumTopCollapsedBar(
     onPlayNextAll: () -> Unit,
     onAddToQueueAll: () -> Unit
 ) {
-    val bgColor = MaterialTheme.colorScheme.surface.copy(alpha = (collapsedAlpha * 0.94f).coerceIn(0f, 0.94f))
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val dividerColor = MaterialTheme.colorScheme.outlineVariant
 
-    Surface(
-        color = bgColor,
-        tonalElevation = if (collapsedAlpha > 0.6f) 4.dp else 0.dp,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(10f)
+            .drawBehind {
+                val alpha = (collapsedAlphaProvider() * 0.95f).coerceIn(0f, 0.95f)
+                drawRect(color = surfaceColor.copy(alpha = alpha))
+                if (alpha > 0.8f) {
+                    drawLine(
+                        color = dividerColor.copy(alpha = (alpha - 0.8f) * 2f),
+                        start = Offset(0f, size.height),
+                        end = Offset(size.width, size.height),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+            }
     ) {
         Column {
             Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
@@ -496,7 +607,7 @@ private fun AlbumTopCollapsedBar(
                 FilledTonalIconButton(
                     onClick = onBack,
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
                     )
                 ) {
                     Icon(
@@ -511,8 +622,9 @@ private fun AlbumTopCollapsedBar(
                     modifier = Modifier
                         .weight(1f)
                         .graphicsLayer {
-                            alpha = collapsedAlpha
-                            translationY = (1f - collapsedAlpha) * 20f
+                            val a = collapsedAlphaProvider()
+                            alpha = a
+                            translationY = (1f - a) * 20f
                         },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -562,7 +674,7 @@ private fun AlbumTopCollapsedBar(
                             containerColor = if (activeSection == 1) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
                             }
                         )
                     ) {
@@ -579,7 +691,7 @@ private fun AlbumTopCollapsedBar(
                     FilledTonalIconButton(
                         onClick = { onToggleBatchMenu(true) },
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f)
                         )
                     ) {
                         Icon(
@@ -629,54 +741,90 @@ private fun SharedTransitionScope.AlbumHeroSection(
     onShuffleAlbumClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     val discPeekOffset by animateDpAsState(
-        targetValue = if (isAlbumPlaying) 54.dp else 26.dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 200f),
+        targetValue = if (isAlbumPlaying) 58.dp else 28.dp,
+        animationSpec = spring(dampingRatio = 0.68f, stiffness = 180f),
         label = "discPeek"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "vinylSpin")
-    val spinAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "spinAngle"
-    )
+    // Энергоэффективное вращение: работает ТОЛЬКО когда играет альбом, и сохраняет угол на паузе
+    val rotationAnim = remember { Animatable(18f) }
+    var isUserScratching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isAlbumPlaying, isUserScratching) {
+        if (isAlbumPlaying && !isUserScratching) {
+            while (isActive) {
+                val startAngle = rotationAnim.value % 360f
+                rotationAnim.snapTo(startAngle)
+                rotationAnim.animateTo(
+                    targetValue = startAngle + 360f,
+                    animationSpec = tween(durationMillis = 10000, easing = LinearEasing)
+                )
+            }
+        }
+    }
+
+    val onAccentColor = if (accentColor.luminance() > 0.55f) Color(0xFF121214) else Color.White
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 96.dp, start = 20.dp, end = 20.dp, bottom = 12.dp),
+            .padding(top = 96.dp, start = 20.dp, end = 20.dp, bottom = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(236.dp),
+                .height(240.dp),
             contentAlignment = Alignment.Center
         ) {
-            Box(
+            // Замена дорогого .blur(40.dp) на радиальный градиент без нагрузки на GPU
+            Canvas(
                 modifier = Modifier
-                    .size(210.dp)
-                    .offset(y = 10.dp)
-                    .blur(40.dp)
-                    .background(accentColor.copy(alpha = 0.45f), RoundedCornerShape(32.dp))
-            )
+                    .size(270.dp)
+                    .offset(y = 12.dp)
+            ) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = 0.48f),
+                            accentColor.copy(alpha = 0.16f),
+                            Color.Transparent
+                        )
+                    ),
+                    radius = size.minDimension / 2f
+                )
+            }
 
+            // Интерактивная виниловая пластинка с возможностью ручного скретча
             Box(
                 modifier = Modifier
                     .offset(x = discPeekOffset)
-                    .size(196.dp)
+                    .size(198.dp)
                     .graphicsLayer {
-                        rotationZ = if (isAlbumPlaying) spinAngle else 18f
+                        rotationZ = rotationAnim.value
                     }
                     .shadow(16.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(Color(0xFF141416))
+                    .background(Color(0xFF121215))
+                    .draggable(
+                        orientation = Orientation.Vertical,
+                        state = rememberDraggableState { delta ->
+                            scope.launch {
+                                rotationAnim.snapTo((rotationAnim.value + delta * 0.45f) % 360f)
+                            }
+                        },
+                        onDragStarted = {
+                            isUserScratching = true
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        },
+                        onDragStopped = {
+                            isUserScratching = false
+                        }
+                    )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -685,26 +833,48 @@ private fun SharedTransitionScope.AlbumHeroSection(
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(discArtworkUri)
-                        .crossfade(true)
-                        .build(),
+                    model = remember(discArtworkUri) {
+                        ImageRequest.Builder(context)
+                            .data(discArtworkUri)
+                            .size(512)
+                            .crossfade(true)
+                            .build()
+                    },
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(0.88f)
+                        .alpha(0.84f)
                 )
 
+                // Анизотропные блики и дорожки винила
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val strokeColor = Color.White.copy(alpha = 0.12f)
-                    drawCircle(color = strokeColor, radius = size.minDimension * 0.44f, style = Stroke(width = 1.5f))
-                    drawCircle(color = strokeColor, radius = size.minDimension * 0.34f, style = Stroke(width = 1f))
-                    drawCircle(color = Color.Black.copy(alpha = 0.55f), radius = size.minDimension * 0.14f)
-                    drawCircle(color = Color.White.copy(alpha = 0.6f), radius = size.minDimension * 0.04f)
+                    val shineBrush = Brush.sweepGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.16f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.25f),
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.16f),
+                            Color.Transparent
+                        )
+                    )
+                    drawCircle(brush = shineBrush)
+
+                    val grooveColor = Color.White.copy(alpha = 0.12f)
+                    drawCircle(color = grooveColor, radius = size.minDimension * 0.46f, style = Stroke(width = 1.2f))
+                    drawCircle(color = grooveColor, radius = size.minDimension * 0.39f, style = Stroke(width = 1f))
+                    drawCircle(color = grooveColor, radius = size.minDimension * 0.31f, style = Stroke(width = 1f))
+
+                    // Яблоко винила и центральное отверстие
+                    drawCircle(color = accentColor.copy(alpha = 0.85f), radius = size.minDimension * 0.16f)
+                    drawCircle(color = Color(0xFF101012), radius = size.minDimension * 0.13f)
+                    drawCircle(color = Color.White.copy(alpha = 0.75f), radius = size.minDimension * 0.038f)
                 }
             }
 
+            // Главная обложка альбома
             Box(
                 modifier = Modifier
                     .offset(x = (-14).dp)
@@ -718,16 +888,19 @@ private fun SharedTransitionScope.AlbumHeroSection(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .border(
                         width = 1.dp,
-                        color = Color.White.copy(alpha = 0.14f),
+                        color = Color.White.copy(alpha = 0.16f),
                         shape = RoundedCornerShape(26.dp)
                     )
                     .clickable(onClick = onCoverClick)
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(mainCoverUri)
-                        .crossfade(true)
-                        .build(),
+                    model = remember(mainCoverUri) {
+                        ImageRequest.Builder(context)
+                            .data(mainCoverUri)
+                            .size(720)
+                            .crossfade(true)
+                            .build()
+                    },
                     contentDescription = album.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -735,7 +908,7 @@ private fun SharedTransitionScope.AlbumHeroSection(
 
                 if (artworksCount > 1) {
                     Surface(
-                        color = Color.Black.copy(alpha = 0.65f),
+                        color = Color.Black.copy(alpha = 0.68f),
                         shape = RoundedCornerShape(50),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -764,7 +937,7 @@ private fun SharedTransitionScope.AlbumHeroSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         Text(
             text = album.title,
@@ -859,7 +1032,7 @@ private fun SharedTransitionScope.AlbumHeroSection(
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = accentColor,
-                    contentColor = MaterialTheme.colorScheme.surface
+                    contentColor = onAccentColor
                 )
             ) {
                 Icon(
@@ -904,6 +1077,52 @@ private fun SharedTransitionScope.AlbumHeroSection(
             accentColor = accentColor,
             onSectionChange = onSectionChange
         )
+    }
+}
+
+/**
+ * Уникальная фича: Интерактивный спектр структуры альбома (Album Flow Bar).
+ * Показывает пропорции длительности треков в альбоме и позволяет тапом переключиться на любой сегмент.
+ */
+@Composable
+private fun AlbumDurationSpectrumBar(
+    tracks: List<AudioTrack>,
+    currentTrackId: Long?,
+    accentColor: Color,
+    onTrackClick: (AudioTrack) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(12.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tracks.forEachIndexed { index, track ->
+                val weight = track.duration.coerceAtLeast(15_000L).toFloat()
+                val isCurrent = track.id == currentTrackId
+                val segmentAlpha = if (isCurrent) 1f else (0.28f + (index % 3) * 0.1f)
+
+                Box(
+                    modifier = Modifier
+                        .weight(weight)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(
+                            if (isCurrent) accentColor
+                            else accentColor.copy(alpha = segmentAlpha)
+                        )
+                        .clickable { onTrackClick(track) }
+                )
+            }
+        }
     }
 }
 
@@ -1126,6 +1345,7 @@ private fun AlbumTrackControlsBar(
 private fun DiscDividerHeader(
     discNumber: Int,
     trackCount: Int,
+    discDurationMs: Long,
     accentColor: Color,
     onPlayDisc: () -> Unit
 ) {
@@ -1157,7 +1377,7 @@ private fun DiscDividerHeader(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "• ${pluralStringResource(id = AppR.plurals.tracks_count, count = trackCount, trackCount)}",
+                text = "• ${pluralStringResource(id = AppR.plurals.tracks_count, count = trackCount, trackCount)} • ${formatAlbumTotalDuration(discDurationMs)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
@@ -1182,6 +1402,11 @@ private fun DiscDividerHeader(
     }
 }
 
+/**
+ * Карточка трека с поддержкой быстрых свайп-жестов:
+ * - Свайп вправо -> Играть следующим
+ * - Свайп влево -> В очередь
+ */
 @Composable
 private fun AlbumTrackItem(
     track: AudioTrack,
@@ -1196,160 +1421,251 @@ private fun AlbumTrackItem(
     onShare: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var thresholdReached by remember { mutableStateOf(false) }
+    val animatedOffset by animateFloatAsState(
+        targetValue = dragOffset,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "swipeOffset"
+    )
+
+    val haptic = LocalHapticFeedback.current
+    val triggerThresholdPx = with(LocalDensity.current) { 76.dp.toPx() }
 
     val containerColor = if (isCurrentTrack) {
         accentColor.copy(alpha = 0.14f)
     } else {
-        Color.Transparent
+        MaterialTheme.colorScheme.background
     }
 
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = containerColor,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 2.dp)
     ) {
-        Row(
+        // Фоновый слой индикации при свайпе
+        if (abs(animatedOffset) > 4f) {
+            val isPlayNextSwipe = animatedOffset > 0f
+            val progress = (abs(animatedOffset) / triggerThresholdPx).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(accentColor.copy(alpha = 0.12f + 0.18f * progress))
+                    .padding(horizontal = 20.dp),
+                contentAlignment = if (isPlayNextSwipe) Alignment.CenterStart else Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = if (isPlayNextSwipe) Icons.Rounded.PlaylistPlay else Icons.AutoMirrored.Rounded.QueueMusic,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.graphicsLayer {
+                        val s = 0.75f + 0.35f * progress
+                        scaleX = s
+                        scaleY = s
+                        alpha = progress
+                    }
+                )
+            }
+        }
+
+        Surface(
+            onClick = onClick,
+            shape = RoundedCornerShape(16.dp),
+            color = containerColor,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.width(34.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isCurrentTrack) {
-                    AnimatedPlayingBars(isPlaying = isPlaying, color = accentColor)
-                } else {
-                    Text(
-                        text = if (track.trackNumber > 0) {
-                            String.format(Locale.US, "%02d", track.trackNumber)
-                        } else "-",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                .pointerInput(track.id) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (dragOffset >= triggerThresholdPx) {
+                                onPlayNext()
+                            } else if (dragOffset <= -triggerThresholdPx) {
+                                onAddToQueue()
+                            }
+                            dragOffset = 0f
+                            thresholdReached = false
+                        },
+                        onDragCancel = {
+                            dragOffset = 0f
+                            thresholdReached = false
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val next = (dragOffset + dragAmount * 0.65f)
+                                .coerceIn(-triggerThresholdPx * 1.35f, triggerThresholdPx * 1.35f)
+                            dragOffset = next
+
+                            val nowReached = abs(next) >= triggerThresholdPx
+                            if (nowReached && !thresholdReached) {
+                                thresholdReached = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            } else if (!nowReached && thresholdReached) {
+                                thresholdReached = false
+                            }
+                        }
                     )
                 }
-            }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.width(34.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isCurrentTrack) {
+                        AnimatedPlayingBars(isPlaying = isPlaying, color = accentColor)
+                    } else {
+                        Text(
+                            text = if (track.trackNumber > 0) {
+                                String.format(Locale.US, "%02d", track.trackNumber)
+                            } else "-",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isCurrentTrack) accentColor else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                val showTrackArtist = !track.artist.equals(albumArtist, ignoreCase = true) && track.artist.isNotBlank()
-                if (showTrackArtist) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = track.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = track.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isCurrentTrack) accentColor else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-            }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = formatTrackTime(track.duration),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isCurrentTrack) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.MoreVert,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    val showTrackArtist = !track.artist.equals(albumArtist, ignoreCase = true) && track.artist.isNotBlank()
+                    if (showTrackArtist) {
+                        Text(
+                            text = track.artist,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(id = AppR.string.album_track_play_next)) },
-                        leadingIcon = { Icon(Icons.Rounded.PlaylistPlay, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onPlayNext()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(id = AppR.string.album_track_add_queue)) },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onAddToQueue()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(id = AppR.string.album_track_add_playlist)) },
-                        leadingIcon = { Icon(Icons.Rounded.PlaylistAdd, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onAddToPlaylist()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(id = AppR.string.album_track_share)) },
-                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onShare()
-                        }
-                    )
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = formatTrackTime(track.duration),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isCurrentTrack) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Box {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(id = AppR.string.album_track_play_next)) },
+                            leadingIcon = { Icon(Icons.Rounded.PlaylistPlay, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onPlayNext()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(id = AppR.string.album_track_add_queue)) },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onAddToQueue()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(id = AppR.string.album_track_add_playlist)) },
+                            leadingIcon = { Icon(Icons.Rounded.PlaylistAdd, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onAddToPlaylist()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(id = AppR.string.album_track_share)) },
+                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onShare()
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Энергоэффективный индикатор эквалайзера:
+ * InfiniteTransition запускается ТОЛЬКО когда `isPlaying == true`. На паузе — 0% нагрузки на CPU/GPU.
+ */
 @Composable
 private fun AnimatedPlayingBars(isPlaying: Boolean, color: Color) {
-    val infiniteTransition = rememberInfiniteTransition(label = "bars")
-    val bar1 by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = if (isPlaying) 1f else 0.25f,
-        animationSpec = infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "b1"
-    )
-    val bar2 by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = if (isPlaying) 0.2f else 0.45f,
-        animationSpec = infiniteRepeatable(tween(360, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "b2"
-    )
-    val bar3 by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = if (isPlaying) 0.95f else 0.3f,
-        animationSpec = infiniteRepeatable(tween(510, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "b3"
-    )
+    val bar1: Float
+    val bar2: Float
+    val bar3: Float
+
+    if (isPlaying) {
+        val infiniteTransition = rememberInfiniteTransition(label = "bars")
+        val b1 by infiniteTransition.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "b1"
+        )
+        val b2 by infiniteTransition.animateFloat(
+            initialValue = 0.85f,
+            targetValue = 0.2f,
+            animationSpec = infiniteRepeatable(tween(360, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "b2"
+        )
+        val b3 by infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 0.95f,
+            animationSpec = infiniteRepeatable(tween(510, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "b3"
+        )
+        bar1 = b1
+        bar2 = b2
+        bar3 = b3
+    } else {
+        bar1 = 0.28f
+        bar2 = 0.48f
+        bar3 = 0.34f
+    }
 
     Canvas(modifier = Modifier.size(18.dp)) {
         val barWidth = size.width / 5f
         val maxH = size.height
-        val values = listOf(bar1, bar2, bar3)
-        values.forEachIndexed { idx, fraction ->
+        val fractions = floatArrayOf(bar1, bar2, bar3)
+        for (idx in fractions.indices) {
+            val fraction = fractions[idx]
             val x = (idx * 2 + 0.5f) * barWidth
             val h = (maxH * fraction).coerceAtLeast(4f)
             drawLine(
@@ -1364,14 +1680,10 @@ private fun AnimatedPlayingBars(isPlaying: Boolean, color: Color) {
 }
 
 @Composable
-private fun AlbumGallerySection(
+private fun AlbumGalleryHeader(
     allArtworks: List<AlbumArtworkItem>,
-    filteredArtworks: List<AlbumArtworkItem>,
-    isScanning: Boolean,
     selectedCategory: ArtworkCategory?,
-    accentColor: Color,
-    onSelectCategory: (ArtworkCategory?) -> Unit,
-    onArtworkClick: (AlbumArtworkItem) -> Unit
+    onSelectCategory: (ArtworkCategory?) -> Unit
 ) {
     val availableCategories = remember(allArtworks) {
         allArtworks.map { it.category }.distinct().sortedBy { it.ordinal }
@@ -1380,31 +1692,22 @@ private fun AlbumGallerySection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    text = stringResource(id = AppR.string.album_gallery_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(id = AppR.string.album_gallery_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = stringResource(id = AppR.string.album_gallery_title),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = stringResource(id = AppR.string.album_gallery_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         if (availableCategories.size > 1) {
+            Spacer(modifier = Modifier.height(12.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -1428,74 +1731,42 @@ private fun AlbumGallerySection(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(14.dp))
         }
+    }
+}
 
-        when {
-            isScanning -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = accentColor)
-                }
-            }
-            filteredArtworks.isEmpty() -> {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.HideImage,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = stringResource(id = AppR.string.album_gallery_empty_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(id = AppR.string.album_gallery_empty_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-            else -> {
-                val rows = remember(filteredArtworks) { filteredArtworks.chunked(2) }
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    rows.forEach { rowItems ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            rowItems.forEach { item ->
-                                AlbumGalleryCard(
-                                    item = item,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { onArtworkClick(item) }
-                                )
-                            }
-                            if (rowItems.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
+@Composable
+private fun AlbumGalleryEmptyState() {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.HideImage,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(id = AppR.string.album_gallery_empty_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(id = AppR.string.album_gallery_empty_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -1524,10 +1795,13 @@ private fun AlbumGalleryCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(item.uri)
-                        .crossfade(true)
-                        .build(),
+                    model = remember(item.uri) {
+                        ImageRequest.Builder(context)
+                            .data(item.uri)
+                            .size(600)
+                            .crossfade(true)
+                            .build()
+                    },
                     contentDescription = item.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -1558,11 +1832,13 @@ private fun AlbumGalleryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val subInfo = buildString {
-                    if (item.resolution.isNotEmpty()) append(item.resolution)
-                    if (item.sizeBytes > 0L) {
-                        if (isNotEmpty()) append(" • ")
-                        append(Formatter.formatShortFileSize(context, item.sizeBytes))
+                val subInfo = remember(item.resolution, item.sizeBytes) {
+                    buildString {
+                        if (item.resolution.isNotEmpty()) append(item.resolution)
+                        if (item.sizeBytes > 0L) {
+                            if (isNotEmpty()) append(" • ")
+                            append(Formatter.formatShortFileSize(context, item.sizeBytes))
+                        }
                     }
                 }
                 if (subInfo.isNotEmpty()) {
@@ -1583,12 +1859,16 @@ private fun AlbumGalleryCard(
 @Composable
 private fun AlbumReleaseSpecsCard(
     totalDurationMs: Long,
+    tracksCount: Int,
     techMetadata: String,
     artworksCount: Int,
     folderPath: String?,
     accentColor: Color,
     onOpenGallery: () -> Unit
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
@@ -1623,17 +1903,60 @@ private fun AlbumReleaseSpecsCard(
             }
             SpecRowItem(
                 label = stringResource(id = AppR.string.album_specs_total_duration),
-                value = formatAlbumTotalDuration(totalDurationMs)
+                value = "${formatAlbumTotalDuration(totalDurationMs)} (${formatTrackTime(totalDurationMs / tracksCount.coerceAtLeast(1))} avg)"
             )
             SpecRowItem(
                 label = stringResource(id = AppR.string.album_specs_artwork_files),
                 value = artworksCount.toString()
             )
             if (!folderPath.isNullOrBlank()) {
-                SpecRowItem(
-                    label = stringResource(id = AppR.string.album_specs_source_folder),
-                    value = File(folderPath).name.ifEmpty { folderPath }
-                )
+                val folderName = remember(folderPath) {
+                    File(folderPath).name.ifEmpty { folderPath }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("Album Folder Path", folderPath))
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            Toast.makeText(context, folderPath, Toast.LENGTH_SHORT).show()
+                        }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(id = AppR.string.album_specs_source_folder),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(0.45f)
+                    )
+                    Row(
+                        modifier = Modifier.weight(0.55f),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = folderName,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.End,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
 
             if (artworksCount > 1) {
@@ -1684,6 +2007,10 @@ private fun SpecRowItem(label: String, value: String) {
     }
 }
 
+/**
+ * Исправленный лайтбокс:
+ * Не блокирует свайпы `HorizontalPager` при `scale == 1f` и удерживает картинку в границах экрана при зуме.
+ */
 @Composable
 private fun AlbumArtworkLightbox(
     artworks: List<AlbumArtworkItem>,
@@ -1706,10 +2033,19 @@ private fun AlbumArtworkLightbox(
             val item = artworks[page]
             var scale by remember(page) { mutableFloatStateOf(1f) }
             var offset by remember(page) { mutableStateOf(Offset.Zero) }
+            var containerSize by remember(page) { mutableStateOf(IntSize.Zero) }
+
+            LaunchedEffect(pagerState.currentPage) {
+                if (pagerState.currentPage != page) {
+                    scale = 1f
+                    offset = Offset.Zero
+                }
+            }
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onSizeChanged { containerSize = it }
                     .pointerInput(page) {
                         detectTapGestures(
                             onDoubleTap = {
@@ -1723,23 +2059,47 @@ private fun AlbumArtworkLightbox(
                         )
                     }
                     .pointerInput(page) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(1f, 4f)
-                            scale = newScale
-                            if (newScale > 1f) {
-                                offset += pan
-                            } else {
-                                offset = Offset.Zero
-                            }
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val zoomChange = event.calculateZoom()
+                                val panChange = event.calculatePan()
+                                val pointerCount = event.changes.size
+
+                                if (scale > 1.01f || pointerCount > 1) {
+                                    val newScale = (scale * zoomChange).coerceIn(1f, 4f)
+                                    val maxX = ((containerSize.width * (newScale - 1f)) / 2f).coerceAtLeast(0f)
+                                    val maxY = ((containerSize.height * (newScale - 1f)) / 2f).coerceAtLeast(0f)
+
+                                    scale = newScale
+                                    offset = if (newScale > 1.01f) {
+                                        Offset(
+                                            x = (offset.x + panChange.x).coerceIn(-maxX, maxX),
+                                            y = (offset.y + panChange.y).coerceIn(-maxY, maxY)
+                                        )
+                                    } else {
+                                        Offset.Zero
+                                    }
+
+                                    event.changes.forEach { change ->
+                                        if (change.positionChanged()) {
+                                            change.consume()
+                                        }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
                         }
                     },
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(item.uri)
-                        .crossfade(true)
-                        .build(),
+                    model = remember(item.uri) {
+                        ImageRequest.Builder(context)
+                            .data(item.uri)
+                            .crossfade(true)
+                            .build()
+                    },
                     contentDescription = item.name,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
