@@ -2,6 +2,7 @@ package com.alcint.pargelium
 
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -14,21 +15,212 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.io.StringReader
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
+
+enum class ArtworkCategory {
+    COVER, DISC, BACK, BOOKLET, ARTIST, EXTRA
+}
+
+data class AlbumArtworkItem(
+    val uri: Uri,
+    val name: String,
+    val category: ArtworkCategory,
+    val resolution: String = "",
+    val sizeBytes: Long = 0L
+)
 
 object AudioRepository {
 
     private var cachedTracks: List<AudioTrack>? = null
     private var cachedAlbums: List<AlbumModel>? = null
+    private val cachedAlbumArtworks = ConcurrentHashMap<Long, List<AlbumArtworkItem>>()
 
     fun clearCache() {
         cachedTracks = null
         cachedAlbums = null
+        cachedAlbumArtworks.clear()
     }
 
     fun getAlbumArtUri(albumId: Long): Uri {
         return ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
+    }
+
+    fun getAlbumFolderPath(context: Context, album: AlbumModel): String? {
+        val firstTrack = album.tracks.firstOrNull() ?: return null
+        val filePath = getAudioFilePath(context, firstTrack.uri) ?: return null
+        return File(filePath).parentFile?.absolutePath
+    }
+
+    fun getAlbumArtworks(context: Context, album: AlbumModel): List<AlbumArtworkItem> {
+        cachedAlbumArtworks[album.id]?.let { return it }
+
+        val results = mutableListOf<AlbumArtworkItem>()
+        val seenNames = HashSet<String>()
+        val seenPaths = HashSet<String>()
+
+        val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif")
+        val subFolderKeywords = setOf("scans", "scan", "artwork", "artworks", "booklet", "covers", "cover", "images", "art", "extra")
+
+        val firstTrack = album.tracks.firstOrNull()
+        val trackPath = if (firstTrack != null) getAudioFilePath(context, firstTrack.uri) else null
+        val albumDir = trackPath?.let { File(it).parentFile }
+
+        fun inspectAndAddFile(file: File) {
+            if (!file.exists() || !file.isFile || !file.canRead()) return
+            val ext = file.extension.lowercase()
+            if (!imageExtensions.contains(ext)) return
+            if (!seenPaths.add(file.absolutePath)) return
+
+            val baseName = file.nameWithoutExtension
+            seenNames.add(baseName.lowercase())
+
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            try {
+                BitmapFactory.decodeFile(file.absolutePath, options)
+            } catch (_: Exception) {}
+
+            val res = if (options.outWidth > 0 && options.outHeight > 0) {
+                "${options.outWidth} × ${options.outHeight}"
+            } else ""
+
+            results.add(
+                AlbumArtworkItem(
+                    uri = Uri.fromFile(file),
+                    name = baseName,
+                    category = classifyArtworkName(baseName),
+                    resolution = res,
+                    sizeBytes = file.length()
+                )
+            )
+        }
+
+        if (albumDir != null && albumDir.exists() && albumDir.isDirectory) {
+            try {
+                albumDir.listFiles()?.forEach { child ->
+                    if (child.isFile) {
+                        inspectAndAddFile(child)
+                    } else if (child.isDirectory && subFolderKeywords.any { child.name.contains(it, ignoreCase = true) }) {
+                        child.listFiles()?.forEach { subFile ->
+                            if (subFile.isFile) inspectAndAddFile(subFile)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (firstTrack != null) {
+            var bucketId: String? = null
+            try {
+                context.contentResolver.query(
+                    firstTrack.uri,
+                    arrayOf(MediaStore.Audio.Media.BUCKET_ID),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idx = cursor.getColumnIndex(MediaStore.Audio.Media.BUCKET_ID)
+                        if (idx != -1) bucketId = cursor.getString(idx)
+                    }
+                }
+            } catch (_: Exception) {}
+
+            if (bucketId != null) {
+                try {
+                    val imgCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                    } else {
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                    }
+                    val projection = arrayOf(
+                        MediaStore.Images.Media._ID,
+                        MediaStore.Images.Media.DISPLAY_NAME,
+                        MediaStore.Images.Media.WIDTH,
+                        MediaStore.Images.Media.HEIGHT,
+                        MediaStore.Images.Media.SIZE,
+                        MediaStore.Images.Media.DATA
+                    )
+                    context.contentResolver.query(
+                        imgCollection,
+                        projection,
+                        "${MediaStore.Images.Media.BUCKET_ID} = ?",
+                        arrayOf(bucketId),
+                        null
+                    )?.use { cursor ->
+                        val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                        val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                        val wCol = cursor.getColumnIndex(MediaStore.Images.Media.WIDTH)
+                        val hCol = cursor.getColumnIndex(MediaStore.Images.Media.HEIGHT)
+                        val sizeCol = cursor.getColumnIndex(MediaStore.Images.Media.SIZE)
+                        val dataCol = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
+
+                        while (cursor.moveToNext()) {
+                            val id = cursor.getLong(idCol)
+                            val fullName = cursor.getString(nameCol) ?: "Artwork"
+                            val baseName = fullName.substringBeforeLast(".")
+                            val dataPath = if (dataCol != -1) cursor.getString(dataCol) else null
+
+                            if (dataPath != null && seenPaths.contains(dataPath)) continue
+                            if (!seenNames.add(baseName.lowercase())) continue
+
+                            val w = if (wCol != -1) cursor.getInt(wCol) else 0
+                            val h = if (hCol != -1) cursor.getInt(hCol) else 0
+                            val size = if (sizeCol != -1) cursor.getLong(sizeCol) else 0L
+                            val res = if (w > 0 && h > 0) "$w × $h" else ""
+
+                            results.add(
+                                AlbumArtworkItem(
+                                    uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id),
+                                    name = baseName,
+                                    category = classifyArtworkName(baseName),
+                                    resolution = res,
+                                    sizeBytes = size
+                                )
+                            )
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        val sorted = results.sortedWith(
+            compareBy<AlbumArtworkItem> { it.category.ordinal }
+                .thenBy { it.name.lowercase() }
+        ).toMutableList()
+
+        val mainCoverUri = getAlbumArtUri(album.id)
+        if (sorted.none { it.category == ArtworkCategory.COVER }) {
+            sorted.add(
+                0,
+                AlbumArtworkItem(
+                    uri = mainCoverUri,
+                    name = album.title,
+                    category = ArtworkCategory.COVER
+                )
+            )
+        }
+
+        cachedAlbumArtworks[album.id] = sorted
+        return sorted
+    }
+
+    private fun classifyArtworkName(rawName: String): ArtworkCategory {
+        val n = rawName.trim().lowercase()
+        return when {
+            n in setOf("cover", "folder", "front", "album", "albumart", "thumb", "default") ||
+                    n.startsWith("cover") || n.startsWith("front") || n.startsWith("folder") || n.contains("albumart") -> ArtworkCategory.COVER
+            n.contains("disc") || n.contains("disk") || n.contains("vinyl") || n.contains("cd") ||
+                    n.contains("lp") || n.contains("plate") || n.contains("matrix") || n.contains("media") || n.contains("side") -> ArtworkCategory.DISC
+            n.contains("back") || n.contains("rear") || n.contains("tray") || n.contains("inlay") ||
+                    n.contains("inside") || n.contains("spine") || n.contains("obi") -> ArtworkCategory.BACK
+            n.contains("booklet") || n.contains("page") || n.contains("scan") || n.contains("insert") ||
+                    n.contains("leaflet") || n.contains("lyric") || n.contains("credits") || n.contains("liner") || n.contains("notes") -> ArtworkCategory.BOOKLET
+            n.contains("artist") || n.contains("band") || n.contains("photo") || n.contains("portrait") ||
+                    n.contains("group") || n.contains("member") -> ArtworkCategory.ARTIST
+            else -> ArtworkCategory.EXTRA
+        }
     }
 
     fun processAlbums(tracks: List<AudioTrack>): List<AlbumModel> {
@@ -466,7 +658,11 @@ object AudioRepository {
 
     fun forceScan(context: Context, onComplete: () -> Unit) {
         val pathsToScan = mutableListOf<String>()
-        val extensions = setOf("mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc", "ttml")
+        // Добавлены форматы изображений для сканирования артов
+        val extensions = setOf(
+            "mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc", "ttml",
+            "jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif"
+        )
 
         val folders = listOf(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
