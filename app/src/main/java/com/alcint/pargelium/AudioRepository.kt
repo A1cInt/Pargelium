@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.runtime.Immutable
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -19,8 +20,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.io.StringReader
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -31,6 +35,7 @@ enum class ArtworkCategory {
     COVER, DISC, BACK, BOOKLET, ARTIST, EXTRA
 }
 
+@Immutable
 data class AlbumArtworkItem(
     val uri: Uri,
     val name: String,
@@ -38,6 +43,17 @@ data class AlbumArtworkItem(
     val resolution: String = "",
     val sizeBytes: Long = 0L,
     val isRemoteFetched: Boolean = false
+)
+
+@Immutable
+data class DiscoveredM3uPlaylist(
+    val filePath: String,
+    val name: String,
+    val folderName: String,
+    val trackIds: List<Long>,
+    val isSingleAlbumDump: Boolean,
+    val dominantAlbumTitle: String? = null,
+    val coverAlbumId: Long = 0L
 )
 
 object AudioRepository {
@@ -76,9 +92,6 @@ object AudioRepository {
         return ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
     }
 
-    /**
-     * Сохраняет выбранную пользователем категорию (например, DISC или BOOKLET) для конкретного арта.
-     */
     fun setArtworkCategoryOverride(context: Context, albumId: Long, artworkUri: Uri, category: ArtworkCategory) {
         val prefs = context.applicationContext.getSharedPreferences(ARTWORK_PREFS, Context.MODE_PRIVATE)
         prefs.edit().putString("override_${albumId}_${artworkUri}", category.name).apply()
@@ -97,10 +110,6 @@ object AudioRepository {
         return runCatching { ArtworkCategory.valueOf(saved) }.getOrNull()
     }
 
-    /**
-     * Возвращает настоящий скан диска (ArtworkCategory.DISC) из галереи альбома, если он есть.
-     * Используется в режиме Винила в плеере и в шапке альбома!
-     */
     fun getPreferredDiscArtworkUri(context: Context, track: AudioTrack): Uri? {
         if (track.albumId <= 0L) return null
         cachedAlbumArtworks[track.albumId]?.let { cached ->
@@ -120,6 +129,283 @@ object AudioRepository {
         val firstTrack = album.tracks.firstOrNull() ?: return null
         val filePath = getAudioFilePath(context, firstTrack.uri) ?: return null
         return File(filePath).parentFile?.absolutePath
+    }
+
+    /**
+     * Парсит любой выбранный пользователем .m3u / .m3u8 файл через ContentResolver (SAF)
+     * и возвращает название плейлиста и найденные треки (либо все треки из той же папки, если пути относительные).
+     */
+    suspend fun parseM3uFromUri(
+        context: Context,
+        uri: Uri,
+        allTracks: List<AudioTrack>
+    ): Pair<String, List<Long>> = withContext(Dispatchers.IO) {
+        val lines = mutableListOf<String>()
+        var fileName = uri.lastPathSegment?.substringAfterLast("/")?.substringAfterLast(":") ?: "Imported M3U8"
+        if (fileName.contains(".")) {
+            fileName = fileName.substringBeforeLast(".")
+        }
+
+        try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
+                    reader.forEachLine { line -> lines.add(line) }
+                }
+            }
+        } catch (_: Exception) {}
+
+        val matchedIds = resolveM3uLinesToTrackIds(lines, parentFolder = null, allTracks = allTracks)
+        fileName.ifBlank { "M3U8 Playlist" } to matchedIds
+    }
+
+    /**
+     * Сканирует локальные папки музыки на наличие .m3u и .m3u8 файлов.
+     * Автоматически помечает `isSingleAlbumDump = true`, если .m3u8 просто дублирует один альбом из папки,
+     * чтобы пользователь мог скрыть сотни одноальбомных .m3u8 одним переключателем!
+     */
+    suspend fun scanDeviceM3uPlaylists(
+        context: Context,
+        allTracks: List<AudioTrack>,
+        includeSingleAlbumM3u: Boolean = false
+    ): List<DiscoveredM3uPlaylist> = withContext(Dispatchers.IO) {
+        if (allTracks.isEmpty()) return@withContext emptyList()
+
+        // Индексируем реальные пути аудиофайлов для мгновенного сопоставления O(1)
+        val pathToTrackId = HashMap<String, AudioTrack>(allTracks.size)
+        val fileNameToTrack = HashMap<String, MutableList<AudioTrack>>(allTracks.size)
+        val trackById = allTracks.associateBy { it.id }
+
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        }
+
+        try {
+            context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.DATA, MediaStore.Audio.Media.DISPLAY_NAME),
+                "${MediaStore.Audio.Media.IS_MUSIC} != 0",
+                null,
+                null
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val nameCol = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val track = trackById[id] ?: continue
+                    val path = if (dataCol != -1) cursor.getString(dataCol) else null
+                    val dispName = if (nameCol != -1) cursor.getString(nameCol) else null
+
+                    if (!path.isNullOrBlank()) {
+                        pathToTrackId[path.lowercase()] = track
+                        val fName = File(path).name.lowercase()
+                        fileNameToTrack.getOrPut(fName) { mutableListOf() }.add(track)
+                    } else if (!dispName.isNullOrBlank()) {
+                        fileNameToTrack.getOrPut(dispName.lowercase()) { mutableListOf() }.add(track)
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        val m3uFiles = mutableListOf<File>()
+        val seenM3uPaths = HashSet<String>()
+        val roots = listOf(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        )
+
+        roots.forEach { root ->
+            if (root != null && root.exists() && root.isDirectory) {
+                try {
+                    root.walkTopDown()
+                        .maxDepth(5)
+                        .onFail { _, _ -> }
+                        .forEach { file ->
+                            if (file.isFile && (file.extension.equals("m3u8", true) || file.extension.equals("m3u", true))) {
+                                if (seenM3uPaths.add(file.absolutePath)) {
+                                    m3uFiles.add(file)
+                                }
+                            }
+                        }
+                } catch (_: Exception) {}
+            }
+        }
+
+        val discovered = mutableListOf<DiscoveredM3uPlaylist>()
+
+        for (m3uFile in m3uFiles) {
+            val lines = try {
+                m3uFile.readLines(Charsets.UTF_8)
+            } catch (_: Exception) {
+                try { m3uFile.readLines(charset("windows-1251")) } catch (_: Exception) { emptyList() }
+            }
+            if (lines.isEmpty()) continue
+
+            val parentDir = m3uFile.parentFile
+            val matchedTracks = mutableListOf<AudioTrack>()
+
+            for (rawLine in lines) {
+                val trimmed = rawLine.trim()
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
+
+                val cleanLine = try {
+                    URLDecoder.decode(trimmed.replace('\\', '/'), "UTF-8")
+                } catch (_: Exception) {
+                    trimmed.replace('\\', '/')
+                }.removePrefix("file://")
+
+                // 1. Пробуем относительный путь от папки с .m3u8
+                val resolvedFile = if (cleanLine.startsWith("/")) {
+                    File(cleanLine)
+                } else if (parentDir != null) {
+                    File(parentDir, cleanLine)
+                } else null
+
+                val directMatch = resolvedFile?.canonicalPath?.lowercase()?.let { pathToTrackId[it] }
+                    ?: resolvedFile?.absolutePath?.lowercase()?.let { pathToTrackId[it] }
+
+                if (directMatch != null) {
+                    matchedTracks.add(directMatch)
+                    continue
+                }
+
+                // 2. Сопоставление по имени файла (приоритет файлам из той же папки)
+                val targetFileName = cleanLine.substringAfterLast('/').lowercase()
+                val candidates = fileNameToTrack[targetFileName]
+                if (!candidates.isNullOrEmpty()) {
+                    val sameFolderCandidate = if (parentDir != null) {
+                        val parentPrefix = parentDir.absolutePath.lowercase()
+                        candidates.firstOrNull { cand ->
+                            pathToTrackId.entries.any { (p, t) -> t.id == cand.id && p.startsWith(parentPrefix) }
+                        }
+                    } else null
+                    matchedTracks.add(sameFolderCandidate ?: candidates.first())
+                }
+            }
+
+            // Если в .m3u8 были битые пути, но в этой же папке лежат треки — предлагаем треки самой папки
+            if (matchedTracks.isEmpty() && parentDir != null) {
+                val parentPrefix = parentDir.absolutePath.lowercase() + "/"
+                val folderTracks = pathToTrackId.entries
+                    .filter { it.key.startsWith(parentPrefix) }
+                    .map { it.value }
+                    .sortedWith(compareBy<AudioTrack> { it.discNumber }.thenBy { it.trackNumber })
+                matchedTracks.addAll(folderTracks)
+            }
+
+            val distinctTracks = matchedTracks.distinctBy { it.id }
+            if (distinctTracks.isEmpty()) continue
+
+            val distinctAlbums = distinctTracks.map { it.albumId }.distinct()
+            val isSingleAlbum = distinctAlbums.size == 1 && distinctTracks.size >= 2
+
+            if (!includeSingleAlbumM3u && isSingleAlbum) {
+                continue
+            }
+
+            val playlistTitle = m3uFile.nameWithoutExtension
+                .replace(Regex("^\\d+\\s*[-_.]\\s*"), "")
+                .trim()
+                .ifEmpty { parentDir?.name ?: "M3U8 Playlist" }
+
+            val firstTrack = distinctTracks.first()
+            discovered.add(
+                DiscoveredM3uPlaylist(
+                    filePath = m3uFile.absolutePath,
+                    name = playlistTitle,
+                    folderName = parentDir?.name ?: "",
+                    trackIds = distinctTracks.map { it.id },
+                    isSingleAlbumDump = isSingleAlbum,
+                    dominantAlbumTitle = if (isSingleAlbum) firstTrack.album else null,
+                    coverAlbumId = firstTrack.albumId
+                )
+            )
+        }
+
+        discovered.sortedWith(
+            compareBy<DiscoveredM3uPlaylist> { it.isSingleAlbumDump }
+                .thenBy { it.name.lowercase() }
+        )
+    }
+
+    private fun resolveM3uLinesToTrackIds(
+        lines: List<String>,
+        parentFolder: File?,
+        allTracks: List<AudioTrack>
+    ): List<Long> {
+        if (allTracks.isEmpty()) return emptyList()
+
+        val matchedIds = mutableListOf<Long>()
+        var pendingExtInfTitle: String? = null
+
+        for (rawLine in lines) {
+            val trimmed = rawLine.trim()
+            if (trimmed.isEmpty()) continue
+
+            if (trimmed.startsWith("#EXTINF:", ignoreCase = true)) {
+                pendingExtInfTitle = trimmed.substringAfter(",", "").trim().takeIf { it.isNotEmpty() }
+                continue
+            }
+            if (trimmed.startsWith("#")) continue
+
+            val normalized = try {
+                URLDecoder.decode(trimmed.replace('\\', '/'), "UTF-8")
+            } catch (_: Exception) {
+                trimmed.replace('\\', '/')
+            }
+            val fileName = normalized.substringAfterLast('/').substringBeforeLast('.')
+
+            val foundTrack = allTracks.firstOrNull { t ->
+                t.title.equals(fileName, ignoreCase = true) ||
+                        fileName.contains(t.title, ignoreCase = true) ||
+                        (pendingExtInfTitle != null && pendingExtInfTitle!!.contains(t.title, ignoreCase = true))
+            }
+
+            if (foundTrack != null) {
+                matchedIds.add(foundTrack.id)
+            }
+            pendingExtInfTitle = null
+        }
+
+        return matchedIds.distinct()
+    }
+
+    /**
+     * Экспортирует плейлист в стандартный файл .m3u8 в папку Music/Playlists.
+     */
+    suspend fun exportPlaylistToM3u8(
+        context: Context,
+        playlistName: String,
+        tracks: List<AudioTrack>
+    ): File? = withContext(Dispatchers.IO) {
+        try {
+            val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+            val playlistsDir = File(musicDir, "Playlists")
+            if (!playlistsDir.exists()) playlistsDir.mkdirs()
+
+            val safeFileName = playlistName.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "Playlist" }
+            val outFile = File(playlistsDir, "$safeFileName.m3u8")
+
+            val sb = StringBuilder()
+            sb.appendLine("#EXTM3U")
+            sb.appendLine("#PLAYLIST:$playlistName")
+
+            for (track in tracks) {
+                val sec = (track.duration / 1000L).coerceAtLeast(0L)
+                sb.appendLine("#EXTINF:$sec,${track.artist} - ${track.title}")
+                val realPath = getAudioFilePath(context, track.uri) ?: track.uri.toString()
+                sb.appendLine(realPath)
+            }
+
+            outFile.writeText(sb.toString(), Charsets.UTF_8)
+            MediaScannerConnection.scanFile(context, arrayOf(outFile.absolutePath), null, null)
+            outFile
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun getAlbumArtworks(context: Context, album: AlbumModel, forceRefresh: Boolean = false): List<AlbumArtworkItem> {
@@ -172,7 +458,6 @@ object AudioRepository {
             )
         }
 
-        // 1. Сканируем локальную папку альбома и подпапки со сканами
         if (albumDir != null && albumDir.exists() && albumDir.isDirectory) {
             try {
                 albumDir.listFiles()?.forEach { child ->
@@ -187,7 +472,6 @@ object AudioRepository {
             } catch (_: Exception) {}
         }
 
-        // 2. Проверяем кэш скачанных сканов с Discogs / Cover Art Archive для этого альбома
         val remoteCacheDir = File(context.getDir("album_remote_artworks", Context.MODE_PRIVATE), "album_${album.id}")
         if (remoteCacheDir.exists() && remoteCacheDir.isDirectory) {
             remoteCacheDir.listFiles()?.forEach { remoteFile ->
@@ -195,7 +479,6 @@ object AudioRepository {
             }
         }
 
-        // 3. Сканируем MediaStore по BUCKET_ID
         if (firstTrack != null) {
             var bucketId: String? = null
             try {
@@ -297,10 +580,6 @@ object AudioRepository {
         return sorted
     }
 
-    /**
-     * Уникальная фича: Автоматически добывает сканы диска (Medium/Vinyl/CD), задника (Back),
-     * буклетов и доп. артов с Discogs и Cover Art Archive (MusicBrainz) и сохраняет их в галерею альбома!
-     */
     suspend fun fetchOnlineReleaseArtworks(context: Context, album: AlbumModel): List<AlbumArtworkItem> = withContext(Dispatchers.IO) {
         val remoteCacheDir = File(context.getDir("album_remote_artworks", Context.MODE_PRIVATE), "album_${album.id}")
         if (!remoteCacheDir.exists()) remoteCacheDir.mkdirs()
@@ -310,10 +589,8 @@ object AudioRepository {
 
         if (cleanAlbum.isEmpty()) return@withContext getAlbumArtworks(context, album, forceRefresh = true)
 
-        // Pair<ImageUrl, SuggestedFileName>
         val discoveredImages = mutableListOf<Pair<String, String>>()
 
-        // 1. Поиск в MusicBrainz + Cover Art Archive (отдает точные типы: Medium/Disc, Back, Booklet)
         try {
             val mbQuery = URLEncoder.encode("release:\"$cleanAlbum\" AND artist:\"$cleanArtist\"", "UTF-8")
             val mbUrl = "https://musicbrainz.org/ws/2/release/?query=$mbQuery&fmt=json&limit=4"
@@ -377,7 +654,6 @@ object AudioRepository {
             }
         } catch (_: Exception) {}
 
-        // 2. Поиск на Discogs (парсинг галереи релиза для получения фото винила/CD и буклетов)
         try {
             val discogsQuery = URLEncoder.encode("$cleanArtist $cleanAlbum", "UTF-8")
             val searchUrl = "https://www.discogs.com/search/?q=$discogsQuery&type=release"
@@ -418,7 +694,6 @@ object AudioRepository {
             }
         } catch (_: Exception) {}
 
-        // Скачиваем найденные файлы в папку кэша альбома (максимум 8 штук, чтобы не забивать память)
         val uniqueDownloads = discoveredImages.distinctBy { it.first }.take(8)
         for ((url, baseName) in uniqueDownloads) {
             val targetFile = File(remoteCacheDir, "$baseName.jpg")
@@ -892,7 +1167,7 @@ object AudioRepository {
         val pathsToScan = mutableListOf<String>()
         val extensions = setOf(
             "mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc", "ttml",
-            "jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif"
+            "jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif", "m3u", "m3u8"
         )
 
         val folders = listOf(

@@ -15,6 +15,9 @@ object PlaylistDatabase {
     @Volatile
     private var isInitialized = false
 
+    @Volatile
+    private var cachedPlaylists: List<PlaylistModel>? = null
+
     fun init(context: Context) {
         if (isInitialized) return
         synchronized(this) {
@@ -26,29 +29,35 @@ object PlaylistDatabase {
     }
 
     private fun migrateFromPrefsIfNeeded() {
-        val oldPlaylists = PrefsManager.getOldPlaylists()
-        if (oldPlaylists.isNotEmpty()) {
-            val db = dbHelper.writableDatabase
-            db.beginTransaction()
-            try {
-                oldPlaylists.forEach { savePlaylistInternal(db, it) }
-                db.setTransactionSuccessful()
-                PrefsManager.clearOldPlaylists()
-            } finally {
-                db.endTransaction()
+        try {
+            val oldPlaylists = PrefsManager.getOldPlaylists()
+            if (oldPlaylists.isNotEmpty()) {
+                val db = dbHelper.writableDatabase
+                db.beginTransaction()
+                try {
+                    oldPlaylists.forEach { savePlaylistInternal(db, it) }
+                    db.setTransactionSuccessful()
+                    PrefsManager.clearOldPlaylists()
+                } finally {
+                    db.endTransaction()
+                }
             }
-        }
+        } catch (_: Exception) {}
     }
 
-    fun getPlaylists(): List<PlaylistModel> {
+    @Synchronized
+    fun getPlaylists(forceRefresh: Boolean = false): List<PlaylistModel> {
         if (!isInitialized) return emptyList()
+        if (!forceRefresh && cachedPlaylists != null) {
+            return cachedPlaylists!!
+        }
 
         val list = mutableListOf<PlaylistModel>()
 
         dbHelper.readableDatabase.query(
             PlaylistDbHelper.TABLE_NAME,
             null, null, null, null, null,
-            "${PlaylistDbHelper.COL_CREATED_AT} ASC"
+            "${PlaylistDbHelper.COL_CREATED_AT} DESC"
         ).use { cursor ->
             val idIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_ID)
             val nameIdx = cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_NAME)
@@ -66,52 +75,33 @@ object PlaylistDatabase {
 
                 list.add(
                     PlaylistModel(
-                        cursor.getString(idIdx),
-                        cursor.getString(nameIdx),
-                        trackIds,
-                        cursor.getString(coverUriIdx),
-                        cursor.getString(bannerUriIdx),
-                        cursor.getLong(createdAtIdx)
+                        id = cursor.getString(idIdx),
+                        name = cursor.getString(nameIdx),
+                        trackIds = trackIds,
+                        coverUri = cursor.getString(coverUriIdx),
+                        bannerUri = cursor.getString(bannerUriIdx),
+                        createdAt = cursor.getLong(createdAtIdx)
                     )
                 )
             }
         }
+
+        cachedPlaylists = list
         return list
     }
 
+    @Synchronized
     fun getPlaylistById(playlistId: String): PlaylistModel? {
         if (!isInitialized) return null
-
-        dbHelper.readableDatabase.query(
-            PlaylistDbHelper.TABLE_NAME,
-            null,
-            "${PlaylistDbHelper.COL_ID} = ?",
-            arrayOf(playlistId),
-            null, null, null
-        ).use { cursor ->
-            if (cursor.moveToFirst()) {
-                val trackIds: List<Long> = try {
-                    gson.fromJson(cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_TRACK_IDS)), trackListType) ?: emptyList()
-                } catch (_: Exception) {
-                    emptyList()
-                }
-
-                return PlaylistModel(
-                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_ID)),
-                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_NAME)),
-                    trackIds,
-                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_COVER_URI)),
-                    cursor.getString(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_BANNER_URI)),
-                    cursor.getLong(cursor.getColumnIndexOrThrow(PlaylistDbHelper.COL_CREATED_AT))
-                )
-            }
-        }
-        return null
+        cachedPlaylists?.find { it.id == playlistId }?.let { return it }
+        return getPlaylists(forceRefresh = true).find { it.id == playlistId }
     }
 
+    @Synchronized
     fun savePlaylist(playlist: PlaylistModel) {
         if (!isInitialized) return
         savePlaylistInternal(dbHelper.writableDatabase, playlist)
+        cachedPlaylists = null
     }
 
     private fun savePlaylistInternal(db: SQLiteDatabase, playlist: PlaylistModel) {
@@ -126,11 +116,18 @@ object PlaylistDatabase {
         db.insertWithOnConflict(PlaylistDbHelper.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
+    @Synchronized
     fun deletePlaylist(playlistId: String) {
         if (!isInitialized) return
-        dbHelper.writableDatabase.delete(PlaylistDbHelper.TABLE_NAME, "${PlaylistDbHelper.COL_ID} = ?", arrayOf(playlistId))
+        dbHelper.writableDatabase.delete(
+            PlaylistDbHelper.TABLE_NAME,
+            "${PlaylistDbHelper.COL_ID} = ?",
+            arrayOf(playlistId)
+        )
+        cachedPlaylists = null
     }
 
+    @Synchronized
     fun addTrackToPlaylist(playlistId: String, trackId: Long) {
         val playlist = getPlaylistById(playlistId) ?: return
         if (!playlist.trackIds.contains(trackId)) {
@@ -142,10 +139,32 @@ object PlaylistDatabase {
         }
     }
 
+    @Synchronized
+    fun addTracksToPlaylist(playlistId: String, newIds: List<Long>) {
+        if (newIds.isEmpty()) return
+        val playlist = getPlaylistById(playlistId) ?: return
+        val merged = (playlist.trackIds + newIds).distinct()
+        if (merged.size != playlist.trackIds.size) {
+            savePlaylist(playlist.copy(trackIds = merged))
+        }
+    }
+
+    @Synchronized
     fun removeTrackFromPlaylist(playlistId: String, trackId: Long) {
         val playlist = getPlaylistById(playlistId) ?: return
         if (playlist.trackIds.contains(trackId)) {
             savePlaylist(playlist.copy(trackIds = playlist.trackIds.filterNot { it == trackId }))
+        }
+    }
+
+    @Synchronized
+    fun moveTrackInPlaylist(playlistId: String, fromIndex: Int, toIndex: Int) {
+        val playlist = getPlaylistById(playlistId) ?: return
+        val mutable = playlist.trackIds.toMutableList()
+        if (fromIndex in mutable.indices && toIndex in mutable.indices && fromIndex != toIndex) {
+            val item = mutable.removeAt(fromIndex)
+            mutable.add(toIndex, item)
+            savePlaylist(playlist.copy(trackIds = mutable))
         }
     }
 }
