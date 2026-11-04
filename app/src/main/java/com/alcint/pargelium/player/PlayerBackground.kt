@@ -30,13 +30,13 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 private val ALBUM_ART_BASE_URI: Uri = Uri.parse("content://media/external/audio/albumart")
 
 private val OVERLAY_GRADIENT_BRUSH = Brush.verticalGradient(
-    0.0f to Color.Black.copy(alpha = 0.4f),
-    0.15f to Color.Transparent,
-    0.6f to Color.Black.copy(alpha = 0.4f),
-    1.0f to Color.Black.copy(alpha = 0.8f)
+    0.0f to Color.Black.copy(alpha = 0.42f),
+    0.18f to Color.Transparent,
+    0.62f to Color.Black.copy(alpha = 0.42f),
+    1.0f to Color.Black.copy(alpha = 0.84f)
 )
 
-private val LYRICS_DIM_COLOR = Color.Black.copy(alpha = 0.6f)
+private val LYRICS_DIM_COLOR = Color.Black.copy(alpha = 0.62f)
 
 @Composable
 fun PlayerBackground(
@@ -68,7 +68,7 @@ fun PlayerBackground(
     ) {
         Crossfade(
             targetState = backgroundState,
-            animationSpec = tween(800),
+            animationSpec = tween(700),
             label = "bg_clear",
             modifier = Modifier.fillMaxSize()
         ) { state ->
@@ -77,7 +77,10 @@ fun PlayerBackground(
                     Box(modifier = Modifier.fillMaxSize()) {
                         if (isVideo && canvasUri != null) {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                VideoBackground(videoUri = canvasUri)
+                                VideoBackground(
+                                    videoUri = canvasUri,
+                                    isPlaying = isPlaying
+                                )
                                 if (showLyrics) {
                                     Box(
                                         modifier = Modifier

@@ -6,11 +6,14 @@ import android.net.Uri
 import android.view.TextureView
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -18,6 +21,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.database.StandaloneDatabaseProvider
@@ -36,13 +40,17 @@ private object VideoCacheHolder {
     @Volatile
     private var cache: SimpleCache? = null
 
-    fun get(context: Context): SimpleCache {
-        return cache ?: synchronized(this) {
-            cache ?: SimpleCache(
-                File(context.cacheDir, "canvas_video_cache"),
-                LeastRecentlyUsedCacheEvictor(120L * 1024L * 1024L),
-                StandaloneDatabaseProvider(context)
-            ).also { cache = it }
+    fun get(context: Context): SimpleCache? {
+        return try {
+            cache ?: synchronized(this) {
+                cache ?: SimpleCache(
+                    File(context.cacheDir, "canvas_video_cache"),
+                    LeastRecentlyUsedCacheEvictor(120L * 1024L * 1024L),
+                    StandaloneDatabaseProvider(context)
+                ).also { cache = it }
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 }
@@ -59,6 +67,13 @@ fun VideoBackground(
     var isLifecycleResumed by remember {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
+    var isFirstFrameRendered by remember(videoUri) { mutableStateOf(false) }
+
+    val videoAlpha by animateFloatAsState(
+        targetValue = if (isFirstFrameRendered) 1f else 0f,
+        animationSpec = tween(450),
+        label = "videoFadeIn"
+    )
 
     val exoPlayer = remember(appContext) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
@@ -67,17 +82,22 @@ fun VideoBackground(
             .setReadTimeoutMs(10000)
 
         val upstreamFactory = DefaultDataSource.Factory(appContext, httpDataSourceFactory)
-        val cacheDataSourceFactory = CacheDataSource.Factory()
-            .setCache(VideoCacheHolder.get(appContext))
-            .setUpstreamDataSourceFactory(upstreamFactory)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        val simpleCache = VideoCacheHolder.get(appContext)
+        val dataSourceFactory = if (simpleCache != null) {
+            CacheDataSource.Factory()
+                .setCache(simpleCache)
+                .setUpstreamDataSourceFactory(upstreamFactory)
+                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        } else {
+            upstreamFactory
+        }
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(1500, 5000, 500, 1000)
             .build()
 
         ExoPlayer.Builder(appContext)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .setLoadControl(loadControl)
             .build()
             .apply {
@@ -93,6 +113,7 @@ fun VideoBackground(
     }
 
     LaunchedEffect(videoUri) {
+        isFirstFrameRendered = false
         exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
         exoPlayer.prepare()
     }
@@ -147,6 +168,14 @@ fun VideoBackground(
                         aspectRatioFrame.setAspectRatio(ratio)
                     }
                 }
+
+                override fun onRenderedFirstFrame() {
+                    isFirstFrameRendered = true
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    isFirstFrameRendered = false
+                }
             }
             aspectRatioFrame.tag = listener
             exoPlayer.addListener(listener)
@@ -159,5 +188,6 @@ fun VideoBackground(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .graphicsLayer { alpha = videoAlpha }
     )
 }

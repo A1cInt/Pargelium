@@ -1,11 +1,15 @@
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.alcint.pargelium.player
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -13,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -24,6 +29,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -37,10 +45,14 @@ import androidx.compose.ui.unit.sp
 import com.alcint.pargelium.LyricLine
 import com.alcint.pargelium.R
 import com.alcint.pargelium.SyllableWord
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 @Composable
-fun InstrumentalCountdown(timeUntilMs: () -> Long) {
+fun InstrumentalCountdown(
+    timeUntilMs: () -> Long,
+    isPlaying: Boolean = true
+) {
     val secondsLeft by remember {
         derivedStateOf { (timeUntilMs() / 1000L).toInt().coerceAtLeast(0) }
     }
@@ -53,20 +65,24 @@ fun InstrumentalCountdown(timeUntilMs: () -> Long) {
     ) {
         AnimatedContent(
             targetState = if (secondsLeft > 3) 4 else secondsLeft,
-            transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+            transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(220)) },
             label = "countdown"
         ) { state ->
             if (state > 3) {
-                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                val alpha by infiniteTransition.animateFloat(
-                    initialValue = 0.25f,
-                    targetValue = 0.85f,
-                    animationSpec = infiniteRepeatable(
-                        tween(800, easing = FastOutSlowInEasing),
-                        RepeatMode.Reverse
-                    ),
-                    label = "alpha"
-                )
+                val alpha = if (isPlaying) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val a by infiniteTransition.animateFloat(
+                        initialValue = 0.25f,
+                        targetValue = 0.88f,
+                        animationSpec = infiniteRepeatable(
+                            tween(750, easing = FastOutSlowInEasing),
+                            RepeatMode.Reverse
+                        ),
+                        label = "alpha"
+                    )
+                    a
+                } else 0.45f
+
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     repeat(3) {
                         Box(
@@ -82,7 +98,7 @@ fun InstrumentalCountdown(timeUntilMs: () -> Long) {
                 Text(
                     text = state.toString(),
                     style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Black),
-                    color = Color.White.copy(alpha = 0.85f)
+                    color = Color.White.copy(alpha = 0.9f)
                 )
             }
         }
@@ -134,16 +150,19 @@ fun KaraokeLine(
     }
 
     val baseTextStyle = MaterialTheme.typography.headlineSmall.copy(
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.ExtraBold,
         lineHeight = 36.sp,
         textAlign = TextAlign.Center
     )
 
     val activeShadow = remember(activeColor) {
-        Shadow(
-            color = activeColor.copy(alpha = 0.25f),
-            blurRadius = 8f
-        )
+        Shadow(color = activeColor.copy(alpha = 0.3f), blurRadius = 10f)
+    }
+    val completedSpanStyle = remember(activeColor, activeShadow) {
+        SpanStyle(color = activeColor, shadow = activeShadow)
+    }
+    val upcomingSpanStyle = remember(inactiveColor) {
+        SpanStyle(color = inactiveColor)
     }
 
     if (isActive && wordsToRender.isNotEmpty()) {
@@ -151,67 +170,75 @@ fun KaraokeLine(
             wordsToRender.maxOfOrNull { it.endMs } ?: (line.timeMs + 4000L)
         }
 
-        var smoothPosition by remember(line.timeMs) { mutableLongStateOf(currentPositionProvider()) }
+        var quantizedPosition by remember(line.timeMs) { mutableLongStateOf(currentPositionProvider()) }
         val latestExternalPos by rememberUpdatedState(currentPositionProvider())
 
         LaunchedEffect(latestExternalPos) {
-            if (abs(smoothPosition - latestExternalPos) > 500L) {
-                smoothPosition = latestExternalPos
+            if (abs(quantizedPosition - latestExternalPos) > 450L) {
+                quantizedPosition = latestExternalPos
             }
         }
 
+        // Оптимизированный цикл: обновляет UI с шагом ~24 мс вместо 120 Гц, снижая нагрузку на GC в 3 раза
         LaunchedEffect(isActive, isPlaying, lastWordEndMs) {
             if (isActive && isPlaying) {
+                var internalPos = quantizedPosition
                 var lastFrameTime = withFrameNanos { it }
                 while (isActive && isPlaying) {
                     val frameTime = withFrameNanos { it }
                     val deltaMs = (frameTime - lastFrameTime) / 1_000_000L
                     lastFrameTime = frameTime
-                    if (smoothPosition <= lastWordEndMs + 200L) {
-                        smoothPosition += deltaMs
+                    if (internalPos <= lastWordEndMs + 200L) {
+                        internalPos += deltaMs
+                        if (abs(internalPos - quantizedPosition) >= 24L) {
+                            quantizedPosition = internalPos
+                        }
                     } else {
-                        kotlinx.coroutines.delay(100L)
+                        delay(120L)
                         lastFrameTime = withFrameNanos { it }
                     }
                 }
             }
         }
 
-        val annotatedText = buildAnnotatedString {
-            wordsToRender.forEachIndexed { index, word ->
-                val wordText = if (index < wordsToRender.lastIndex && !word.text.endsWith(" ")) {
-                    word.text + " "
-                } else {
-                    word.text
-                }
-
-                val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
-                val progress = when {
-                    smoothPosition >= word.endMs -> 1f
-                    smoothPosition <= word.startMs -> 0f
-                    else -> ((smoothPosition - word.startMs).toFloat() / duration).coerceIn(0f, 1f)
-                }
-
-                val spanStyle = when {
-                    progress >= 1f -> SpanStyle(color = activeColor, shadow = activeShadow)
-                    progress <= 0f -> SpanStyle(color = inactiveColor)
-                    else -> {
-                        val p1 = (progress - 0.08f).coerceIn(0f, 1f)
-                        val p2 = (progress + 0.08f).coerceIn(0f, 1f)
-                        SpanStyle(
-                            brush = Brush.horizontalGradient(
-                                0.0f to activeColor,
-                                p1 to activeColor,
-                                p2 to inactiveColor,
-                                1.0f to inactiveColor
-                            ),
-                            shadow = activeShadow
-                        )
+        val annotatedText = remember(quantizedPosition, wordsToRender, completedSpanStyle, upcomingSpanStyle) {
+            buildAnnotatedString {
+                for (index in wordsToRender.indices) {
+                    val word = wordsToRender[index]
+                    val wordText = if (index < wordsToRender.lastIndex && !word.text.endsWith(" ")) {
+                        word.text + " "
+                    } else {
+                        word.text
                     }
-                }
 
-                withStyle(spanStyle) {
-                    append(wordText)
+                    val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
+                    val progress = when {
+                        quantizedPosition >= word.endMs -> 1f
+                        quantizedPosition <= word.startMs -> 0f
+                        else -> ((quantizedPosition - word.startMs).toFloat() / duration).coerceIn(0f, 1f)
+                    }
+
+                    val spanStyle = when {
+                        progress >= 1f -> completedSpanStyle
+                        progress <= 0f -> upcomingSpanStyle
+                        else -> {
+                            val p1 = (progress - 0.08f).coerceIn(0f, 1f)
+                            val p2 = (progress + 0.08f).coerceIn(0f, 1f)
+                            SpanStyle(
+                                brush = Brush.horizontalGradient(
+                                    0.0f to activeColor,
+                                    p1 to activeColor,
+                                    p2 to inactiveColor,
+                                    1.0f to inactiveColor
+                                ),
+                                shadow = activeShadow
+                            )
+                        }
+                    }
+
+                    withStyle(spanStyle) {
+                        append(wordText)
+                    }
                 }
             }
         }
@@ -244,8 +271,8 @@ private fun TranslationLine(
     isPast: Boolean,
     currentPositionProvider: () -> Long
 ) {
-    val activeColor = remember { Color.White.copy(alpha = 0.8f) }
-    val inactiveColor = remember { Color.White.copy(alpha = 0.3f) }
+    val activeColor = remember { Color.White.copy(alpha = 0.85f) }
+    val inactiveColor = remember { Color.White.copy(alpha = 0.32f) }
     val baseStyle = MaterialTheme.typography.titleMedium.copy(
         fontStyle = FontStyle.Italic,
         textAlign = TextAlign.Center
@@ -294,6 +321,8 @@ fun LyricsView(
     isSearching: Boolean,
     contentPadding: PaddingValues
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val listState = rememberLazyListState()
     val currentPositionState = rememberUpdatedState(currentPosition)
 
@@ -338,9 +367,9 @@ fun LyricsView(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                stringResource(R.string.lyrics_not_found),
+                text = stringResource(R.string.lyrics_not_found),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.5f)
+                color = Color.White.copy(alpha = 0.55f)
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -349,6 +378,7 @@ fun LyricsView(
             } else {
                 OutlinedButton(
                     onClick = onSearchOnline,
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
                 ) {
@@ -374,12 +404,12 @@ fun LyricsView(
 
                 val scale by animateFloatAsState(
                     targetValue = if (isActive) 1.05f else 0.94f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
                     label = "scale"
                 )
                 val alpha by animateFloatAsState(
-                    targetValue = if (isActive) 1f else if (isPast) 0.32f else 0.52f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+                    targetValue = if (isActive) 1f else if (isPast) 0.30f else 0.52f,
+                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
                     label = "alpha"
                 )
 
@@ -388,9 +418,7 @@ fun LyricsView(
                     if (index > 0) {
                         val pLine = lyrics[index - 1]
                         pLine.words.lastOrNull()?.endMs ?: (pLine.timeMs + 3000L)
-                    } else {
-                        0L
-                    }
+                    } else 0L
                 }
 
                 val isBigGap = remember(line.timeMs, prevLineEnd, index) {
@@ -410,21 +438,35 @@ fun LyricsView(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
+                        .combinedClickable(
                             interactionSource = interactionSource,
-                            indication = null
-                        ) { onLineClick(line.timeMs) }
+                            indication = null,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onLineClick(line.timeMs)
+                            },
+                            onLongClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                val textToCopy = if (!line.translation.isNullOrBlank()) {
+                                    "${line.text}\n${line.translation}"
+                                } else line.text
+                                clipboard?.setPrimaryClip(ClipData.newPlainText("Lyrics", textToCopy))
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                Toast.makeText(context, line.text, Toast.LENGTH_SHORT).show()
+                            }
+                        )
                         .padding(vertical = 14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (line.text.isNotBlank()) {
                         AnimatedVisibility(
                             visible = showCountdown,
-                            enter = expandVertically(tween(300)) + fadeIn(tween(300)),
-                            exit = fadeOut(tween(250)) + shrinkVertically(tween(300))
+                            enter = expandVertically(tween(280)) + fadeIn(tween(280)),
+                            exit = fadeOut(tween(220)) + shrinkVertically(tween(280))
                         ) {
                             InstrumentalCountdown(
-                                timeUntilMs = { line.timeMs - currentPositionState.value }
+                                timeUntilMs = { line.timeMs - currentPositionState.value },
+                                isPlaying = isPlaying
                             )
                         }
 

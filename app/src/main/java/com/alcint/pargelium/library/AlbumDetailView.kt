@@ -41,7 +41,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -201,6 +200,7 @@ fun SharedTransitionScope.AlbumDetailView(
     onArtistClick: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
     val listState = rememberLazyListState()
@@ -218,6 +218,7 @@ fun SharedTransitionScope.AlbumDetailView(
 
     var artworksList by remember(album.id) { mutableStateOf<List<AlbumArtworkItem>>(emptyList()) }
     var isScanningArtworks by remember(album.id) { mutableStateOf(true) }
+    var isFetchingOnlineArt by remember(album.id) { mutableStateOf(false) }
     var albumTechMetadata by remember(album.id) { mutableStateOf("") }
     var albumFolderPath by remember(album.id) { mutableStateOf<String?>(null) }
     var lightboxInitialIndex by remember { mutableStateOf<Int?>(null) }
@@ -231,15 +232,24 @@ fun SharedTransitionScope.AlbumDetailView(
 
     LaunchedEffect(album.id) {
         isScanningArtworks = true
-        withContext(Dispatchers.IO) {
-            val loadedArt = AudioRepository.getAlbumArtworks(context, album)
+        val (loadedArt, techMeta, folder) = withContext(Dispatchers.IO) {
+            val art = AudioRepository.getAlbumArtworks(context, album)
             val firstUri = album.tracks.firstOrNull()?.uri
-            val techMeta = if (firstUri != null) AudioRepository.getTrackMetadata(context, firstUri) else ""
-            val folder = AudioRepository.getAlbumFolderPath(context, album)
-            artworksList = loadedArt
-            albumTechMetadata = techMeta
-            albumFolderPath = folder
-            isScanningArtworks = false
+            val meta = if (firstUri != null) AudioRepository.getTrackMetadata(context, firstUri) else ""
+            val path = AudioRepository.getAlbumFolderPath(context, album)
+            Triple(art, meta, path)
+        }
+        artworksList = loadedArt
+        albumTechMetadata = techMeta
+        albumFolderPath = folder
+        isScanningArtworks = false
+
+        // Автоматическая докачка сканов с Discogs / Cover Art Archive, если в папке только 1 обложка
+        if (loadedArt.size <= 1) {
+            isFetchingOnlineArt = true
+            val enrichedArt = AudioRepository.fetchOnlineReleaseArtworks(context, album)
+            artworksList = enrichedArt
+            isFetchingOnlineArt = false
         }
     }
 
@@ -271,9 +281,10 @@ fun SharedTransitionScope.AlbumDetailView(
         filteredArtworks.chunked(2)
     }
 
-    val discArtworkUri = remember(artworksList, mainCoverUri) {
-        artworksList.firstOrNull { it.category == ArtworkCategory.DISC }?.uri ?: mainCoverUri
+    val authenticDiscUri = remember(artworksList) {
+        artworksList.firstOrNull { it.category == ArtworkCategory.DISC }?.uri
     }
+    val discArtworkUri = authenticDiscUri ?: mainCoverUri
 
     val totalDurationMs = remember(album.tracks) {
         album.tracks.sumOf { it.duration }
@@ -303,7 +314,6 @@ fun SharedTransitionScope.AlbumDetailView(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Легкий статический градиент фона без перерисовки при скролле
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -331,6 +341,7 @@ fun SharedTransitionScope.AlbumDetailView(
                     album = album,
                     mainCoverUri = mainCoverUri,
                     discArtworkUri = discArtworkUri,
+                    hasAuthenticDiscArt = authenticDiscUri != null,
                     animatedVisibilityScope = animatedVisibilityScope,
                     isAlbumPlaying = isAlbumCurrentlyPlaying,
                     accentColor = accentColor,
@@ -465,8 +476,20 @@ fun SharedTransitionScope.AlbumDetailView(
                 item(key = "gallery_header", contentType = "gallery_header") {
                     AlbumGalleryHeader(
                         allArtworks = artworksList,
+                        isFetchingOnline = isFetchingOnlineArt,
                         selectedCategory = selectedCategory,
-                        onSelectCategory = { selectedCategory = it }
+                        accentColor = accentColor,
+                        onSelectCategory = { selectedCategory = it },
+                        onFetchOnlineClick = {
+                            if (!isFetchingOnlineArt) {
+                                scope.launch {
+                                    isFetchingOnlineArt = true
+                                    val fetched = AudioRepository.fetchOnlineReleaseArtworks(context, album)
+                                    artworksList = fetched
+                                    isFetchingOnlineArt = false
+                                }
+                            }
+                        }
                     )
                 }
 
@@ -503,7 +526,13 @@ fun SharedTransitionScope.AlbumDetailView(
                                 rowItems.forEach { item ->
                                     AlbumGalleryCard(
                                         item = item,
+                                        accentColor = accentColor,
                                         modifier = Modifier.weight(1f),
+                                        onCategoryChange = { newCat ->
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            AudioRepository.setArtworkCategoryOverride(context, album.id, item.uri, newCat)
+                                            artworksList = AudioRepository.getAlbumArtworks(context, album, forceRefresh = true)
+                                        },
                                         onClick = {
                                             val idx = artworksList
                                                 .indexOfFirst { it.uri == item.uri }
@@ -553,6 +582,12 @@ fun SharedTransitionScope.AlbumDetailView(
                 AlbumArtworkLightbox(
                     artworks = artworksList,
                     initialIndex = startIndex.coerceIn(0, (artworksList.size - 1).coerceAtLeast(0)),
+                    accentColor = accentColor,
+                    onCategoryChange = { item, newCat ->
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        AudioRepository.setArtworkCategoryOverride(context, album.id, item.uri, newCat)
+                        artworksList = AudioRepository.getAlbumArtworks(context, album, forceRefresh = true)
+                    },
                     onDismiss = { lightboxInitialIndex = null }
                 )
             }
@@ -727,6 +762,7 @@ private fun SharedTransitionScope.AlbumHeroSection(
     album: AlbumModel,
     mainCoverUri: Uri,
     discArtworkUri: Uri,
+    hasAuthenticDiscArt: Boolean,
     animatedVisibilityScope: AnimatedVisibilityScope,
     isAlbumPlaying: Boolean,
     accentColor: Color,
@@ -750,7 +786,6 @@ private fun SharedTransitionScope.AlbumHeroSection(
         label = "discPeek"
     )
 
-    // Энергоэффективное вращение: работает ТОЛЬКО когда играет альбом, и сохраняет угол на паузе
     val rotationAnim = remember { Animatable(18f) }
     var isUserScratching by remember { mutableStateOf(false) }
 
@@ -781,7 +816,6 @@ private fun SharedTransitionScope.AlbumHeroSection(
                 .height(240.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Замена дорогого .blur(40.dp) на радиальный градиент без нагрузки на GPU
             Canvas(
                 modifier = Modifier
                     .size(270.dp)
@@ -799,7 +833,6 @@ private fun SharedTransitionScope.AlbumHeroSection(
                 )
             }
 
-            // Интерактивная виниловая пластинка с возможностью ручного скретча
             Box(
                 modifier = Modifier
                     .offset(x = discPeekOffset)
@@ -844,17 +877,16 @@ private fun SharedTransitionScope.AlbumHeroSection(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(0.84f)
+                        .alpha(if (hasAuthenticDiscArt) 0.96f else 0.84f)
                 )
 
-                // Анизотропные блики и дорожки винила
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val shineBrush = Brush.sweepGradient(
                         colors = listOf(
                             Color.Transparent,
                             Color.White.copy(alpha = 0.16f),
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.25f),
+                            Color.Black.copy(alpha = 0.22f),
                             Color.Transparent,
                             Color.White.copy(alpha = 0.16f),
                             Color.Transparent
@@ -862,19 +894,19 @@ private fun SharedTransitionScope.AlbumHeroSection(
                     )
                     drawCircle(brush = shineBrush)
 
-                    val grooveColor = Color.White.copy(alpha = 0.12f)
-                    drawCircle(color = grooveColor, radius = size.minDimension * 0.46f, style = Stroke(width = 1.2f))
-                    drawCircle(color = grooveColor, radius = size.minDimension * 0.39f, style = Stroke(width = 1f))
-                    drawCircle(color = grooveColor, radius = size.minDimension * 0.31f, style = Stroke(width = 1f))
+                    if (!hasAuthenticDiscArt) {
+                        val grooveColor = Color.White.copy(alpha = 0.12f)
+                        drawCircle(color = grooveColor, radius = size.minDimension * 0.46f, style = Stroke(width = 1.2f))
+                        drawCircle(color = grooveColor, radius = size.minDimension * 0.39f, style = Stroke(width = 1f))
+                        drawCircle(color = grooveColor, radius = size.minDimension * 0.31f, style = Stroke(width = 1f))
+                        drawCircle(color = accentColor.copy(alpha = 0.85f), radius = size.minDimension * 0.16f)
+                    }
 
-                    // Яблоко винила и центральное отверстие
-                    drawCircle(color = accentColor.copy(alpha = 0.85f), radius = size.minDimension * 0.16f)
-                    drawCircle(color = Color(0xFF101012), radius = size.minDimension * 0.13f)
-                    drawCircle(color = Color.White.copy(alpha = 0.75f), radius = size.minDimension * 0.038f)
+                    drawCircle(color = Color(0xFF101012), radius = size.minDimension * 0.10f)
+                    drawCircle(color = Color.White.copy(alpha = 0.75f), radius = size.minDimension * 0.034f)
                 }
             }
 
-            // Главная обложка альбома
             Box(
                 modifier = Modifier
                     .offset(x = (-14).dp)
@@ -1080,10 +1112,6 @@ private fun SharedTransitionScope.AlbumHeroSection(
     }
 }
 
-/**
- * Уникальная фича: Интерактивный спектр структуры альбома (Album Flow Bar).
- * Показывает пропорции длительности треков в альбоме и позволяет тапом переключиться на любой сегмент.
- */
 @Composable
 private fun AlbumDurationSpectrumBar(
     tracks: List<AudioTrack>,
@@ -1402,11 +1430,6 @@ private fun DiscDividerHeader(
     }
 }
 
-/**
- * Карточка трека с поддержкой быстрых свайп-жестов:
- * - Свайп вправо -> Играть следующим
- * - Свайп влево -> В очередь
- */
 @Composable
 private fun AlbumTrackItem(
     track: AudioTrack,
@@ -1443,7 +1466,6 @@ private fun AlbumTrackItem(
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 2.dp)
     ) {
-        // Фоновый слой индикации при свайпе
         if (abs(animatedOffset) > 4f) {
             val isPlayNextSwipe = animatedOffset > 0f
             val progress = (abs(animatedOffset) / triggerThresholdPx).coerceIn(0f, 1f)
@@ -1621,10 +1643,6 @@ private fun AlbumTrackItem(
     }
 }
 
-/**
- * Энергоэффективный индикатор эквалайзера:
- * InfiniteTransition запускается ТОЛЬКО когда `isPlaying == true`. На паузе — 0% нагрузки на CPU/GPU.
- */
 @Composable
 private fun AnimatedPlayingBars(isPlaying: Boolean, color: Color) {
     val bar1: Float
@@ -1682,8 +1700,11 @@ private fun AnimatedPlayingBars(isPlaying: Boolean, color: Color) {
 @Composable
 private fun AlbumGalleryHeader(
     allArtworks: List<AlbumArtworkItem>,
+    isFetchingOnline: Boolean,
     selectedCategory: ArtworkCategory?,
-    onSelectCategory: (ArtworkCategory?) -> Unit
+    accentColor: Color,
+    onSelectCategory: (ArtworkCategory?) -> Unit,
+    onFetchOnlineClick: () -> Unit
 ) {
     val availableCategories = remember(allArtworks) {
         allArtworks.map { it.category }.distinct().sortedBy { it.ordinal }
@@ -1694,17 +1715,52 @@ private fun AlbumGalleryHeader(
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = stringResource(id = AppR.string.album_gallery_title),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = stringResource(id = AppR.string.album_gallery_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(id = AppR.string.album_gallery_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Нажми на бейдж на карточке, чтобы назначить арт Диском или Буклетом",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            FilledTonalButton(
+                onClick = onFetchOnlineClick,
+                enabled = !isFetchingOnline,
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                if (isFetchingOnline) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = accentColor
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Поиск...", style = MaterialTheme.typography.labelMedium)
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Collections,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Discogs", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
 
         if (availableCategories.size > 1) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -1774,10 +1830,13 @@ private fun AlbumGalleryEmptyState() {
 @Composable
 private fun AlbumGalleryCard(
     item: AlbumArtworkItem,
+    accentColor: Color,
     modifier: Modifier = Modifier,
+    onCategoryChange: (ArtworkCategory) -> Unit,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    var showCategoryMenu by remember { mutableStateOf(false) }
 
     Card(
         onClick = onClick,
@@ -1807,20 +1866,69 @@ private fun AlbumGalleryCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color.Black.copy(alpha = 0.65f),
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
                 ) {
-                    Text(
-                        text = artworkCategoryLabel(item.category),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    Surface(
+                        onClick = { showCategoryMenu = true },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (item.category == ArtworkCategory.DISC) {
+                            accentColor.copy(alpha = 0.92f)
+                        } else {
+                            Color.Black.copy(alpha = 0.72f)
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (item.category == ArtworkCategory.DISC) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Album,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            Text(
+                                text = artworkCategoryLabel(item.category),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (item.category == ArtworkCategory.DISC) Color.Black else Color.White
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showCategoryMenu,
+                        onDismissRequest = { showCategoryMenu = false },
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        ArtworkCategory.entries.forEach { category ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = artworkCategoryLabel(category),
+                                        fontWeight = if (item.category == category) FontWeight.ExtraBold else FontWeight.Normal
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (category == ArtworkCategory.DISC) Icons.Rounded.Album else Icons.Rounded.Collections,
+                                        contentDescription = null,
+                                        tint = if (item.category == category) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                onClick = {
+                                    showCategoryMenu = false
+                                    onCategoryChange(category)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1832,11 +1940,12 @@ private fun AlbumGalleryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val subInfo = remember(item.resolution, item.sizeBytes) {
+                val subInfo = remember(item.resolution, item.sizeBytes, item.isRemoteFetched) {
                     buildString {
+                        if (item.isRemoteFetched) append("Discogs/CAA • ")
                         if (item.resolution.isNotEmpty()) append(item.resolution)
                         if (item.sizeBytes > 0L) {
-                            if (isNotEmpty()) append(" • ")
+                            if (isNotEmpty() && !endsWith("• ")) append(" • ")
                             append(Formatter.formatShortFileSize(context, item.sizeBytes))
                         }
                     }
@@ -2007,19 +2116,18 @@ private fun SpecRowItem(label: String, value: String) {
     }
 }
 
-/**
- * Исправленный лайтбокс:
- * Не блокирует свайпы `HorizontalPager` при `scale == 1f` и удерживает картинку в границах экрана при зуме.
- */
 @Composable
 private fun AlbumArtworkLightbox(
     artworks: List<AlbumArtworkItem>,
     initialIndex: Int,
+    accentColor: Color,
+    onCategoryChange: (AlbumArtworkItem, ArtworkCategory) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val pagerState = rememberPagerState(initialPage = initialIndex) { artworks.size }
     val currentItem = artworks.getOrNull(pagerState.currentPage)
+    var showLightboxCatMenu by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -2192,6 +2300,7 @@ private fun AlbumArtworkLightbox(
                             overflow = TextOverflow.Ellipsis
                         )
                         val details = buildString {
+                            if (item.isRemoteFetched) append("Discogs/CAA • ")
                             append(artworkCategoryLabel(item.category))
                             if (item.resolution.isNotEmpty()) append(" • ${item.resolution}")
                             if (item.sizeBytes > 0L) append(" • ${Formatter.formatShortFileSize(context, item.sizeBytes)}")
@@ -2201,6 +2310,48 @@ private fun AlbumArtworkLightbox(
                             color = Color.White.copy(alpha = 0.75f),
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Box {
+                        FilledTonalButton(
+                            onClick = { showLightboxCatMenu = true },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = accentColor,
+                                contentColor = Color.Black
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Album, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = artworkCategoryLabel(item.category),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showLightboxCatMenu,
+                            onDismissRequest = { showLightboxCatMenu = false },
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            ArtworkCategory.entries.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = artworkCategoryLabel(cat),
+                                            fontWeight = if (item.category == cat) FontWeight.ExtraBold else FontWeight.Normal
+                                        )
+                                    },
+                                    onClick = {
+                                        showLightboxCatMenu = false
+                                        onCategoryChange(item, cat)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

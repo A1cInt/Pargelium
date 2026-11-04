@@ -11,11 +11,19 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.io.StringReader
+import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
@@ -28,14 +36,31 @@ data class AlbumArtworkItem(
     val name: String,
     val category: ArtworkCategory,
     val resolution: String = "",
-    val sizeBytes: Long = 0L
+    val sizeBytes: Long = 0L,
+    val isRemoteFetched: Boolean = false
 )
 
 object AudioRepository {
 
+    private const val ARTWORK_PREFS = "pargelium_artwork_overrides"
+
     private var cachedTracks: List<AudioTrack>? = null
     private var cachedAlbums: List<AlbumModel>? = null
     private val cachedAlbumArtworks = ConcurrentHashMap<Long, List<AlbumArtworkItem>>()
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val req = chain.request().newBuilder()
+                .header("User-Agent", "PargeliumMusicPlayer/2.5 (https://github.com/AlcInt)")
+                .header("Accept", "application/json, text/html, */*")
+                .build()
+            chain.proceed(req)
+        }
+        .build()
+
+    private val gson = Gson()
 
     fun clearCache() {
         cachedTracks = null
@@ -43,8 +68,52 @@ object AudioRepository {
         cachedAlbumArtworks.clear()
     }
 
+    fun invalidateAlbumArtworkCache(albumId: Long) {
+        cachedAlbumArtworks.remove(albumId)
+    }
+
     fun getAlbumArtUri(albumId: Long): Uri {
         return ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
+    }
+
+    /**
+     * Сохраняет выбранную пользователем категорию (например, DISC или BOOKLET) для конкретного арта.
+     */
+    fun setArtworkCategoryOverride(context: Context, albumId: Long, artworkUri: Uri, category: ArtworkCategory) {
+        val prefs = context.applicationContext.getSharedPreferences(ARTWORK_PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putString("override_${albumId}_${artworkUri}", category.name).apply()
+
+        cachedAlbumArtworks[albumId]?.let { currentList ->
+            val updated = currentList.map { item ->
+                if (item.uri == artworkUri) item.copy(category = category) else item
+            }.sortedWith(compareBy<AlbumArtworkItem> { it.category.ordinal }.thenBy { it.name.lowercase() })
+            cachedAlbumArtworks[albumId] = updated
+        }
+    }
+
+    private fun getArtworkCategoryOverride(context: Context, albumId: Long, artworkUri: Uri): ArtworkCategory? {
+        val prefs = context.applicationContext.getSharedPreferences(ARTWORK_PREFS, Context.MODE_PRIVATE)
+        val saved = prefs.getString("override_${albumId}_${artworkUri}", null) ?: return null
+        return runCatching { ArtworkCategory.valueOf(saved) }.getOrNull()
+    }
+
+    /**
+     * Возвращает настоящий скан диска (ArtworkCategory.DISC) из галереи альбома, если он есть.
+     * Используется в режиме Винила в плеере и в шапке альбома!
+     */
+    fun getPreferredDiscArtworkUri(context: Context, track: AudioTrack): Uri? {
+        if (track.albumId <= 0L) return null
+        cachedAlbumArtworks[track.albumId]?.let { cached ->
+            cached.firstOrNull { it.category == ArtworkCategory.DISC }?.uri?.let { return it }
+        }
+        val dummyAlbum = AlbumModel(
+            id = track.albumId,
+            title = track.album,
+            artist = track.artist,
+            tracks = listOf(track)
+        )
+        val artworks = getAlbumArtworks(context, dummyAlbum)
+        return artworks.firstOrNull { it.category == ArtworkCategory.DISC }?.uri
     }
 
     fun getAlbumFolderPath(context: Context, album: AlbumModel): String? {
@@ -53,21 +122,23 @@ object AudioRepository {
         return File(filePath).parentFile?.absolutePath
     }
 
-    fun getAlbumArtworks(context: Context, album: AlbumModel): List<AlbumArtworkItem> {
-        cachedAlbumArtworks[album.id]?.let { return it }
+    fun getAlbumArtworks(context: Context, album: AlbumModel, forceRefresh: Boolean = false): List<AlbumArtworkItem> {
+        if (!forceRefresh) {
+            cachedAlbumArtworks[album.id]?.let { return it }
+        }
 
         val results = mutableListOf<AlbumArtworkItem>()
         val seenNames = HashSet<String>()
         val seenPaths = HashSet<String>()
 
         val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif")
-        val subFolderKeywords = setOf("scans", "scan", "artwork", "artworks", "booklet", "covers", "cover", "images", "art", "extra")
+        val subFolderKeywords = setOf("scans", "scan", "artwork", "artworks", "booklet", "covers", "cover", "images", "art", "extra", "discogs")
 
         val firstTrack = album.tracks.firstOrNull()
         val trackPath = if (firstTrack != null) getAudioFilePath(context, firstTrack.uri) else null
         val albumDir = trackPath?.let { File(it).parentFile }
 
-        fun inspectAndAddFile(file: File) {
+        fun inspectAndAddFile(file: File, isRemote: Boolean = false) {
             if (!file.exists() || !file.isFile || !file.canRead()) return
             val ext = file.extension.lowercase()
             if (!imageExtensions.contains(ext)) return
@@ -85,17 +156,23 @@ object AudioRepository {
                 "${options.outWidth} × ${options.outHeight}"
             } else ""
 
+            val fileUri = Uri.fromFile(file)
+            val effectiveCategory = getArtworkCategoryOverride(context, album.id, fileUri)
+                ?: classifyArtworkName(baseName)
+
             results.add(
                 AlbumArtworkItem(
-                    uri = Uri.fromFile(file),
+                    uri = fileUri,
                     name = baseName,
-                    category = classifyArtworkName(baseName),
+                    category = effectiveCategory,
                     resolution = res,
-                    sizeBytes = file.length()
+                    sizeBytes = file.length(),
+                    isRemoteFetched = isRemote
                 )
             )
         }
 
+        // 1. Сканируем локальную папку альбома и подпапки со сканами
         if (albumDir != null && albumDir.exists() && albumDir.isDirectory) {
             try {
                 albumDir.listFiles()?.forEach { child ->
@@ -110,6 +187,15 @@ object AudioRepository {
             } catch (_: Exception) {}
         }
 
+        // 2. Проверяем кэш скачанных сканов с Discogs / Cover Art Archive для этого альбома
+        val remoteCacheDir = File(context.getDir("album_remote_artworks", Context.MODE_PRIVATE), "album_${album.id}")
+        if (remoteCacheDir.exists() && remoteCacheDir.isDirectory) {
+            remoteCacheDir.listFiles()?.forEach { remoteFile ->
+                if (remoteFile.isFile) inspectAndAddFile(remoteFile, isRemote = true)
+            }
+        }
+
+        // 3. Сканируем MediaStore по BUCKET_ID
         if (firstTrack != null) {
             var bucketId: String? = null
             try {
@@ -170,11 +256,15 @@ object AudioRepository {
                             val size = if (sizeCol != -1) cursor.getLong(sizeCol) else 0L
                             val res = if (w > 0 && h > 0) "$w × $h" else ""
 
+                            val contentUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                            val effectiveCategory = getArtworkCategoryOverride(context, album.id, contentUri)
+                                ?: classifyArtworkName(baseName)
+
                             results.add(
                                 AlbumArtworkItem(
-                                    uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id),
+                                    uri = contentUri,
                                     name = baseName,
-                                    category = classifyArtworkName(baseName),
+                                    category = effectiveCategory,
                                     resolution = res,
                                     sizeBytes = size
                                 )
@@ -191,19 +281,161 @@ object AudioRepository {
         ).toMutableList()
 
         val mainCoverUri = getAlbumArtUri(album.id)
-        if (sorted.none { it.category == ArtworkCategory.COVER }) {
+        val mainCoverOverride = getArtworkCategoryOverride(context, album.id, mainCoverUri) ?: ArtworkCategory.COVER
+        if (sorted.none { it.uri == mainCoverUri } && sorted.none { it.category == ArtworkCategory.COVER }) {
             sorted.add(
                 0,
                 AlbumArtworkItem(
                     uri = mainCoverUri,
                     name = album.title,
-                    category = ArtworkCategory.COVER
+                    category = mainCoverOverride
                 )
             )
         }
 
         cachedAlbumArtworks[album.id] = sorted
         return sorted
+    }
+
+    /**
+     * Уникальная фича: Автоматически добывает сканы диска (Medium/Vinyl/CD), задника (Back),
+     * буклетов и доп. артов с Discogs и Cover Art Archive (MusicBrainz) и сохраняет их в галерею альбома!
+     */
+    suspend fun fetchOnlineReleaseArtworks(context: Context, album: AlbumModel): List<AlbumArtworkItem> = withContext(Dispatchers.IO) {
+        val remoteCacheDir = File(context.getDir("album_remote_artworks", Context.MODE_PRIVATE), "album_${album.id}")
+        if (!remoteCacheDir.exists()) remoteCacheDir.mkdirs()
+
+        val cleanArtist = album.artist.replace(Regex("(?i)<unknown>"), "").trim()
+        val cleanAlbum = album.title.replace(Regex("(?i)\\(.*?edition.*?\\)|\\[.*?]"), "").trim()
+
+        if (cleanAlbum.isEmpty()) return@withContext getAlbumArtworks(context, album, forceRefresh = true)
+
+        // Pair<ImageUrl, SuggestedFileName>
+        val discoveredImages = mutableListOf<Pair<String, String>>()
+
+        // 1. Поиск в MusicBrainz + Cover Art Archive (отдает точные типы: Medium/Disc, Back, Booklet)
+        try {
+            val mbQuery = URLEncoder.encode("release:\"$cleanAlbum\" AND artist:\"$cleanArtist\"", "UTF-8")
+            val mbUrl = "https://musicbrainz.org/ws/2/release/?query=$mbQuery&fmt=json&limit=4"
+
+            val mbIds = mutableListOf<String>()
+            httpClient.newCall(Request.Builder().url(mbUrl).build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val json = gson.fromJson(body, JsonObject::class.java)
+                        val releases = json.getAsJsonArray("releases")
+                        if (releases != null) {
+                            for (i in 0 until releases.size()) {
+                                val r = releases.get(i).asJsonObject
+                                r.get("id")?.asString?.let { mbIds.add(it) }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (mbId in mbIds.take(2)) {
+                val caaUrl = "https://coverartarchive.org/release/$mbId"
+                httpClient.newCall(Request.Builder().url(caaUrl).build()).execute().use { caaResp ->
+                    if (caaResp.isSuccessful) {
+                        val caaBody = caaResp.body?.string()
+                        if (!caaBody.isNullOrBlank()) {
+                            val caaJson = gson.fromJson(caaBody, JsonObject::class.java)
+                            val images = caaJson.getAsJsonArray("images")
+                            if (images != null) {
+                                for (j in 0 until images.size()) {
+                                    val imgObj = images.get(j).asJsonObject
+                                    val typesArr = imgObj.getAsJsonArray("types")
+                                    val typesList = mutableListOf<String>()
+                                    if (typesArr != null) {
+                                        for (k in 0 until typesArr.size()) {
+                                            typesList.add(typesArr.get(k).asString.lowercase())
+                                        }
+                                    }
+                                    val thumbs = imgObj.getAsJsonObject("thumbnails")
+                                    val imgUrl = thumbs?.get("large")?.asString
+                                        ?: thumbs?.get("1200")?.asString
+                                        ?: imgObj.get("image")?.asString
+
+                                    if (!imgUrl.isNullOrBlank()) {
+                                        val prefix = when {
+                                            typesList.any { it.contains("medium") || it.contains("disc") || it.contains("vinyl") } -> "Disc_Scan_${j + 1}"
+                                            typesList.any { it.contains("back") || it.contains("spine") || it.contains("tray") } -> "Back_Cover_${j + 1}"
+                                            typesList.any { it.contains("booklet") || it.contains("liner") } -> "Booklet_Page_${j + 1}"
+                                            typesList.any { it.contains("front") } -> "Front_Cover_${j + 1}"
+                                            else -> "Extra_Art_${j + 1}"
+                                        }
+                                        discoveredImages.add(imgUrl.replace("http://", "https://") to prefix)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (discoveredImages.size >= 4) break
+            }
+        } catch (_: Exception) {}
+
+        // 2. Поиск на Discogs (парсинг галереи релиза для получения фото винила/CD и буклетов)
+        try {
+            val discogsQuery = URLEncoder.encode("$cleanArtist $cleanAlbum", "UTF-8")
+            val searchUrl = "https://www.discogs.com/search/?q=$discogsQuery&type=release"
+            var releasePath: String? = null
+
+            httpClient.newCall(Request.Builder().url(searchUrl).build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val html = resp.body?.string() ?: ""
+                    val releaseRegex = Regex("""href="(/release/\d+-[^"]+)"""")
+                    releasePath = releaseRegex.find(html)?.groupValues?.getOrNull(1)
+                }
+            }
+
+            if (releasePath != null) {
+                val releaseUrl = "https://www.discogs.com$releasePath"
+                httpClient.newCall(Request.Builder().url(releaseUrl).build()).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val html = resp.body?.string() ?: ""
+                        val discogsImgRegex = Regex("""(https://i\.discogs\.com/[^\s"']+\.(?:jpeg|jpg|png|webp))""", RegexOption.IGNORE_CASE)
+                        val foundUrls = discogsImgRegex.findAll(html)
+                            .map { it.value.replace("&amp;", "&") }
+                            .filter { !it.contains("spacer.gif") && (it.contains("Rs:fit") || it.contains("h:") || it.length > 45) }
+                            .distinct()
+                            .take(6)
+                            .toList()
+
+                        foundUrls.forEachIndexed { idx, url ->
+                            val guessedRole = when (idx) {
+                                0 -> if (discoveredImages.isEmpty()) "Discogs_Cover_1" else "Discogs_Art_1"
+                                1 -> "Discogs_Disc_Vinyl_2"
+                                2 -> "Discogs_Back_Cover_3"
+                                else -> "Discogs_Booklet_Scan_${idx + 1}"
+                            }
+                            discoveredImages.add(url to guessedRole)
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Скачиваем найденные файлы в папку кэша альбома (максимум 8 штук, чтобы не забивать память)
+        val uniqueDownloads = discoveredImages.distinctBy { it.first }.take(8)
+        for ((url, baseName) in uniqueDownloads) {
+            val targetFile = File(remoteCacheDir, "$baseName.jpg")
+            if (targetFile.exists() && targetFile.length() > 1024L) continue
+            try {
+                httpClient.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val bytes = resp.body?.bytes()
+                        if (bytes != null && bytes.size > 2048) {
+                            targetFile.writeBytes(bytes)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        return@withContext getAlbumArtworks(context, album, forceRefresh = true)
     }
 
     private fun classifyArtworkName(rawName: String): ArtworkCategory {
@@ -658,7 +890,6 @@ object AudioRepository {
 
     fun forceScan(context: Context, onComplete: () -> Unit) {
         val pathsToScan = mutableListOf<String>()
-        // Добавлены форматы изображений для сканирования артов
         val extensions = setOf(
             "mp3", "wav", "flac", "m4a", "mp4", "ogg", "opus", "m4b", "lrc", "ttml",
             "jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif"

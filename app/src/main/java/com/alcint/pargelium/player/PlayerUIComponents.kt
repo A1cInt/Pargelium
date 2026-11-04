@@ -4,27 +4,42 @@
 )
 package com.alcint.pargelium.player
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.foundation.background
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.rounded.SpeakerGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.alcint.pargelium.AudioTrack
 import com.alcint.pargelium.LyricLine
@@ -47,55 +62,183 @@ fun PlayerTopBar(
     onTranslateClick: () -> Unit,
     showLyrics: Boolean,
     onToggleLyrics: () -> Unit,
-    iconTint: Color
+    iconTint: Color,
+    isVinylMode: Boolean = false,
+    onToggleVinylMode: () -> Unit = {},
+    isOnlineCanvasEnabled: Boolean = true,
+    onToggleOnlineCanvas: (Boolean) -> Unit = {},
+    canvasSourceMode: CanvasSourceMode = CanvasSourceMode.BOTH_SPOTIFY_PRIORITY,
+    onCanvasSourceModeChange: (CanvasSourceMode) -> Unit = {}
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onCollapse) {
-            Icon(Icons.Default.KeyboardArrowDown, stringResource(id = R.string.action_collapse), modifier = Modifier.size(32.dp), tint = Color.White)
+        IconButton(
+            onClick = onCollapse,
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = Color.White.copy(alpha = 0.08f)
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(id = R.string.action_collapse),
+                modifier = Modifier.size(28.dp),
+                tint = Color.White
+            )
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            var showCanvasMenu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(onClick = { showCanvasMenu = true }) {
-                    Icon(Icons.Default.Movie, stringResource(id = R.string.background), tint = Color.White)
-                }
-                DropdownMenu(expanded = showCanvasMenu, onDismissRequest = { showCanvasMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(id = R.string.choose_canvas)) },
-                        onClick = { showCanvasMenu = false; onPickCanvas() }
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = Color.White.copy(alpha = 0.08f),
+            modifier = Modifier.border(0.5.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(50))
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleVinylMode()
+                    },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (isVinylMode) iconTint.copy(alpha = 0.25f) else Color.Transparent
                     )
-                    if (hasCanvas) {
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Album,
+                        contentDescription = "Vinyl Mode",
+                        tint = if (isVinylMode) iconTint else Color.White
+                    )
+                }
+
+                var showCanvasMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { showCanvasMenu = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Movie,
+                            contentDescription = stringResource(id = R.string.background),
+                            tint = when {
+                                hasCanvas -> iconTint
+                                !isOnlineCanvasEnabled -> Color.White.copy(alpha = 0.45f)
+                                else -> Color.White
+                            }
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showCanvasMenu,
+                        onDismissRequest = { showCanvasMenu = false },
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(id = R.string.reset_canvas)) },
-                            onClick = { showCanvasMenu = false; onResetCanvas() }
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.choose_canvas),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            onClick = {
+                                showCanvasMenu = false
+                                onPickCanvas()
+                            }
+                        )
+                        if (hasCanvas) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(id = R.string.reset_canvas)) },
+                                onClick = {
+                                    showCanvasMenu = false
+                                    onResetCanvas()
+                                }
+                            )
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = if (isOnlineCanvasEnabled) "Онлайн Canvas: ВКЛ" else "Онлайн Canvas: ВЫКЛ",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            trailingIcon = {
+                                Switch(
+                                    checked = isOnlineCanvasEnabled,
+                                    onCheckedChange = { onToggleOnlineCanvas(it) }
+                                )
+                            },
+                            onClick = { onToggleOnlineCanvas(!isOnlineCanvasEnabled) }
+                        )
+
+                        if (isOnlineCanvasEnabled) {
+                            CanvasSourceMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text(mode.label) },
+                                    trailingIcon = {
+                                        if (canvasSourceMode == mode) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = iconTint
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        onCanvasSourceModeChange(mode)
+                                        showCanvasMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                IconButton(onClick = onBookmarksClick) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = stringResource(id = R.string.bookmarks),
+                        tint = Color.White
+                    )
+                }
+
+                val hasTranslation = lyrics.any { !it.translation.isNullOrBlank() }
+                IconButton(onClick = onTranslateClick) {
+                    if (isTranslating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = stringResource(id = R.string.translation),
+                            tint = if (hasTranslation) iconTint else Color.White
                         )
                     }
                 }
-            }
 
-            IconButton(onClick = onBookmarksClick) {
-                Icon(Icons.Default.Flag, stringResource(id = R.string.bookmarks), tint = Color.White)
-            }
-
-            val hasTranslation = lyrics.any { !it.translation.isNullOrBlank() }
-            IconButton(onClick = onTranslateClick) {
-                if (isTranslating) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Language, stringResource(id = R.string.translation), tint = if (hasTranslation) iconTint else Color.White)
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onToggleLyrics()
+                    },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (showLyrics) iconTint.copy(alpha = 0.28f) else Color.Transparent
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FormatQuote,
+                        contentDescription = stringResource(id = R.string.action_lyrics),
+                        tint = if (showLyrics) iconTint else Color.White
+                    )
                 }
-            }
-
-            IconButton(
-                onClick = onToggleLyrics,
-                colors = IconButtonDefaults.iconButtonColors(containerColor = if (showLyrics) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-            ) {
-                Icon(Icons.Default.FormatQuote, stringResource(id = R.string.action_lyrics), tint = Color.White)
             }
         }
     }
@@ -110,24 +253,39 @@ fun TrackTitleArtist(
         Text(
             text = track.title,
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             color = Color.White,
             maxLines = 1,
             modifier = Modifier.basicMarquee()
         )
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = track.artist,
-            style = MaterialTheme.typography.titleMedium,
-            color = Color.White.copy(0.9f),
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { onArtistClick(track.artist) }
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-                .basicMarquee()
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = track.artist,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.88f),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onArtistClick(track.artist) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .basicMarquee()
+            )
+            if (track.album.isNotBlank() && !track.album.equals("<unknown>", ignoreCase = true)) {
+                Text(
+                    text = "• ${track.album}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 150.dp)
+                )
+            }
+        }
     }
 }
 
@@ -141,6 +299,8 @@ fun PlayerProgressSlider(
     iconTint: Color,
     onSeek: (Long) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+
     if (isRadio) {
         val saavnTrack = SaavnApi.trackCache[track.id]
         LinearWavyProgressIndicator(
@@ -152,50 +312,199 @@ fun PlayerProgressSlider(
             Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.PlayArrow, null, tint = iconTint, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("JioSaavn • MP4A 320kbps", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = iconTint)
+                Text(
+                    text = "JioSaavn • MP4A 320kbps",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = iconTint
+                )
             }
         } else {
-            Text(stringResource(R.string.status_live_broadcast), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                text = stringResource(R.string.status_live_broadcast),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.Red,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     } else {
         var sliderPosition by remember { mutableFloatStateOf(0f) }
         var isDragging by remember { mutableStateOf(false) }
-        LaunchedEffect(currentPosition) { if (!isDragging) sliderPosition = currentPosition.toFloat() }
+        var lastHapticBucket by remember { mutableIntStateOf(-1) }
+        var showRemainingTime by remember { mutableStateOf(false) }
+
+        LaunchedEffect(currentPosition) {
+            if (!isDragging) sliderPosition = currentPosition.toFloat()
+        }
 
         val animatedWaveHeight by animateDpAsState(
-            targetValue = if (isPlaying && !isDragging) 16.dp else 0.dp,
-            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            targetValue = if (isPlaying && !isDragging) 15.dp else 0.dp,
+            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
             label = "waveHeight"
         )
 
-        WavySlider(
-            value = sliderPosition,
-            valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
-            onValueChange = { isDragging = true; sliderPosition = it },
-            onValueChangeFinished = { onSeek(sliderPosition.toLong()); isDragging = false },
-            waveHeight = animatedWaveHeight,
-            waveLength = 45.dp,
-            waveThickness = 12.dp,
-            trackThickness = 12.dp,
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = iconTint,
-                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-            )
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(formatDuration(if (isDragging) sliderPosition.toLong() else currentPosition), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(0.7f))
-
-            val saavnTrack = SaavnApi.trackCache[track.id]
-            if (saavnTrack != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.PlayArrow, null, tint = iconTint, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("JioSaavn", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = iconTint)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AnimatedVisibility(
+                visible = isDragging,
+                enter = fadeIn(tween(150)) + scaleIn(tween(150)),
+                exit = fadeOut(tween(150)) + scaleOut(tween(150))
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = iconTint,
+                    contentColor = Color.Black,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = "${formatDuration(sliderPosition.toLong())} / ${formatDuration(duration)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                    )
                 }
             }
 
-            Text(formatDuration(duration), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(0.7f))
+            WavySlider(
+                value = sliderPosition,
+                valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
+                onValueChange = { newVal ->
+                    if (!isDragging) {
+                        isDragging = true
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    sliderPosition = newVal
+                    val bucket = (newVal / 15_000f).toInt()
+                    if (bucket != lastHapticBucket) {
+                        lastHapticBucket = bucket
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                },
+                onValueChangeFinished = {
+                    onSeek(sliderPosition.toLong())
+                    isDragging = false
+                    lastHapticBucket = -1
+                },
+                waveHeight = animatedWaveHeight,
+                waveLength = 45.dp,
+                waveThickness = 11.dp,
+                trackThickness = 11.dp,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = iconTint,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.26f)
+                )
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatDuration(if (isDragging) sliderPosition.toLong() else currentPosition),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.78f)
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSeek((currentPosition - 10_000L).coerceAtLeast(0L))
+                        },
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.08f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Replay10,
+                                contentDescription = "-10s",
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = "10s",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+
+                    val saavnTrack = SaavnApi.trackCache[track.id]
+                    if (saavnTrack != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PlayArrow, null, tint = iconTint, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = "JioSaavn",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = iconTint
+                            )
+                        }
+                    }
+
+                    Surface(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSeek((currentPosition + 10_000L).coerceAtMost(duration))
+                        },
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.08f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "10s",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.Forward10,
+                                contentDescription = "+10s",
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+
+                val rightTimeText = if (showRemainingTime) {
+                    val rem = (duration - (if (isDragging) sliderPosition.toLong() else currentPosition)).coerceAtLeast(0L)
+                    "-${formatDuration(rem)}"
+                } else {
+                    formatDuration(duration)
+                }
+
+                Text(
+                    text = rightTimeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.78f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { showRemainingTime = !showRemainingTime }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
         }
     }
 }
@@ -214,7 +523,9 @@ fun PlayerControlsRow(
     onToggleQueue: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -276,33 +587,163 @@ fun PlayerBottomInfo(
     showTrackInfoBar: Boolean,
     metadata: String
 ) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var showSignalChainDialog by remember { mutableStateOf(false) }
+
+    if (showSignalChainDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignalChainDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = iconTint)
+            },
+            title = {
+                Text(
+                    text = "Audio Signal Path",
+                    fontWeight = FontWeight.ExtraBold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SignalPathNode(
+                        step = "1. Source Stream",
+                        detail = metadata.ifEmpty { stringResource(R.string.meta_unknown) },
+                        accentColor = iconTint
+                    )
+                    SignalPathNode(
+                        step = "2. Audio Engine & DSP",
+                        detail = "Media3 ExoPlayer • 32-bit Float Pipeline",
+                        accentColor = iconTint
+                    )
+                    SignalPathNode(
+                        step = "3. Output Endpoint",
+                        detail = "${audioOutput.name} (${audioOutput.typeLabel})",
+                        accentColor = iconTint
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSignalChainDialog = false
+                    openSystemAudioOutputSwitcher(context)
+                }) {
+                    Icon(Icons.Rounded.SpeakerGroup, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Switch Output")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignalChainDialog = false }) {
+                    Text(stringResource(id = R.string.album_action_close))
+                }
+            }
+        )
+    }
+
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                openSystemAudioOutputSwitcher(context)
+            },
             shape = CircleShape,
-            color = Color.White.copy(alpha = 0.1f),
-            modifier = Modifier.height(24.dp)
+            color = Color.White.copy(alpha = 0.12f),
+            modifier = Modifier
+                .height(28.dp)
+                .border(0.5.dp, Color.White.copy(alpha = 0.16f), CircleShape)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = 12.dp)
             ) {
-                Icon(painterResource(audioOutput.iconResId), null, tint = iconTint, modifier = Modifier.size(14.dp))
+                Icon(
+                    painter = painterResource(audioOutput.iconResId),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(14.dp)
+                )
                 Spacer(Modifier.width(6.dp))
-                Text(audioOutput.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+                Text(
+                    text = audioOutput.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.92f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
 
         if (showTrackInfoBar) {
             Spacer(Modifier.width(8.dp))
-            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.1f), modifier = Modifier.height(24.dp)) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
-                    Text(metadata.ifEmpty { stringResource(R.string.meta_unknown) }, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+            Surface(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    showSignalChainDialog = true
+                },
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .height(28.dp)
+                    .border(0.5.dp, Color.White.copy(alpha = 0.16f), CircleShape)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.GraphicEq,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = metadata.ifEmpty { stringResource(R.string.meta_unknown) },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.92f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SignalPathNode(
+    step: String,
+    detail: String,
+    accentColor: Color
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(
+                text = step,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = accentColor
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

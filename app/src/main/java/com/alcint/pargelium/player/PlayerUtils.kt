@@ -1,12 +1,18 @@
 package com.alcint.pargelium.player
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.runtime.*
 import com.alcint.pargelium.AudioDeviceHelper
 import com.alcint.pargelium.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 fun formatDuration(durationMs: Long): String {
     val totalSeconds = (durationMs / 1000L).coerceAtLeast(0L)
@@ -52,8 +58,55 @@ fun parseDurationToMs(durationStr: String): Long {
     }
 }
 
+suspend fun isVideoUriAsync(context: Context, uri: Uri): Boolean {
+    val str = uri.toString().lowercase()
+    if (
+        str.endsWith(".mp4") ||
+        str.endsWith(".webm") ||
+        str.endsWith(".m3u8") ||
+        str.endsWith(".mov") ||
+        str.contains(".mp4?") ||
+        str.contains(".m3u8?") ||
+        str.contains("video") ||
+        str.contains("canvaz")
+    ) {
+        return true
+    }
+    return withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.getType(uri)?.startsWith("video") == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+}
+
+fun openSystemAudioOutputSwitcher(context: Context) {
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val panelIntent = Intent("com.android.settings.panel.action.MEDIA_OUTPUT").apply {
+                putExtra("com.android.settings.panel.extra.PACKAGE_NAME", context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(panelIntent)
+            return
+        }
+    } catch (_: Exception) {}
+
+    try {
+        val btIntent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(btIntent)
+    } catch (_: Exception) {}
+}
+
 @Immutable
-data class AudioOutputState(val name: String, val iconResId: Int)
+data class AudioOutputState(
+    val name: String,
+    val iconResId: Int,
+    val typeLabel: String = "Direct"
+)
 
 @Composable
 fun rememberAudioOutputState(context: Context): AudioOutputState {
@@ -63,7 +116,7 @@ fun rememberAudioOutputState(context: Context): AudioOutputState {
     }
     val helper = remember(appContext) { AudioDeviceHelper(appContext) }
 
-    var state by remember { mutableStateOf(AudioOutputState("Speaker", R.drawable.ic_play_mobile)) }
+    var state by remember { mutableStateOf(AudioOutputState("Speaker", R.drawable.ic_play_mobile, "Speaker")) }
 
     DisposableEffect(audioManager) {
         val updateState = {
@@ -95,7 +148,12 @@ fun rememberAudioOutputState(context: Context): AudioOutputState {
             if (active != null) {
                 val name = active.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Speaker"
                 val icon = helper.getDeviceIcon(active)
-                val newState = AudioOutputState(name, icon)
+                val typeLabel = when {
+                    btDevice != null -> "Bluetooth A2DP / BLE"
+                    wiredDevice != null -> "Wired / USB DAC"
+                    else -> "Internal Speaker"
+                }
+                val newState = AudioOutputState(name, icon, typeLabel)
                 if (state != newState) {
                     state = newState
                 }
