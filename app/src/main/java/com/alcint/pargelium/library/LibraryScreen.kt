@@ -283,8 +283,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         if (track != null) {
             if (!track.coverUrl.isNullOrEmpty() && track.coverUrl != "null") {
                 currentAlbumArt = Uri.parse(track.coverUrl)
-                val sourceName = if (track.source == "local") "Онлайн Радио" else track.source.uppercase()
-                trackMetadata = "$sourceName • Стриминг"
+                val sourceName = if (track.source == "local") context.getString(R.string.tab_online_radio) else track.source.uppercase()
+                trackMetadata = "$sourceName • ${context.getString(R.string.streaming)}"
             } else if (track.albumId != 0L && track.albumId != -1L) {
                 currentAlbumArt = AudioRepository.getAlbumArtUri(track.albumId)
                 trackMetadata = withContext(Dispatchers.IO) {
@@ -317,14 +317,16 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             val (loadedAlbums, loadedArtists, idMap) = withContext(Dispatchers.Default) {
                 val albums = AudioRepository.processAlbums(loadedTracks)
                 val albumsByArtist = albums.groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
-                // Предзагрузка метаданных артистов в фоне, чтобы убрать фризы при скролле LazyVerticalGrid
+
                 val artists = loadedTracks
                     .groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
                     .map { (name, artistTracks) ->
                         val artistAlbums = albumsByArtist[name]?.sortedBy { it.title } ?: emptyList()
-                        val customAvatar = try {
-                            PrefsManager.getArtistMetadata(name).avatarUri
-                        } catch (_: Exception) { null }
+                        val (folderAvatar, folderBanner, folderLogo) = ArtistRepository.resolveQuickFolderAssets(
+                            context = context,
+                            artistName = name,
+                            tracks = artistTracks
+                        )
                         val firstAlbumId = artistAlbums.firstOrNull()?.id ?: artistTracks.firstOrNull()?.albumId
                         val fallbackCover = if (firstAlbumId != null && firstAlbumId > 0L) {
                             AudioRepository.getAlbumArtUri(firstAlbumId)
@@ -334,7 +336,9 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             name = name,
                             tracks = artistTracks.sortedBy { it.title },
                             albums = artistAlbums,
-                            customAvatarUri = customAvatar,
+                            customAvatarUri = folderAvatar,
+                            customBannerUri = folderBanner,
+                            customLogoUri = folderLogo,
                             fallbackCoverUri = fallbackCover
                         )
                     }
@@ -383,7 +387,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             val readyTrack = try {
                 track.copy(uri = StreamingManager.getPlayableUri(context, track))
             } catch (_: Exception) {
-                Toast.makeText(context, "Стриминг: Сервер недоступен", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.stream_server_unavailable_msg), Toast.LENGTH_SHORT).show()
                 return@launch
             } finally {
                 if (isNetwork) isLoading = false
