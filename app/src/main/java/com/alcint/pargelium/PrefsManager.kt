@@ -23,6 +23,41 @@ data class ArtistMetadata(
     val description: String = ""
 )
 
+data class JamesDspFullSnapshot(
+    val name: String,
+    val eq15Enabled: Boolean = false,
+    val eqFilterMode: Int = 0,
+    val eqInterpMode: Int = 0,
+    val eqGains15: List<Float> = List(15) { 0f },
+    val companderEnabled: Boolean = false,
+    val companderTc: Float = 0.22f,
+    val companderGranularity: Int = 2,
+    val companderTfRes: Int = 0,
+    val companderGains: List<Float> = List(7) { 0f },
+    val bassEnabled: Boolean = false,
+    val bassGain: Int = 6,
+    val tubeEnabled: Boolean = false,
+    val tubeDrive: Float = 2.0f,
+    val ddcEnabled: Boolean = false,
+    val ddcPresetId: String = "dt770_80",
+    val convolverEnabled: Boolean = false,
+    val convolverPresetId: Int = 0,
+    val convolverWetMix: Float = 100f,
+    val convolverPreDelay: Float = 0f,
+    val liveprogEnabled: Boolean = false,
+    val liveprogScriptId: Int = 0,
+    val liveprogParams: List<Float> = listOf(0.35f, 0.74f, 0.42f, 1.0f, 80f, 0.71f, 0f, 0f),
+    val reverbEnabled: Boolean = false,
+    val reverbPreset: Int = 0,
+    val stereoWideEnabled: Boolean = false,
+    val stereoWidth: Float = 60f,
+    val bs2bEnabled: Boolean = false,
+    val bs2bMode: Int = 0,
+    val limThreshold: Float = -0.5f,
+    val limRelease: Float = 60f,
+    val postGain: Float = 0f
+)
+
 object PrefsManager {
     private const val PREFS_NAME = "pargelium_audio_prefs"
     private lateinit var prefs: SharedPreferences
@@ -231,6 +266,53 @@ object PrefsManager {
     fun getConvolverEnabled(): Boolean = prefs.getBoolean("dsp_convolver_enabled", false)
     fun saveConvolverPresetId(id: Int) = prefs.edit().putInt("dsp_convolver_preset_id", id).apply()
     fun getConvolverPresetId(): Int = prefs.getInt("dsp_convolver_preset_id", 0)
+    fun saveConvolverWetMix(mix: Float) = prefs.edit().putFloat("dsp_convolver_wet_mix", mix).apply()
+    fun getConvolverWetMix(): Float = prefs.getFloat("dsp_convolver_wet_mix", 100f)
+    fun saveConvolverPreDelayMs(ms: Float) = prefs.edit().putFloat("dsp_convolver_predelay_ms", ms).apply()
+    fun getConvolverPreDelayMs(): Float = prefs.getFloat("dsp_convolver_predelay_ms", 0f)
+    fun saveConvolverTailTrim(trim: Float) = prefs.edit().putFloat("dsp_convolver_tail_trim", trim).apply()
+    fun getConvolverTailTrim(): Float = prefs.getFloat("dsp_convolver_tail_trim", 100f)
+    fun saveConvolverInvertPhase(inv: Boolean) = prefs.edit().putBoolean("dsp_convolver_inv_phase", inv).apply()
+    fun getConvolverInvertPhase(): Boolean = prefs.getBoolean("dsp_convolver_inv_phase", false)
+
+    // EEL2 Liveprog
+    fun saveLiveprogEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_liveprog_enabled", enabled).apply()
+    fun getLiveprogEnabled(): Boolean = prefs.getBoolean("dsp_liveprog_enabled", false)
+    fun saveLiveprogScriptId(id: Int) = prefs.edit().putInt("dsp_liveprog_script_id", id).apply()
+    fun getLiveprogScriptId(): Int = prefs.getInt("dsp_liveprog_script_id", 0)
+    fun saveLiveprogParams(params: FloatArray) = prefs.edit().putString("dsp_liveprog_params", params.joinToString(",")).apply()
+    fun getLiveprogParams(): FloatArray {
+        val str = prefs.getString("dsp_liveprog_params", "") ?: ""
+        return try {
+            val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
+            if (parsed.size >= 4) {
+                FloatArray(8) { idx -> parsed.getOrElse(idx) { 0f } }
+            } else {
+                floatArrayOf(0.35f, 0.74f, 0.42f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f)
+            }
+        } catch (_: Exception) {
+            floatArrayOf(0.35f, 0.74f, 0.42f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f)
+        }
+    }
+    fun saveCustomEelCode(code: String?) {
+        if (code == null) prefs.edit().remove("dsp_custom_eel_code").apply() else prefs.edit().putString("dsp_custom_eel_code", code).apply()
+    }
+    fun getCustomEelCode(): String? = prefs.getString("dsp_custom_eel_code", null)
+
+    // Full DSP Snapshots
+    fun getSavedDspSnapshots(): List<JamesDspFullSnapshot> {
+        val json = prefs.getString("dsp_saved_snapshots", "[]")
+        val type = object : TypeToken<List<JamesDspFullSnapshot>>() {}.type
+        return try {
+            gson.fromJson(json, type) ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveDspSnapshots(list: List<JamesDspFullSnapshot>) {
+        prefs.edit().putString("dsp_saved_snapshots", gson.toJson(list)).apply()
+    }
 
     fun saveBassEnabled(enabled: Boolean) = prefs.edit().putBoolean("bass_enabled", enabled).apply()
     fun getBassEnabled(): Boolean = prefs.getBoolean("bass_enabled", false)
