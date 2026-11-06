@@ -14,6 +14,8 @@ data class ArtistModel(
     val tracks: List<AudioTrack>,
     val albums: List<AlbumModel>,
     val customAvatarUri: String? = null,
+    val customBannerUri: String? = null,
+    val customLogoUri: String? = null,
     val fallbackCoverUri: Uri? = null
 )
 
