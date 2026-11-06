@@ -113,7 +113,7 @@ fun PlayerTopBar(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Album,
-                        contentDescription = "Vinyl Mode",
+                        contentDescription = stringResource(id = R.string.player_vinyl_mode_cd),
                         tint = if (isVinylMode) iconTint else Color.White
                     )
                 }
@@ -163,7 +163,10 @@ fun PlayerTopBar(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    text = if (isOnlineCanvasEnabled) "Онлайн Canvas: ВКЛ" else "Онлайн Canvas: ВЫКЛ",
+                                    text = stringResource(
+                                        id = if (isOnlineCanvasEnabled) R.string.online_canvas_enabled_label
+                                        else R.string.online_canvas_disabled_label
+                                    ),
                                     fontWeight = FontWeight.Bold
                                 )
                             },
@@ -313,7 +316,7 @@ fun PlayerProgressSlider(
                 Icon(Icons.Default.PlayArrow, null, tint = iconTint, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "JioSaavn • MP4A 320kbps",
+                    text = stringResource(id = R.string.saavn_stream_quality_badge),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = iconTint
@@ -430,13 +433,13 @@ fun PlayerProgressSlider(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Replay10,
-                                contentDescription = "-10s",
+                                contentDescription = stringResource(id = R.string.seek_10s_short),
                                 tint = Color.White.copy(alpha = 0.8f),
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(2.dp))
                             Text(
-                                text = "10s",
+                                text = stringResource(id = R.string.seek_10s_short),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White.copy(alpha = 0.8f)
@@ -450,7 +453,7 @@ fun PlayerProgressSlider(
                             Icon(Icons.Default.PlayArrow, null, tint = iconTint, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(3.dp))
                             Text(
-                                text = "JioSaavn",
+                                text = stringResource(id = R.string.saavn_service_name),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = iconTint
@@ -471,7 +474,7 @@ fun PlayerProgressSlider(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "10s",
+                                text = stringResource(id = R.string.seek_10s_short),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White.copy(alpha = 0.8f)
@@ -479,7 +482,7 @@ fun PlayerProgressSlider(
                             Spacer(modifier = Modifier.width(2.dp))
                             Icon(
                                 imageVector = Icons.Rounded.Forward10,
-                                contentDescription = "+10s",
+                                contentDescription = stringResource(id = R.string.seek_10s_short),
                                 tint = Color.White.copy(alpha = 0.8f),
                                 modifier = Modifier.size(14.dp)
                             )
@@ -600,24 +603,24 @@ fun PlayerBottomInfo(
             },
             title = {
                 Text(
-                    text = "Audio Signal Path",
+                    text = stringResource(id = R.string.signal_path_dialog_title),
                     fontWeight = FontWeight.ExtraBold
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SignalPathNode(
-                        step = "1. Source Stream",
+                        step = stringResource(id = R.string.signal_path_step_source),
                         detail = metadata.ifEmpty { stringResource(R.string.meta_unknown) },
                         accentColor = iconTint
                     )
                     SignalPathNode(
-                        step = "2. Audio Engine & DSP",
-                        detail = "Media3 ExoPlayer • 32-bit Float Pipeline",
+                        step = stringResource(id = R.string.signal_path_step_engine),
+                        detail = stringResource(id = R.string.signal_path_engine_desc),
                         accentColor = iconTint
                     )
                     SignalPathNode(
-                        step = "3. Output Endpoint",
+                        step = stringResource(id = R.string.signal_path_step_output),
                         detail = "${audioOutput.name} (${audioOutput.typeLabel})",
                         accentColor = iconTint
                     )
@@ -630,7 +633,7 @@ fun PlayerBottomInfo(
                 }) {
                     Icon(Icons.Rounded.SpeakerGroup, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Switch Output")
+                    Text(stringResource(id = R.string.action_switch_audio_output))
                 }
             },
             dismissButton = {
