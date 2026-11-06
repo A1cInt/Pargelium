@@ -402,4 +402,31 @@
     <string name="signal_path_engine_desc">Media3 ExoPlayer • JamesDSP 32-bit Float</string>
     <string name="signal_path_step_output">3. Устройство вывода</string>
     <string name="action_switch_audio_output">Сменить выход</string>
+
+    <string name="artist_stat_albums_fmt">%1$d альб.</string>
+    <string name="artist_stat_singles_fmt">%1$d сингл./EP</string>
+    <string name="artist_action_radio_mix">Микс исполнителя</string>
+    <string name="artist_tab_discography">Дискография</string>
+    <string name="artist_bio_section_title">Об исполнителе</string>
+    <string name="artist_bio_local_badge">Из папки</string>
+    <string name="artist_fetch_wiki_btn">Wikipedia</string>
+    <string name="artist_bio_read_more">Читать полностью</string>
+    <string name="artist_bio_read_less">Свернуть</string>
+    <string name="artist_latest_release_badge">ПОСЛЕДНИЙ РЕЛИЗ</string>
+    <string name="artist_release_type_album">Альбом</string>
+    <string name="artist_release_type_single_ep">Сингл / EP</string>
+    <string name="artist_singles_and_eps_tab">Синглы и EP</string>
+    <string name="artist_show_all_tracks_fmt">Показать все треки (%1$d)</string>
+    <string name="artist_show_less_tracks">Свернуть до топ-10</string>
+    <string name="artist_appears_on_title">Совместные треки и участие</string>
+    <string name="artist_root_folder_card_title">Корневая папка исполнителя</string>
+    <string name="artist_folder_images_count_fmt">%1$d арт-файлов</string>
+    <string name="artist_gallery_role_hint">Нажми на бейдж карточки, чтобы назначить фото Аватаром, Баннером или Логотипом</string>
+    <string name="artist_fetch_online_images_btn">Найти фото и лого</string>
+    <string name="artist_gallery_empty_desc">Положи avatar.jpg, banner.jpg, logo.png или gallery_1.jpg в папку исполнителя или загрузи их из сети</string>
+    <string name="artist_role_avatar">Аватар</string>
+    <string name="artist_role_banner">Баннер</string>
+    <string name="artist_role_logo">Логотип</string>
+    <string name="artist_role_gallery">Галерея</string>
+    <string name="stream_server_unavailable_msg">Стриминг: Сервер недоступен</string>
 </resources>
