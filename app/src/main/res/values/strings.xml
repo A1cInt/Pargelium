@@ -417,4 +417,31 @@
     <string name="signal_path_engine_desc">Media3 ExoPlayer • JamesDSP 32-bit Float Pipeline</string>
     <string name="signal_path_step_output">3. Output Endpoint</string>
     <string name="action_switch_audio_output">Switch Output</string>
+
+    <string name="artist_stat_albums_fmt">%1$d Albums</string>
+    <string name="artist_stat_singles_fmt">%1$d Singles/EP</string>
+    <string name="artist_action_radio_mix">Artist Deep Cuts Mix</string>
+    <string name="artist_tab_discography">Discography</string>
+    <string name="artist_bio_section_title">About Artist</string>
+    <string name="artist_bio_local_badge">Local File</string>
+    <string name="artist_fetch_wiki_btn">Wikipedia</string>
+    <string name="artist_bio_read_more">Read full biography</string>
+    <string name="artist_bio_read_less">Collapse</string>
+    <string name="artist_latest_release_badge">LATEST RELEASE</string>
+    <string name="artist_release_type_album">Album</string>
+    <string name="artist_release_type_single_ep">Single / EP</string>
+    <string name="artist_singles_and_eps_tab">Singles &amp; EPs</string>
+    <string name="artist_show_all_tracks_fmt">Show all tracks (%1$d)</string>
+    <string name="artist_show_less_tracks">Show top 10 only</string>
+    <string name="artist_appears_on_title">Collaborations &amp; Features</string>
+    <string name="artist_root_folder_card_title">Artist Root Folder</string>
+    <string name="artist_folder_images_count_fmt">%1$d images</string>
+    <string name="artist_gallery_role_hint">Tap the badge on any image to set it as Avatar, Banner or Logo</string>
+    <string name="artist_fetch_online_images_btn">Fetch Photos &amp; Logo</string>
+    <string name="artist_gallery_empty_desc">Place avatar.jpg, banner.jpg, logo.png or gallery_1.jpg in the artist folder, or fetch them online</string>
+    <string name="artist_role_avatar">Avatar</string>
+    <string name="artist_role_banner">Banner</string>
+    <string name="artist_role_logo">Logo</string>
+    <string name="artist_role_gallery">Gallery</string>
+    <string name="stream_server_unavailable_msg">Streaming: Server unavailable</string>
 </resources>
