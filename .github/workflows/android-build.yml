@@ -58,6 +58,17 @@ jobs:
         if: ${{ github.event.inputs.build_type == 'release' }}
         run: ./gradlew assembleRelease --stacktrace --no-daemon
 
+      - name: Sign Release APK
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.SIGNING_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
       - name: Upload Debug APK Artifact
         if: ${{ github.event.inputs.build_type != 'release' }}
         uses: actions/upload-artifact@v4
@@ -71,5 +82,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Pargelium-Release-${{ github.sha }}
-          path: app/build/outputs/apk/release/*.apk
+          path: ${{steps.sign_app.outputs.signedReleaseFile}}
           retention-days: 30
