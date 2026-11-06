@@ -71,6 +71,7 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -80,13 +81,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.FlipCameraAndroid
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.HighQuality
@@ -101,6 +105,7 @@ import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
@@ -175,6 +180,7 @@ import com.alcint.pargelium.AudioRepository
 import com.alcint.pargelium.AudioTrack
 import com.alcint.pargelium.R as AppR
 import com.alcint.pargelium.rememberDominantColor
+import com.alcint.pargelium.tiltOnTouch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -212,6 +218,7 @@ fun SharedTransitionScope.AlbumDetailView(
     var activeSection by remember { mutableIntStateOf(0) }
     var selectedCategory by remember { mutableStateOf<ArtworkCategory?>(null) }
     var selectedDisc by remember { mutableIntStateOf(0) }
+    var manualVinylIndex by remember(album.id) { mutableStateOf<Int?>(null) }
     var isTrackSearchOpen by remember { mutableStateOf(false) }
     var trackSearchQuery by remember { mutableStateOf("") }
     var showBatchMenu by remember { mutableStateOf(false) }
@@ -244,12 +251,18 @@ fun SharedTransitionScope.AlbumDetailView(
         albumFolderPath = folder
         isScanningArtworks = false
 
-        // Автоматическая докачка сканов с Discogs / Cover Art Archive, если в папке только 1 обложка
         if (loadedArt.size <= 1) {
             isFetchingOnlineArt = true
             val enrichedArt = AudioRepository.fetchOnlineReleaseArtworks(context, album)
             artworksList = enrichedArt
             isFetchingOnlineArt = false
+        }
+    }
+
+    // При смене играющего трека внутри этого альбома сбрасываем ручной выбор пластинки, чтобы диск менялся автоматически
+    LaunchedEffect(currentTrack?.id) {
+        if (currentTrack?.albumId == album.id) {
+            manualVinylIndex = null
         }
     }
 
@@ -281,10 +294,51 @@ fun SharedTransitionScope.AlbumDetailView(
         filteredArtworks.chunked(2)
     }
 
-    val authenticDiscUri = remember(artworksList) {
-        artworksList.firstOrNull { it.category == ArtworkCategory.DISC }?.uri
+    // Список виниловых дисков (vinyl_1, vinyl_2 и т.д.) и расчет привязки треков к номеру винила
+    val vinylArtworks = remember(artworksList) {
+        val allDiscs = artworksList.filter { it.category == ArtworkCategory.DISC }
+        val namedVinyls = allDiscs.filter { AudioRepository.isVinylNamedArtwork(it.name) }
+            .sortedWith(compareBy<AlbumArtworkItem> { AudioRepository.extractArtworkSequenceIndex(it.name) }.thenBy { it.name.lowercase() })
+        namedVinyls.ifEmpty {
+            allDiscs.sortedWith(compareBy<AlbumArtworkItem> { AudioRepository.extractArtworkSequenceIndex(it.name) }.thenBy { it.name.lowercase() })
+        }
     }
-    val discArtworkUri = authenticDiscUri ?: mainCoverUri
+
+    val trackIdToVinylNumberMap = remember(album.tracks, vinylArtworks) {
+        val map = HashMap<Long, Int>()
+        if (vinylArtworks.isNotEmpty()) {
+            val sortedTracks = album.tracks.sortedWith(compareBy<AudioTrack> { it.discNumber }.thenBy { it.trackNumber }.thenBy { it.id })
+            val explicitVinylTracks = sortedTracks.filter { AudioRepository.isVinylTrack(it) }
+            val pool = if (explicitVinylTracks.isNotEmpty()) explicitVinylTracks else if (vinylArtworks.size > 1) sortedTracks else emptyList()
+            if (pool.isNotEmpty()) {
+                val total = pool.size.coerceAtLeast(1)
+                pool.forEachIndexed { idx, t ->
+                    val vNum = ((idx * vinylArtworks.size) / total).coerceIn(0, vinylArtworks.lastIndex) + 1
+                    map[t.id] = vNum
+                }
+            }
+        }
+        map
+    }
+
+    val resolvedAuthenticDiscUri = remember(artworksList, album.tracks, currentTrack, manualVinylIndex, vinylArtworks) {
+        when {
+            manualVinylIndex != null && manualVinylIndex in vinylArtworks.indices -> {
+                vinylArtworks[manualVinylIndex!!].uri
+            }
+            currentTrack?.albumId == album.id -> {
+                AudioRepository.resolveDiscArtworkForTrack(album.tracks, artworksList, currentTrack)
+            }
+            else -> {
+                AudioRepository.resolveDiscArtworkForTrack(album.tracks, artworksList, album.tracks.firstOrNull())
+            }
+        }
+    }
+    val discArtworkUri = resolvedAuthenticDiscUri ?: mainCoverUri
+
+    val activeVinylIndex = remember(resolvedAuthenticDiscUri, vinylArtworks) {
+        vinylArtworks.indexOfFirst { it.uri == resolvedAuthenticDiscUri }
+    }
 
     val totalDurationMs = remember(album.tracks) {
         album.tracks.sumOf { it.duration }
@@ -341,7 +395,13 @@ fun SharedTransitionScope.AlbumDetailView(
                     album = album,
                     mainCoverUri = mainCoverUri,
                     discArtworkUri = discArtworkUri,
-                    hasAuthenticDiscArt = authenticDiscUri != null,
+                    hasAuthenticDiscArt = resolvedAuthenticDiscUri != null,
+                    vinylArtworks = vinylArtworks,
+                    activeVinylIndex = activeVinylIndex,
+                    onSelectVinylDisc = { idx ->
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        manualVinylIndex = idx
+                    },
                     animatedVisibilityScope = animatedVisibilityScope,
                     isAlbumPlaying = isAlbumCurrentlyPlaying,
                     accentColor = accentColor,
@@ -448,6 +508,7 @@ fun SharedTransitionScope.AlbumDetailView(
                             AlbumTrackItem(
                                 track = track,
                                 albumArtist = album.artist,
+                                vinylDiscNumber = trackIdToVinylNumberMap[track.id],
                                 isCurrentTrack = currentTrack?.id == track.id,
                                 isPlaying = isPlaying,
                                 accentColor = accentColor,
@@ -473,6 +534,26 @@ fun SharedTransitionScope.AlbumDetailView(
                     )
                 }
             } else {
+                // Интерактивный стол коллекционера (Буклеты, 3D-Карточки, Стикеры), если они есть в папке
+                val booklets = artworksList.filter { it.category == ArtworkCategory.BOOKLET }
+                val cards = artworksList.filter { it.category == ArtworkCategory.CARD }
+                val stickers = artworksList.filter { it.category == ArtworkCategory.STICKER }
+
+                if (booklets.isNotEmpty() || cards.isNotEmpty() || stickers.isNotEmpty()) {
+                    item(key = "interactive_collector_desk", contentType = "collector_desk") {
+                        InteractiveCollectorDesk(
+                            booklets = booklets,
+                            cards = cards,
+                            stickers = stickers,
+                            accentColor = accentColor,
+                            onOpenInLightbox = { clickedArt ->
+                                val idx = artworksList.indexOfFirst { it.uri == clickedArt.uri }.coerceAtLeast(0)
+                                lightboxInitialIndex = idx
+                            }
+                        )
+                    }
+                }
+
                 item(key = "gallery_header", contentType = "gallery_header") {
                     AlbumGalleryHeader(
                         allArtworks = artworksList,
@@ -763,6 +844,9 @@ private fun SharedTransitionScope.AlbumHeroSection(
     mainCoverUri: Uri,
     discArtworkUri: Uri,
     hasAuthenticDiscArt: Boolean,
+    vinylArtworks: List<AlbumArtworkItem>,
+    activeVinylIndex: Int,
+    onSelectVinylDisc: (Int) -> Unit,
     animatedVisibilityScope: AnimatedVisibilityScope,
     isAlbumPlaying: Boolean,
     accentColor: Color,
@@ -969,7 +1053,39 @@ private fun SharedTransitionScope.AlbumHeroSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        // Если в папке несколько виниловых дисков (vinyl_1, vinyl_2 и т.д.), показываем переключатель пластинок
+        if (vinylArtworks.size > 1) {
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                itemsIndexed(vinylArtworks, key = { _, item -> item.uri.toString() }) { idx, _ ->
+                    val isSelected = activeVinylIndex == idx
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onSelectVinylDisc(idx) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Album,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(id = AppR.string.vinyl_disc_chip_fmt, idx + 1),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        shape = RoundedCornerShape(50)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
             text = album.title,
@@ -1109,6 +1225,288 @@ private fun SharedTransitionScope.AlbumHeroSection(
             accentColor = accentColor,
             onSectionChange = onSectionChange
         )
+    }
+}
+
+/**
+ * Уникальный интерактивный "Стол коллекционера" (Booklet Reader, 3D Flip Card и Sticker Peel Showcase)
+ */
+@Composable
+private fun InteractiveCollectorDesk(
+    booklets: List<AlbumArtworkItem>,
+    cards: List<AlbumArtworkItem>,
+    stickers: List<AlbumArtworkItem>,
+    accentColor: Color,
+    onOpenInLightbox: (AlbumArtworkItem) -> Unit
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    Surface(
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.AutoAwesome,
+                    contentDescription = null,
+                    tint = accentColor
+                )
+                Column {
+                    Text(
+                        text = stringResource(id = AppR.string.collector_desk_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = stringResource(id = AppR.string.collector_desk_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // 1. Постраничная листалка буклета (Booklet Flip Reader)
+            if (booklets.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                val bookletPager = rememberPagerState { booklets.size }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.MenuBook,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(id = AppR.string.booklet_reader_title),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = stringResource(
+                            id = AppR.string.booklet_page_indicator_fmt,
+                            bookletPager.currentPage + 1,
+                            booklets.size
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                HorizontalPager(
+                    state = bookletPager,
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    pageSpacing = 12.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(210.dp)
+                ) { page ->
+                    val pageItem = booklets[page]
+                    Card(
+                        onClick = { onOpenInLightbox(pageItem) },
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .tiltOnTouch()
+                    ) {
+                        AsyncImage(
+                            model = remember(pageItem.uri) {
+                                ImageRequest.Builder(context)
+                                    .data(pageItem.uri)
+                                    .size(800)
+                                    .crossfade(true)
+                                    .build()
+                            },
+                            contentDescription = pageItem.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+
+            // 2. Интерактивная 3D-карточка с переворотом (3D Flip Photocard)
+            if (cards.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(18.dp))
+                var isCardFlipped by remember { mutableStateOf(false) }
+                val flipRotation by animateFloatAsState(
+                    targetValue = if (isCardFlipped) 180f else 0f,
+                    animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow),
+                    label = "card3dFlip"
+                )
+
+                val frontCard = cards.first()
+                val backCard = cards.getOrNull(1) ?: frontCard
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Style,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = stringResource(id = AppR.string.collector_card_title),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    TextButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            isCardFlipped = !isCardFlipped
+                        }
+                    ) {
+                        Icon(Icons.Rounded.FlipCameraAndroid, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(id = AppR.string.collector_card_flip_hint),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Card(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            isCardFlipped = !isCardFlipped
+                        },
+                        shape = RoundedCornerShape(22.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                        modifier = Modifier
+                            .width(190.dp)
+                            .height(250.dp)
+                            .graphicsLayer {
+                                rotationY = flipRotation
+                                cameraDistance = 14f * density
+                            }
+                    ) {
+                        val activeSide = if (flipRotation <= 90f) frontCard else backCard
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    if (flipRotation > 90f) {
+                                        rotationY = 180f
+                                    }
+                                }
+                        ) {
+                            AsyncImage(
+                                model = remember(activeSide.uri) {
+                                    ImageRequest.Builder(context)
+                                        .data(activeSide.uri)
+                                        .size(640)
+                                        .crossfade(true)
+                                        .build()
+                                },
+                                contentDescription = activeSide.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 3. Интерактивная доска стикеров (Sticker Peel Board)
+            if (stickers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = stringResource(id = AppR.string.sticker_pack_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    itemsIndexed(stickers, key = { _, s -> s.uri.toString() }) { idx, sticker ->
+                        var isPeeled by remember { mutableStateOf(false) }
+                        val stickerScale by animateFloatAsState(
+                            targetValue = if (isPeeled) 1.14f else 1f,
+                            animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+                            label = "stickerScale"
+                        )
+                        val stickerTilt = remember(idx) {
+                            if (idx % 2 == 0) -5f else 5f
+                        }
+
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(110.dp)
+                                .graphicsLayer {
+                                    scaleX = stickerScale
+                                    scaleY = stickerScale
+                                    rotationZ = if (isPeeled) 0f else stickerTilt
+                                }
+                                .shadow(if (isPeeled) 12.dp else 4.dp, RoundedCornerShape(18.dp))
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(3.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(18.dp))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (isPeeled) {
+                                        onOpenInLightbox(sticker)
+                                    } else {
+                                        isPeeled = true
+                                    }
+                                }
+                                .padding(6.dp)
+                        ) {
+                            AsyncImage(
+                                model = remember(sticker.uri) {
+                                    ImageRequest.Builder(context)
+                                        .data(sticker.uri)
+                                        .size(320)
+                                        .crossfade(true)
+                                        .build()
+                                },
+                                contentDescription = sticker.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1434,6 +1832,7 @@ private fun DiscDividerHeader(
 private fun AlbumTrackItem(
     track: AudioTrack,
     albumArtist: String,
+    vinylDiscNumber: Int?,
     isCurrentTrack: Boolean,
     isPlaying: Boolean,
     accentColor: Color,
@@ -1557,14 +1956,46 @@ private fun AlbumTrackItem(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isCurrentTrack) accentColor else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = track.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isCurrentTrack) accentColor else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        if (vinylDiscNumber != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = accentColor.copy(alpha = 0.16f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Album,
+                                        contentDescription = null,
+                                        tint = accentColor,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(id = AppR.string.vinyl_badge_short_fmt, vinylDiscNumber),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = accentColor
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     val showTrackArtist = !track.artist.equals(albumArtist, ignoreCase = true) && track.artist.isNotBlank()
                     if (showTrackArtist) {
@@ -1728,7 +2159,7 @@ private fun AlbumGalleryHeader(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Нажми на бейдж на карточке, чтобы назначить арт Диском или Буклетом",
+                    text = stringResource(id = AppR.string.album_gallery_assign_role_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1749,7 +2180,10 @@ private fun AlbumGalleryHeader(
                         color = accentColor
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Поиск...", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = stringResource(id = AppR.string.action_searching_short),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 } else {
                     Icon(
                         imageVector = Icons.Rounded.Collections,
@@ -1757,7 +2191,11 @@ private fun AlbumGalleryHeader(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Discogs", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = stringResource(id = AppR.string.action_fetch_discogs),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -1837,6 +2275,7 @@ private fun AlbumGalleryCard(
 ) {
     val context = LocalContext.current
     var showCategoryMenu by remember { mutableStateOf(false) }
+    val remoteTagStr = stringResource(id = AppR.string.artwork_remote_source_tag)
 
     Card(
         onClick = onClick,
@@ -1940,9 +2379,9 @@ private fun AlbumGalleryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val subInfo = remember(item.resolution, item.sizeBytes, item.isRemoteFetched) {
+                val subInfo = remember(item.resolution, item.sizeBytes, item.isRemoteFetched, remoteTagStr) {
                     buildString {
-                        if (item.isRemoteFetched) append("Discogs/CAA • ")
+                        if (item.isRemoteFetched) append("$remoteTagStr • ")
                         if (item.resolution.isNotEmpty()) append(item.resolution)
                         if (item.sizeBytes > 0L) {
                             if (isNotEmpty() && !endsWith("• ")) append(" • ")
@@ -1977,6 +2416,7 @@ private fun AlbumReleaseSpecsCard(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val avgLabel = stringResource(id = AppR.string.album_specs_avg_suffix)
 
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -2012,7 +2452,7 @@ private fun AlbumReleaseSpecsCard(
             }
             SpecRowItem(
                 label = stringResource(id = AppR.string.album_specs_total_duration),
-                value = "${formatAlbumTotalDuration(totalDurationMs)} (${formatTrackTime(totalDurationMs / tracksCount.coerceAtLeast(1))} avg)"
+                value = "${formatAlbumTotalDuration(totalDurationMs)} (${formatTrackTime(totalDurationMs / tracksCount.coerceAtLeast(1))} $avgLabel)"
             )
             SpecRowItem(
                 label = stringResource(id = AppR.string.album_specs_artwork_files),
@@ -2128,6 +2568,7 @@ private fun AlbumArtworkLightbox(
     val pagerState = rememberPagerState(initialPage = initialIndex) { artworks.size }
     val currentItem = artworks.getOrNull(pagerState.currentPage)
     var showLightboxCatMenu by remember { mutableStateOf(false) }
+    val remoteTagStr = stringResource(id = AppR.string.artwork_remote_source_tag)
 
     Box(
         modifier = Modifier
@@ -2300,7 +2741,7 @@ private fun AlbumArtworkLightbox(
                             overflow = TextOverflow.Ellipsis
                         )
                         val details = buildString {
-                            if (item.isRemoteFetched) append("Discogs/CAA • ")
+                            if (item.isRemoteFetched) append("$remoteTagStr • ")
                             append(artworkCategoryLabel(item.category))
                             if (item.resolution.isNotEmpty()) append(" • ${item.resolution}")
                             if (item.sizeBytes > 0L) append(" • ${Formatter.formatShortFileSize(context, item.sizeBytes)}")
@@ -2366,6 +2807,8 @@ private fun artworkCategoryLabel(category: ArtworkCategory): String {
         ArtworkCategory.DISC -> stringResource(id = AppR.string.artwork_type_disc)
         ArtworkCategory.BACK -> stringResource(id = AppR.string.artwork_type_back)
         ArtworkCategory.BOOKLET -> stringResource(id = AppR.string.artwork_type_booklet)
+        ArtworkCategory.STICKER -> stringResource(id = AppR.string.artwork_type_sticker)
+        ArtworkCategory.CARD -> stringResource(id = AppR.string.artwork_type_card)
         ArtworkCategory.ARTIST -> stringResource(id = AppR.string.artwork_type_artist)
         ArtworkCategory.EXTRA -> stringResource(id = AppR.string.artwork_type_extra)
     }
