@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
 
 enum class ArtworkCategory {
-    COVER, DISC, BACK, BOOKLET, ARTIST, EXTRA
+    COVER, DISC, BACK, BOOKLET, STICKER, CARD, ARTIST, EXTRA
 }
 
 @Immutable
@@ -63,6 +63,9 @@ object AudioRepository {
     private var cachedTracks: List<AudioTrack>? = null
     private var cachedAlbums: List<AlbumModel>? = null
     private val cachedAlbumArtworks = ConcurrentHashMap<Long, List<AlbumArtworkItem>>()
+
+    private val numberExtractorRegex = Regex("(\\d+)")
+    private val vinylKeywordRegex = Regex("(?i)(vinyl|vinil|винил|\\blp\\b)")
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -99,7 +102,11 @@ object AudioRepository {
         cachedAlbumArtworks[albumId]?.let { currentList ->
             val updated = currentList.map { item ->
                 if (item.uri == artworkUri) item.copy(category = category) else item
-            }.sortedWith(compareBy<AlbumArtworkItem> { it.category.ordinal }.thenBy { it.name.lowercase() })
+            }.sortedWith(
+                compareBy<AlbumArtworkItem> { it.category.ordinal }
+                    .thenBy { extractArtworkSequenceIndex(it.name) }
+                    .thenBy { it.name.lowercase() }
+            )
             cachedAlbumArtworks[albumId] = updated
         }
     }
@@ -110,19 +117,88 @@ object AudioRepository {
         return runCatching { ArtworkCategory.valueOf(saved) }.getOrNull()
     }
 
+    fun extractArtworkSequenceIndex(name: String): Int {
+        val match = numberExtractorRegex.findAll(name).lastOrNull()
+        return match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: Int.MAX_VALUE
+    }
+
+    fun isVinylNamedArtwork(name: String): Boolean {
+        return vinylKeywordRegex.containsMatchIn(name)
+    }
+
+    fun isVinylTrack(track: AudioTrack): Boolean {
+        return vinylKeywordRegex.containsMatchIn(track.title) ||
+                vinylKeywordRegex.containsMatchIn(track.album)
+    }
+
+    /**
+     * Вычисляет правильный диск/винил для конкретного трека альбома:
+     * 1) Если в папке несколько файлов винила (vinyl_1, vinyl_2 / vinil1 и т.д.) и есть треки с припиской vinyl
+     *    (или все треки альбома относятся к винилу), делит список таких треков поровну на число виниловых дисков
+     *    и возвращает соответствующий номеру трека винил.
+     * 2) Для остальных треков возвращает обычный диск (disc/cd) или диск по номеру discNumber.
+     */
+    fun resolveDiscArtworkForTrack(
+        albumTracks: List<AudioTrack>,
+        artworks: List<AlbumArtworkItem>,
+        targetTrack: AudioTrack?
+    ): Uri? {
+        val discItems = artworks.filter { it.category == ArtworkCategory.DISC }
+        if (discItems.isEmpty()) return null
+
+        val vinylDiscs = discItems
+            .filter { isVinylNamedArtwork(it.name) }
+            .sortedWith(compareBy<AlbumArtworkItem> { extractArtworkSequenceIndex(it.name) }.thenBy { it.name.lowercase() })
+
+        val standardDiscs = discItems
+            .filterNot { isVinylNamedArtwork(it.name) }
+            .sortedWith(compareBy<AlbumArtworkItem> { extractArtworkSequenceIndex(it.name) }.thenBy { it.name.lowercase() })
+
+        if (targetTrack == null) {
+            return (standardDiscs.firstOrNull() ?: vinylDiscs.firstOrNull() ?: discItems.firstOrNull())?.uri
+        }
+
+        val sortedAlbumTracks = albumTracks.sortedWith(
+            compareBy<AudioTrack> { it.discNumber }.thenBy { it.trackNumber }.thenBy { it.id }
+        )
+        val explicitVinylTracks = sortedAlbumTracks.filter { vinylKeywordRegex.containsMatchIn(it.title) }
+        val trackIsVinyl = explicitVinylTracks.any { it.id == targetTrack.id } ||
+                (explicitVinylTracks.isEmpty() && vinylDiscs.isNotEmpty() &&
+                        (vinylKeywordRegex.containsMatchIn(targetTrack.album) || standardDiscs.isEmpty()))
+
+        if (trackIsVinyl && vinylDiscs.isNotEmpty()) {
+            if (vinylDiscs.size == 1) return vinylDiscs.first().uri
+            val pool = if (explicitVinylTracks.isNotEmpty()) explicitVinylTracks else sortedAlbumTracks
+            val trackIdx = pool.indexOfFirst { it.id == targetTrack.id }.coerceAtLeast(0)
+            val totalPool = pool.size.coerceAtLeast(1)
+            val vinylIdx = ((trackIdx * vinylDiscs.size) / totalPool).coerceIn(0, vinylDiscs.lastIndex)
+            return vinylDiscs[vinylIdx].uri
+        }
+
+        val fallbackPool = standardDiscs.ifEmpty { discItems }
+        if (fallbackPool.size == 1) return fallbackPool.first().uri
+
+        val byDiscNumber = fallbackPool.firstOrNull {
+            extractArtworkSequenceIndex(it.name) == targetTrack.discNumber
+        }
+        if (byDiscNumber != null) return byDiscNumber.uri
+
+        val allIdx = sortedAlbumTracks.indexOfFirst { it.id == targetTrack.id }.coerceAtLeast(0)
+        val totalAll = sortedAlbumTracks.size.coerceAtLeast(1)
+        val mappedIdx = ((allIdx * fallbackPool.size) / totalAll).coerceIn(0, fallbackPool.lastIndex)
+        return fallbackPool[mappedIdx].uri
+    }
+
     fun getPreferredDiscArtworkUri(context: Context, track: AudioTrack): Uri? {
         if (track.albumId <= 0L) return null
-        cachedAlbumArtworks[track.albumId]?.let { cached ->
-            cached.firstOrNull { it.category == ArtworkCategory.DISC }?.uri?.let { return it }
-        }
-        val dummyAlbum = AlbumModel(
-            id = track.albumId,
-            title = track.album,
-            artist = track.artist,
-            tracks = listOf(track)
-        )
-        val artworks = getAlbumArtworks(context, dummyAlbum)
-        return artworks.firstOrNull { it.category == ArtworkCategory.DISC }?.uri
+        val albumModel = cachedAlbums?.find { it.id == track.albumId }
+            ?: cachedTracks?.filter { it.albumId == track.albumId }?.takeIf { it.isNotEmpty() }?.let { tracks ->
+                AlbumModel(track.albumId, track.album, track.artist, tracks)
+            }
+            ?: AlbumModel(track.albumId, track.album, track.artist, listOf(track))
+
+        val artworks = getAlbumArtworks(context, albumModel)
+        return resolveDiscArtworkForTrack(albumModel.tracks, artworks, track)
     }
 
     fun getAlbumFolderPath(context: Context, album: AlbumModel): String? {
@@ -131,10 +207,6 @@ object AudioRepository {
         return File(filePath).parentFile?.absolutePath
     }
 
-    /**
-     * Парсит любой выбранный пользователем .m3u / .m3u8 файл через ContentResolver (SAF)
-     * и возвращает название плейлиста и найденные треки (либо все треки из той же папки, если пути относительные).
-     */
     suspend fun parseM3uFromUri(
         context: Context,
         uri: Uri,
@@ -158,11 +230,6 @@ object AudioRepository {
         fileName.ifBlank { "M3U8 Playlist" } to matchedIds
     }
 
-    /**
-     * Сканирует локальные папки музыки на наличие .m3u и .m3u8 файлов.
-     * Автоматически помечает `isSingleAlbumDump = true`, если .m3u8 просто дублирует один альбом из папки,
-     * чтобы пользователь мог скрыть сотни одноальбомных .m3u8 одним переключателем!
-     */
     suspend fun scanDeviceM3uPlaylists(
         context: Context,
         allTracks: List<AudioTrack>,
@@ -170,7 +237,6 @@ object AudioRepository {
     ): List<DiscoveredM3uPlaylist> = withContext(Dispatchers.IO) {
         if (allTracks.isEmpty()) return@withContext emptyList()
 
-        // Индексируем реальные пути аудиофайлов для мгновенного сопоставления O(1)
         val pathToTrackId = HashMap<String, AudioTrack>(allTracks.size)
         val fileNameToTrack = HashMap<String, MutableList<AudioTrack>>(allTracks.size)
         val trackById = allTracks.associateBy { it.id }
@@ -257,7 +323,6 @@ object AudioRepository {
                     trimmed.replace('\\', '/')
                 }.removePrefix("file://")
 
-                // 1. Пробуем относительный путь от папки с .m3u8
                 val resolvedFile = if (cleanLine.startsWith("/")) {
                     File(cleanLine)
                 } else if (parentDir != null) {
@@ -272,7 +337,6 @@ object AudioRepository {
                     continue
                 }
 
-                // 2. Сопоставление по имени файла (приоритет файлам из той же папки)
                 val targetFileName = cleanLine.substringAfterLast('/').lowercase()
                 val candidates = fileNameToTrack[targetFileName]
                 if (!candidates.isNullOrEmpty()) {
@@ -286,7 +350,6 @@ object AudioRepository {
                 }
             }
 
-            // Если в .m3u8 были битые пути, но в этой же папке лежат треки — предлагаем треки самой папки
             if (matchedTracks.isEmpty() && parentDir != null) {
                 val parentPrefix = parentDir.absolutePath.lowercase() + "/"
                 val folderTracks = pathToTrackId.entries
@@ -373,9 +436,6 @@ object AudioRepository {
         return matchedIds.distinct()
     }
 
-    /**
-     * Экспортирует плейлист в стандартный файл .m3u8 в папку Music/Playlists.
-     */
     suspend fun exportPlaylistToM3u8(
         context: Context,
         playlistName: String,
@@ -418,7 +478,10 @@ object AudioRepository {
         val seenPaths = HashSet<String>()
 
         val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "avif")
-        val subFolderKeywords = setOf("scans", "scan", "artwork", "artworks", "booklet", "covers", "cover", "images", "art", "extra", "discogs")
+        val subFolderKeywords = setOf(
+            "scans", "scan", "artwork", "artworks", "booklet", "covers", "cover",
+            "images", "art", "extra", "discogs", "stickers", "cards", "inserts"
+        )
 
         val firstTrack = album.tracks.firstOrNull()
         val trackPath = if (firstTrack != null) getAudioFilePath(context, firstTrack.uri) else null
@@ -560,6 +623,7 @@ object AudioRepository {
 
         val sorted = results.sortedWith(
             compareBy<AlbumArtworkItem> { it.category.ordinal }
+                .thenBy { extractArtworkSequenceIndex(it.name) }
                 .thenBy { it.name.lowercase() }
         ).toMutableList()
 
@@ -640,6 +704,7 @@ object AudioRepository {
                                             typesList.any { it.contains("medium") || it.contains("disc") || it.contains("vinyl") } -> "Disc_Scan_${j + 1}"
                                             typesList.any { it.contains("back") || it.contains("spine") || it.contains("tray") } -> "Back_Cover_${j + 1}"
                                             typesList.any { it.contains("booklet") || it.contains("liner") } -> "Booklet_Page_${j + 1}"
+                                            typesList.any { it.contains("sticker") } -> "Sticker_${j + 1}"
                                             typesList.any { it.contains("front") } -> "Front_Cover_${j + 1}"
                                             else -> "Extra_Art_${j + 1}"
                                         }
@@ -683,9 +748,9 @@ object AudioRepository {
                         foundUrls.forEachIndexed { idx, url ->
                             val guessedRole = when (idx) {
                                 0 -> if (discoveredImages.isEmpty()) "Discogs_Cover_1" else "Discogs_Art_1"
-                                1 -> "Discogs_Disc_Vinyl_2"
-                                2 -> "Discogs_Back_Cover_3"
-                                else -> "Discogs_Booklet_Scan_${idx + 1}"
+                                1 -> "Discogs_Disc_Vinyl_1"
+                                2 -> "Discogs_Back_Cover_1"
+                                else -> "Discogs_Booklet_Scan_${idx - 1}"
                             }
                             discoveredImages.add(url to guessedRole)
                         }
@@ -718,8 +783,13 @@ object AudioRepository {
         return when {
             n in setOf("cover", "folder", "front", "album", "albumart", "thumb", "default") ||
                     n.startsWith("cover") || n.startsWith("front") || n.startsWith("folder") || n.contains("albumart") -> ArtworkCategory.COVER
-            n.contains("disc") || n.contains("disk") || n.contains("vinyl") || n.contains("cd") ||
-                    n.contains("lp") || n.contains("plate") || n.contains("matrix") || n.contains("media") || n.contains("side") -> ArtworkCategory.DISC
+            n.contains("disc") || n.contains("disk") || n.contains("vinyl") || n.contains("vinil") ||
+                    n.contains("cd") || n.contains("lp") || n.contains("plate") || n.contains("matrix") ||
+                    n.contains("media") || n.contains("side") -> ArtworkCategory.DISC
+            n.contains("sticker") || n.contains("stiker") || n.contains("badge") ||
+                    n.contains("decal") || n.contains("hype") || n.contains("label_sticker") -> ArtworkCategory.STICKER
+            n.contains("card") || n.contains("photocard") || n.contains("polaroid") ||
+                    n.contains("postcard") || n.contains("trading") || n.contains("ticket") -> ArtworkCategory.CARD
             n.contains("back") || n.contains("rear") || n.contains("tray") || n.contains("inlay") ||
                     n.contains("inside") || n.contains("spine") || n.contains("obi") -> ArtworkCategory.BACK
             n.contains("booklet") || n.contains("page") || n.contains("scan") || n.contains("insert") ||
