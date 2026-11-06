@@ -373,4 +373,33 @@
     <string name="album_specs_artwork_files">Файлов галереи</string>
     <string name="album_specs_source_folder">Папка</string>
     <string name="album_open_gallery_btn">Открыть галерею альбома (%1$d)</string>
+
+    <string name="artwork_type_sticker">Стикер</string>
+    <string name="artwork_type_card">Карточка</string>
+    <string name="vinyl_disc_chip_fmt">Винил %1$d</string>
+    <string name="vinyl_badge_short_fmt">ВИНИЛ %1$d</string>
+    <string name="collector_desk_title">Стол коллекционера</string>
+    <string name="collector_desk_subtitle">Интерактивный буклет, 3D-карточки и стикеры из папки альбома</string>
+    <string name="booklet_reader_title">Буклет издания</string>
+    <string name="booklet_page_indicator_fmt">Стр. %1$d из %2$d</string>
+    <string name="collector_card_title">3D-карточка вкладыш</string>
+    <string name="collector_card_flip_hint">Перевернуть 180°</string>
+    <string name="sticker_pack_title">Стикерпак релиза (нажми для осмотра)</string>
+    <string name="album_gallery_assign_role_hint">Нажми на бейдж на карточке, чтобы назначить арт Диском, Буклетом, Карточкой или Стикером</string>
+    <string name="action_searching_short">Поиск…</string>
+    <string name="action_fetch_discogs">Discogs</string>
+    <string name="artwork_remote_source_tag">Discogs/CAA</string>
+    <string name="album_specs_avg_suffix">средн.</string>
+    <string name="player_vinyl_mode_cd">Режим винила</string>
+    <string name="online_canvas_enabled_label">Онлайн Canvas: ВКЛ</string>
+    <string name="online_canvas_disabled_label">Онлайн Canvas: ВЫКЛ</string>
+    <string name="saavn_stream_quality_badge">JioSaavn • MP4A 320 кбит/с</string>
+    <string name="saavn_service_name">JioSaavn</string>
+    <string name="seek_10s_short">10с</string>
+    <string name="signal_path_dialog_title">Аудио-тракт сигнала</string>
+    <string name="signal_path_step_source">1. Источник потока</string>
+    <string name="signal_path_step_engine">2. Аудио-движок и DSP</string>
+    <string name="signal_path_engine_desc">Media3 ExoPlayer • JamesDSP 32-bit Float</string>
+    <string name="signal_path_step_output">3. Устройство вывода</string>
+    <string name="action_switch_audio_output">Сменить выход</string>
 </resources>
