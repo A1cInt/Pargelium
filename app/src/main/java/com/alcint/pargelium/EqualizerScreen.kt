@@ -5,6 +5,10 @@ import android.content.Context
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.provider.OpenableColumns
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -33,8 +37,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Compress
 import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.SpatialAudioOff
@@ -71,12 +78,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.util.Locale
 import kotlin.math.abs
 
 @Composable
 fun EqualizerScreen(seedColor: Color) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val accentColor = if (seedColor != Color.Unspecified && seedColor != Color.Transparent) {
         seedColor
@@ -87,49 +97,144 @@ fun EqualizerScreen(seedColor: Color) {
     var isEnabled by remember { mutableStateOf(PrefsManager.getEnabled()) }
     var autoHeadroomEnabled by remember { mutableStateOf(JamesDspController.isAutoHeadroomEnabled) }
 
-    // AutoEQ
+    // 1. AutoEQ & Arbitrary Response EQ (GraphicEQ)
     var autoEqEnabled by remember { mutableStateOf(PrefsManager.getAutoEqEnabled()) }
     var currentProfile by remember { mutableStateOf(PrefsManager.getCurrentAutoEqProfile()) }
+    var customGraphicEqStr by remember { mutableStateOf(PrefsManager.getCustomGraphicEqString()) }
+    var showGraphicEqEditor by remember { mutableStateOf(false) }
     var showAutoEqSheet by remember { mutableStateOf(false) }
     var autoEqDatabaseList by remember { mutableStateOf<List<AutoEqProfile>>(emptyList()) }
     var isAutoEqListLoading by remember { mutableStateOf(true) }
     var autoEqErrorText by remember { mutableStateOf<String?>(null) }
 
+    // 2. Multimodal Equalizer (15-Band ISO & 10-Band)
     var userEqEnabled by remember { mutableStateOf(PrefsManager.getUserEqEnabled()) }
-    val userEqGains = remember {
+    var is15BandMode by remember { mutableStateOf(PrefsManager.getEq15BandMode()) }
+    var eqFilterMode by remember { mutableIntStateOf(PrefsManager.getEqFilterMode()) }
+    var eqInterpMode by remember { mutableIntStateOf(PrefsManager.getEqInterpolationMode()) }
+
+    val userEqGains10 = remember {
         val saved = PrefsManager.getUserEqGains()
-        val padded = FloatArray(10) { idx -> saved.getOrElse(idx) { 0f } }
-        mutableStateListOf(*padded.toTypedArray())
+        mutableStateListOf(*FloatArray(10) { idx -> saved.getOrElse(idx) { 0f } }.toTypedArray())
     }
-    val eqLabels = remember { listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k") }
+    val userEqGains15 = remember {
+        val saved = PrefsManager.getUserEqGains15()
+        mutableStateListOf(*FloatArray(15) { idx -> saved.getOrElse(idx) { 0f } }.toTypedArray())
+    }
+    val eqLabels10 = remember { listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k") }
+    val eqLabels15 = remember {
+        listOf("25", "40", "63", "100", "160", "250", "400", "630", "1k", "1.6k", "2.5k", "4k", "6.3k", "10k", "16k")
+    }
+    val eqFilterModeLabels = remember {
+        listOf(
+            "FIR Min Phase",
+            "FIR Linear Phase",
+            "IIR 4th Order",
+            "IIR 6th Order",
+            "IIR 8th Order",
+            "IIR 10th Order",
+            "IIR 12th Order"
+        )
+    }
     var activePresetName by remember { mutableStateOf<String?>(null) }
 
-    // Dynamic Bass
+    // 3. Dynamic Range Compander (7 bands)
+    var companderEnabled by remember { mutableStateOf(PrefsManager.getCompanderEnabled()) }
+    var companderTc by remember { mutableFloatStateOf(PrefsManager.getCompanderTimeConstant()) }
+    var companderGranularity by remember { mutableIntStateOf(PrefsManager.getCompanderGranularity()) }
+    var companderTfRes by remember { mutableIntStateOf(PrefsManager.getCompanderTfResolution()) }
+    val companderGains = remember {
+        val saved = PrefsManager.getCompanderGains()
+        mutableStateListOf(*FloatArray(7) { idx -> saved.getOrElse(idx) { 0f } }.toTypedArray())
+    }
+    val companderLabels = remember { listOf("95", "200", "400", "800", "1.6k", "3.4k", "7.5k") }
+    val companderTfLabels = remember { listOf("Uniform", "Low Latency", "High Res", "Extreme") }
+
+    // 4. Dynamic Bass Boost
     var bassEnabled by remember { mutableStateOf(PrefsManager.getBassEnabled()) }
     var bass by remember { mutableFloatStateOf(PrefsManager.getBass().toFloat()) }
 
-    // Reverb
+    // 5. Reverberation (Progenitor 2)
     var roomEnabled by remember { mutableStateOf(PrefsManager.getRoom()) }
     var reverbMode by remember { mutableIntStateOf(PrefsManager.getReverbMode()) }
     val reverbModesList = stringArrayResource(id = R.array.reverb_modes).toList()
 
-    // Vacuum Tube
+    // 6. Vacuum Tube (Analog Modeling)
     var tubeEnabled by remember { mutableStateOf(PrefsManager.getTubeEnabled()) }
     var tubeDrive by remember { mutableFloatStateOf(PrefsManager.getTubeDrive()) }
 
-    // Stereo Widener
+    // 7. Stereo Widener
     var stereoWideEnabled by remember { mutableStateOf(PrefsManager.getStereoWideEnabled()) }
     var stereoWidth by remember { mutableFloatStateOf(PrefsManager.getStereoWidth()) }
 
-    // BS2B Crossfeed
+    // 8. BS2B & HRTF Crossfeed
     var bs2bEnabled by remember { mutableStateOf(PrefsManager.getBs2bEnabled()) }
     var bs2bMode by remember { mutableIntStateOf(PrefsManager.getBs2bMode()) }
     val bs2bModesList = stringArrayResource(id = R.array.bs2b_modes).toList()
 
-    // Master Limiter
+    // 9. ViPER-DDC (.vdc)
+    var ddcEnabled by remember { mutableStateOf(PrefsManager.getDdcEnabled()) }
+    var selectedVdcId by remember { mutableStateOf(PrefsManager.getDdcPresetId()) }
+    var hasCustomVdc by remember { mutableStateOf(!PrefsManager.getCustomVdcContent().isNullOrBlank()) }
+
+    // 10. Convolver (1D Impulse Response)
+    var convolverEnabled by remember { mutableStateOf(PrefsManager.getConvolverEnabled()) }
+    var convolverPresetId by remember { mutableIntStateOf(PrefsManager.getConvolverPresetId()) }
+    var customIrName by remember { mutableStateOf(JamesDspController.customImpulseName) }
+
+    // 11. Master Limiter & PostGain
     var limThreshold by remember { mutableFloatStateOf(PrefsManager.getLimThreshold()) }
     var limRelease by remember { mutableFloatStateOf(PrefsManager.getLimRelease()) }
     var postGain by remember { mutableFloatStateOf(PrefsManager.getPostGain()) }
+
+    val vdcFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val content = try {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        BufferedReader(InputStreamReader(stream)).readText()
+                    }
+                } catch (_: Exception) { null }
+
+                withContext(Dispatchers.Main) {
+                    if (!content.isNullOrBlank()) {
+                        JamesDspController.setCustomVdcContent(content)
+                        JamesDspController.setDdcEnabled(true)
+                        ddcEnabled = true
+                        hasCustomVdc = true
+                        Toast.makeText(context, "ViPER-DDC (.vdc) loaded", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    val irWavPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                var fileName: String? = null
+                try {
+                    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (idx != -1) fileName = c.getString(idx)
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                val ok = JamesDspController.loadImpulseFromUri(context, uri, fileName)
+                withContext(Dispatchers.Main) {
+                    if (ok) {
+                        convolverEnabled = true
+                        customIrName = JamesDspController.customImpulseName
+                        Toast.makeText(context, "Impulse Response loaded: ${customIrName ?: "WAV"}", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Unsupported WAV format (use 16/24/32-bit WAV)", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         JamesDspController.syncFromPrefs()
@@ -168,9 +273,13 @@ fun EqualizerScreen(seedColor: Color) {
     }
 
     val activeModulesCount = remember(
-        autoEqEnabled, userEqEnabled, bassEnabled, roomEnabled, stereoWideEnabled, bs2bEnabled, tubeEnabled
+        autoEqEnabled, userEqEnabled, companderEnabled, bassEnabled, roomEnabled,
+        stereoWideEnabled, bs2bEnabled, tubeEnabled, ddcEnabled, convolverEnabled
     ) {
-        listOf(autoEqEnabled, userEqEnabled, bassEnabled, roomEnabled, stereoWideEnabled, bs2bEnabled, tubeEnabled).count { it }
+        listOf(
+            autoEqEnabled, userEqEnabled, companderEnabled, bassEnabled, roomEnabled,
+            stereoWideEnabled, bs2bEnabled, tubeEnabled, ddcEnabled, convolverEnabled
+        ).count { it }
     }
 
     Column(
@@ -254,6 +363,7 @@ fun EqualizerScreen(seedColor: Color) {
                 )
             }
 
+            // 1. ЭКВАЛАЙЗЕРЫ (Arbitrary Response EQ + Multimodal 15-Band / 10-Band EQ)
             item(key = "dsp_eq_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.Equalizer,
@@ -262,7 +372,11 @@ fun EqualizerScreen(seedColor: Color) {
                 )
 
                 val autoEqDesc = buildString {
-                    append(currentProfile?.name ?: stringResource(id = R.string.click_to_select_model))
+                    if (customGraphicEqStr.isNotBlank()) {
+                        append("Custom GraphicEQ Curve Active")
+                    } else {
+                        append(currentProfile?.name ?: stringResource(id = R.string.click_to_select_model))
+                    }
                     if (connectedDeviceName != null) {
                         append("\n🎧 ${stringResource(id = R.string.connected_device_fmt, connectedDeviceName!!)}")
                     }
@@ -271,7 +385,7 @@ fun EqualizerScreen(seedColor: Color) {
                 EffectCardWithSettings(
                     title = stringResource(id = R.string.autoeq_title),
                     desc = autoEqDesc,
-                    badge = if (autoEqEnabled && currentProfile != null) "FIR/IIR" else null,
+                    badge = if (autoEqEnabled) "Arbitrary FIR" else null,
                     checked = autoEqEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -286,34 +400,60 @@ fun EqualizerScreen(seedColor: Color) {
                     },
                     onClick = { showAutoEqSheet = true }
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilledTonalButton(
-                            onClick = { showAutoEqSheet = true },
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = currentProfile?.name ?: stringResource(id = R.string.select_headphone_model),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = FontWeight.Bold
+                            FilledTonalButton(
+                                onClick = { showAutoEqSheet = true },
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Headphones, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = currentProfile?.name ?: stringResource(id = R.string.select_headphone_model),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { showGraphicEqEditor = !showGraphicEqEditor },
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Text("GraphicEQ", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        AnimatedVisibility(visible = showGraphicEqEditor) {
+                            OutlinedTextField(
+                                value = customGraphicEqStr,
+                                onValueChange = {
+                                    customGraphicEqStr = it
+                                    JamesDspController.setCustomGraphicEqString(it)
+                                },
+                                label = { Text("GraphicEQ: 20 0.0; 63 3.5; 1000 -1.2...") },
+                                singleLine = false,
+                                maxLines = 3,
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
                 }
 
                 EffectCardWithSettings(
-                    title = stringResource(id = R.string.ten_band_eq_title),
-                    desc = stringResource(id = R.string.ten_band_eq_desc),
-                    badge = activePresetName,
+                    title = if (is15BandMode) "15-Band Multimodal Equalizer" else stringResource(id = R.string.ten_band_eq_title),
+                    desc = "${eqFilterModeLabels.getOrElse(eqFilterMode) { "FIR" }} • ${if (eqInterpMode == 0) "PCHIP" else "Makima Spline"}",
+                    badge = activePresetName ?: if (is15BandMode) "15 ISO" else "10 Band",
                     checked = userEqEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -323,18 +463,69 @@ fun EqualizerScreen(seedColor: Color) {
                         JamesDspController.setEqualizerEnabled(it)
                     }
                 ) {
+                    val activeGainsList = if (is15BandMode) userEqGains15 else userEqGains10
+                    val activeLabels = if (is15BandMode) eqLabels15 else eqLabels10
+
                     EqFrequencyResponseGraph(
-                        userGains = userEqGains,
+                        userGains = activeGainsList,
                         autoEqGains = if (autoEqEnabled) currentProfile?.gains else null,
                         accentColor = accentColor,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(110.dp)
+                            .height(114.dp)
                             .padding(horizontal = 16.dp, vertical = 6.dp)
                     )
 
+                    // Переключатели режима 15/10 полос, типа фильтра (FIR/IIR) и сплайна (PCHIP/Makima)
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = is15BandMode,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val next = !is15BandMode
+                                    if (next && userEqGains15.all { it == 0f }) {
+                                        val interp = JamesDspController.interpolate10To15Bands(userEqGains10.toFloatArray())
+                                        for (i in 0 until 15) userEqGains15[i] = interp[i]
+                                    }
+                                    is15BandMode = next
+                                    JamesDspController.setEq15BandMode(next)
+                                },
+                                label = { Text(if (is15BandMode) "15 ISO Bands" else "10 Bands", fontWeight = FontWeight.Bold) },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = eqInterpMode == 1,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    eqInterpMode = if (eqInterpMode == 0) 1 else 0
+                                    JamesDspController.setEqInterpolationMode(eqInterpMode)
+                                },
+                                label = { Text(if (eqInterpMode == 0) "Spline: PCHIP" else "Spline: Makima") },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                        itemsIndexed(eqFilterModeLabels) { idx, modeName ->
+                            FilterChip(
+                                selected = eqFilterMode == idx,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    eqFilterMode = idx
+                                    JamesDspController.setEqFilterMode(idx)
+                                },
+                                label = { Text(modeName) },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -346,11 +537,14 @@ fun EqualizerScreen(seedColor: Color) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     activePresetName = preset.name
                                     for (i in 0..9) {
-                                        userEqGains[i] = preset.gains10.getOrElse(i) { 0f }
+                                        userEqGains10[i] = preset.gains10.getOrElse(i) { 0f }
                                     }
-                                    val arr = userEqGains.toFloatArray()
-                                    PrefsManager.saveUserEqGains(arr)
-                                    JamesDspController.setEqualizerGains(arr)
+                                    val arr10 = userEqGains10.toFloatArray()
+                                    val arr15 = JamesDspController.interpolate10To15Bands(arr10)
+                                    for (i in 0..14) userEqGains15[i] = arr15[i]
+                                    PrefsManager.saveUserEqGains(arr10)
+                                    PrefsManager.saveUserEqGains15(arr15)
+                                    JamesDspController.setEqualizerGains(if (is15BandMode) arr15 else arr10)
                                 },
                                 label = { Text(preset.name, fontWeight = FontWeight.SemiBold) },
                                 shape = RoundedCornerShape(12.dp)
@@ -365,11 +559,12 @@ fun EqualizerScreen(seedColor: Color) {
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        for (i in 0..9) {
-                            val gainVal = userEqGains[i]
+                        val bandCount = activeGainsList.size
+                        for (i in 0 until bandCount) {
+                            val gainVal = activeGainsList[i]
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 6.dp)
+                                modifier = Modifier.padding(horizontal = 5.dp)
                             ) {
                                 Text(
                                     text = String.format(Locale.US, "%+.1f", gainVal),
@@ -380,20 +575,31 @@ fun EqualizerScreen(seedColor: Color) {
                                 Box(
                                     modifier = Modifier
                                         .height(156.dp)
-                                        .width(38.dp),
+                                        .width(36.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Slider(
                                         value = gainVal,
                                         onValueChange = { newValue ->
                                             activePresetName = null
-                                            userEqGains[i] = newValue
-                                            JamesDspController.setEqualizerGains(userEqGains.toFloatArray())
+                                            if (is15BandMode) {
+                                                userEqGains15[i] = newValue
+                                                JamesDspController.setEqualizerGains15(userEqGains15.toFloatArray())
+                                            } else {
+                                                userEqGains10[i] = newValue
+                                                JamesDspController.setEqualizerGains(userEqGains10.toFloatArray())
+                                            }
                                         },
                                         onValueChangeFinished = {
-                                            val array = userEqGains.toFloatArray()
-                                            PrefsManager.saveUserEqGains(array)
-                                            JamesDspController.setEqualizerGains(array)
+                                            if (is15BandMode) {
+                                                val array15 = userEqGains15.toFloatArray()
+                                                PrefsManager.saveUserEqGains15(array15)
+                                                JamesDspController.setEqualizerGains15(array15)
+                                            } else {
+                                                val array10 = userEqGains10.toFloatArray()
+                                                PrefsManager.saveUserEqGains(array10)
+                                                JamesDspController.setEqualizerGains(array10)
+                                            }
                                         },
                                         valueRange = -15f..15f,
                                         colors = SliderDefaults.colors(
@@ -409,7 +615,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     )
                                 }
                                 Text(
-                                    text = eqLabels[i],
+                                    text = activeLabels[i],
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.ExtraBold
                                 )
@@ -421,10 +627,13 @@ fun EqualizerScreen(seedColor: Color) {
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             activePresetName = "Flat"
-                            for (i in 0..9) userEqGains[i] = 0f
-                            val zeroArray = FloatArray(10) { 0f }
-                            PrefsManager.saveUserEqGains(zeroArray)
-                            JamesDspController.setEqualizerGains(zeroArray)
+                            for (i in 0..9) userEqGains10[i] = 0f
+                            for (i in 0..14) userEqGains15[i] = 0f
+                            val zero10 = FloatArray(10) { 0f }
+                            val zero15 = FloatArray(15) { 0f }
+                            PrefsManager.saveUserEqGains(zero10)
+                            PrefsManager.saveUserEqGains15(zero15)
+                            JamesDspController.setEqualizerGains(zero15)
                         },
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
@@ -438,7 +647,156 @@ fun EqualizerScreen(seedColor: Color) {
                 }
             }
 
-            item(key = "dsp_bass_section") {
+            // 2. DYNAMIC RANGE COMPANDER (7-Band Time-Frequency Compander)
+            item(key = "dsp_compander_section") {
+                SectionHeaderTitle(
+                    icon = Icons.Rounded.Compress,
+                    title = "Dynamic Range Compander",
+                    accentColor = accentColor
+                )
+
+                EffectCardWithSettings(
+                    title = "Multiband Compander (7-Band)",
+                    desc = "Time-frequency dynamic range compression & micro-detail booster",
+                    badge = if (companderEnabled) companderTfLabels.getOrElse(companderTfRes) { "Active" } else null,
+                    checked = companderEnabled,
+                    accentColor = accentColor,
+                    onChecked = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        companderEnabled = it
+                        JamesDspController.setCompanderEnabled(it)
+                    }
+                ) {
+                    EqFrequencyResponseGraph(
+                        userGains = companderGains,
+                        autoEqGains = null,
+                        accentColor = accentColor,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(92.dp)
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+
+                    SettingSlider(
+                        name = "Time Constant (Release Speed)",
+                        value = companderTc,
+                        range = 0.05f..1.0f,
+                        unit = " s",
+                        showDecimal = true,
+                        accentColor = accentColor,
+                        onValueChange = {
+                            companderTc = it
+                            JamesDspController.setCompanderParams(
+                                companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
+                            )
+                        },
+                        onValueChangeFinished = {
+                            PrefsManager.saveCompanderTimeConstant(companderTc)
+                        }
+                    )
+
+                    SettingSlider(
+                        name = "Granularity",
+                        value = companderGranularity.toFloat(),
+                        range = 1f..4f,
+                        unit = "x",
+                        accentColor = accentColor,
+                        onValueChange = {
+                            companderGranularity = it.toInt().coerceIn(1, 4)
+                            JamesDspController.setCompanderParams(
+                                companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
+                            )
+                        },
+                        onValueChangeFinished = {
+                            PrefsManager.saveCompanderGranularity(companderGranularity)
+                        }
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        companderTfLabels.forEachIndexed { idx, label ->
+                            FilterChip(
+                                selected = companderTfRes == idx,
+                                onClick = {
+                                    companderTfRes = idx
+                                    PrefsManager.saveCompanderTfResolution(idx)
+                                    JamesDspController.setCompanderParams(
+                                        companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
+                                    )
+                                },
+                                label = { Text(label) },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        for (i in 0 until 7) {
+                            val gVal = companderGains[i]
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(horizontal = 6.dp)
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%+.1f", gVal),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (abs(gVal) > 0.2f) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .height(136.dp)
+                                        .width(38.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Slider(
+                                        value = gVal,
+                                        onValueChange = { newVal ->
+                                            companderGains[i] = newVal
+                                            JamesDspController.setCompanderParams(
+                                                companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
+                                            )
+                                        },
+                                        onValueChangeFinished = {
+                                            PrefsManager.saveCompanderGains(companderGains.toFloatArray())
+                                        },
+                                        valueRange = -12f..12f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = accentColor,
+                                            activeTrackColor = accentColor
+                                        ),
+                                        modifier = Modifier
+                                            .requiredWidth(136.dp)
+                                            .graphicsLayer {
+                                                rotationZ = -90f
+                                                transformOrigin = TransformOrigin(0.5f, 0.5f)
+                                            }
+                                    )
+                                }
+                                Text(
+                                    text = companderLabels[i],
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. DYNAMIC BASS & ANALOG TUBE
+            item(key = "dsp_bass_and_tube_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.Speaker,
                     title = stringResource(id = R.string.bass_management_title),
@@ -474,8 +832,182 @@ fun EqualizerScreen(seedColor: Color) {
                         }
                     )
                 }
+
+                EffectCardWithSettings(
+                    title = stringResource(id = R.string.tube_title),
+                    desc = stringResource(id = R.string.tube_desc),
+                    badge = if (tubeEnabled) String.format(Locale.US, "%.1f dB", tubeDrive) else null,
+                    checked = tubeEnabled,
+                    accentColor = accentColor,
+                    onChecked = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        tubeEnabled = it
+                        PrefsManager.saveTubeEnabled(it)
+                        JamesDspController.setTubeEnabled(it)
+                    }
+                ) {
+                    SettingSlider(
+                        name = stringResource(id = R.string.setting_tube_drive),
+                        value = tubeDrive,
+                        range = 0f..12f,
+                        unit = " dB",
+                        showDecimal = true,
+                        accentColor = accentColor,
+                        onValueChange = {
+                            tubeDrive = it
+                            JamesDspController.setTubeDrive(it)
+                        },
+                        onValueChangeFinished = {
+                            PrefsManager.saveTubeDrive(tubeDrive)
+                            JamesDspController.setTubeDrive(tubeDrive)
+                        }
+                    )
+                }
             }
 
+            // 4. VIPER-DDC & CONVOLVER (IMPULSE RESPONSE ENGINE)
+            item(key = "dsp_ddc_and_convolver_section") {
+                SectionHeaderTitle(
+                    icon = Icons.Rounded.Memory,
+                    title = "Convolver & ViPER-DDC",
+                    accentColor = accentColor
+                )
+
+                val activeVdcTitle = if (hasCustomVdc) {
+                    "Custom .vdc File"
+                } else {
+                    JamesDspController.builtInVdcPresets.find { it.id == selectedVdcId }?.name ?: "DT770 Pro"
+                }
+
+                EffectCardWithSettings(
+                    title = "ViPER-DDC (IIR Cascade)",
+                    desc = "Precision Second-Order Sections headphone correction ($activeVdcTitle)",
+                    badge = if (ddcEnabled) "SOS IIR" else null,
+                    checked = ddcEnabled,
+                    accentColor = accentColor,
+                    onChecked = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        ddcEnabled = it
+                        JamesDspController.setDdcEnabled(it)
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        JamesDspController.builtInVdcPresets.forEach { preset ->
+                            val isSelected = !hasCustomVdc && selectedVdcId == preset.id
+                            Surface(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedVdcId = preset.id
+                                    hasCustomVdc = false
+                                    JamesDspController.setDdcPreset(preset.id)
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) accentColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(preset.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(preset.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = accentColor)
+                                    }
+                                }
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { vdcFilePicker.launch(arrayOf("*/*")) },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (hasCustomVdc) "Change Custom .vdc File" else "Import .vdc File from Storage", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                val activeIrTitle = customIrName
+                    ?: JamesDspController.builtInImpulsePresets.find { it.id == convolverPresetId }?.name
+                    ?: "Studio Impulse"
+
+                EffectCardWithSettings(
+                    title = "Convolver (1D FIR Impulse Engine)",
+                    desc = "Partitioned FFT convolution engine ($activeIrTitle)",
+                    badge = if (convolverEnabled) "FIR IR" else null,
+                    checked = convolverEnabled,
+                    accentColor = accentColor,
+                    onChecked = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        convolverEnabled = it
+                        JamesDspController.setConvolverEnabled(it)
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        JamesDspController.builtInImpulsePresets.forEach { irPreset ->
+                            val isSelected = customIrName == null && convolverPresetId == irPreset.id
+                            Surface(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    convolverPresetId = irPreset.id
+                                    customIrName = null
+                                    JamesDspController.setConvolverPreset(irPreset.id)
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) accentColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(irPreset.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(irPreset.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = accentColor)
+                                    }
+                                }
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { irWavPicker.launch(arrayOf("audio/*", "*/*")) },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = if (customIrName != null) "Loaded: $customIrName" else "Load Custom .wav / .irs Impulse",
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 5. ПРОСТРАНСТВО (Progenitor 2 Reverb, Stereo Widener, BS2B / HRTF Crossfeed)
             item(key = "dsp_space_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.SpatialAudioOff,
@@ -586,45 +1118,7 @@ fun EqualizerScreen(seedColor: Color) {
                 }
             }
 
-            item(key = "dsp_tube_section") {
-                SectionHeaderTitle(
-                    icon = Icons.Rounded.AutoAwesome,
-                    title = stringResource(id = R.string.section_analog_color),
-                    accentColor = accentColor
-                )
-
-                EffectCardWithSettings(
-                    title = stringResource(id = R.string.tube_title),
-                    desc = stringResource(id = R.string.tube_desc),
-                    badge = if (tubeEnabled) String.format(Locale.US, "%.1f dB", tubeDrive) else null,
-                    checked = tubeEnabled,
-                    accentColor = accentColor,
-                    onChecked = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        tubeEnabled = it
-                        PrefsManager.saveTubeEnabled(it)
-                        JamesDspController.setTubeEnabled(it)
-                    }
-                ) {
-                    SettingSlider(
-                        name = stringResource(id = R.string.setting_tube_drive),
-                        value = tubeDrive,
-                        range = 0f..10f,
-                        unit = " dB",
-                        showDecimal = true,
-                        accentColor = accentColor,
-                        onValueChange = {
-                            tubeDrive = it
-                            JamesDspController.setTubeDrive(it)
-                        },
-                        onValueChangeFinished = {
-                            PrefsManager.saveTubeDrive(tubeDrive)
-                            JamesDspController.setTubeDrive(tubeDrive)
-                        }
-                    )
-                }
-            }
-
+            // 6. MASTER LIMITER & POST-GAIN
             item(key = "dsp_limiter_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.Tune,
@@ -681,7 +1175,7 @@ fun EqualizerScreen(seedColor: Color) {
                         SettingSlider(
                             name = stringResource(id = R.string.setting_limiter_threshold),
                             value = limThreshold,
-                            range = -12f..0f,
+                            range = -24f..-0.05f,
                             unit = " ${stringResource(id = R.string.unit_db)}",
                             showDecimal = true,
                             accentColor = accentColor,
@@ -698,7 +1192,7 @@ fun EqualizerScreen(seedColor: Color) {
                         SettingSlider(
                             name = stringResource(id = R.string.setting_limiter_release),
                             value = limRelease,
-                            range = 10f..300f,
+                            range = 5f..500f,
                             unit = " ${stringResource(id = R.string.unit_ms)}",
                             accentColor = accentColor,
                             onValueChange = {
@@ -714,7 +1208,7 @@ fun EqualizerScreen(seedColor: Color) {
                         SettingSlider(
                             name = stringResource(id = R.string.setting_postgain),
                             value = postGain,
-                            range = -12f..12f,
+                            range = -15f..15f,
                             unit = " ${stringResource(id = R.string.unit_db)}",
                             showDecimal = true,
                             accentColor = accentColor,
@@ -812,7 +1306,7 @@ private fun DspSignalTelemetryDeck(
                     )
                     Column {
                         Text(
-                            text = "DSP Signal & Headroom Guard",
+                            text = "JamesDSP 64-bit Engine • ${JamesDspController.currentSampleRate} Hz",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.ExtraBold
                         )
@@ -1006,7 +1500,7 @@ fun SettingSlider(
     onValueChangeFinished: () -> Unit
 ) {
     val formattedValue = if (showDecimal) {
-        String.format(Locale.US, "%.1f%s", value, unit)
+        String.format(Locale.US, "%.2f%s", value, unit)
     } else {
         "${value.toInt()}$unit"
     }
@@ -1210,7 +1704,7 @@ fun AutoEqSelectionSheet(
                             searchQuery = if (searchQuery.equals(connectedDeviceName, ignoreCase = true)) "" else connectedDeviceName
                         },
                         leadingIcon = { Icon(Icons.Default.Headphones, null, modifier = Modifier.size(16.dp)) },
-                        label = { Text("Найти для $connectedDeviceName") },
+                        label = { Text(connectedDeviceName) },
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -1277,15 +1771,6 @@ fun AutoEqSelectionSheet(
                                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                     )
                                 },
-                                supportingContent = if (isConnectedMatch) {
-                                    {
-                                        Text(
-                                            text = "Совпадает с подключенным устройством",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                } else null,
                                 leadingContent = {
                                     Icon(
                                         imageVector = Icons.Default.Headphones,
