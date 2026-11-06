@@ -9,6 +9,12 @@
 extern "C" {
 #include "jdsp_header.h"
 
+extern void JamesDSPGlobalMemoryAllocation(void);
+extern void JamesDSPGlobalMemoryDeallocation(void);
+extern void JamesDSPInit(JamesDSPLib *jdsp, int blockSizeMax, float sample_rate);
+extern void JamesDSPFree(JamesDSPLib *jdsp);
+extern void JamesDSPProcess(JamesDSPLib *jdsp, size_t n);
+
 extern void JDSP_LiveProgSetConfig(int enabled, int mode, const float *params, int paramCount, float sampleRate);
 extern void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleRate);
 }
@@ -144,7 +150,6 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeProcess(
         return;
     }
 
-    /* Сначала прогоняем буфер через наш EEL2 Liveprog, если он активен */
     JDSP_LiveProgProcessInterleaved(buf, numFrames, engine->sampleRate);
 
     JamesDSPLib *jdsp = &engine->jdsp;
@@ -243,7 +248,7 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetCompander(
             int safeGran = granularity < 1 ? 1 : (granularity > 4 ? 4 : granularity);
             int safeTf = tfResolution < 0 ? 0 : (tfResolution > 3 ? 3 : tfResolution);
 
-            CompressorSetParam(&engine->jdsp, safeTc, safeGran, safeTf);
+            CompressorSetParam(&engine->jdsp, safeTc, safeGran, safeTf, 1);
             CompressorSetGain(&engine->jdsp, freqs, dGains, 1);
             CompressorEnable(&engine->jdsp, 1);
         }
@@ -524,7 +529,7 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetLiveprog(
     if (eelCode != nullptr) {
         const char *rawCode = env->GetStringUTFChars(eelCode, nullptr);
         if (rawCode) {
-            LiveProgStringParser(&engine->jdsp, rawCode);
+            LiveProgStringParser(&engine->jdsp, const_cast<char *>(rawCode));
             env->ReleaseStringUTFChars(eelCode, rawCode);
         }
     }
