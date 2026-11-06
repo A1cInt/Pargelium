@@ -388,4 +388,33 @@
     <string name="album_specs_artwork_files">Gallery Files</string>
     <string name="album_specs_source_folder">Source Folder</string>
     <string name="album_open_gallery_btn">Open Album Gallery (%1$d)</string>
+
+    <string name="artwork_type_sticker">Sticker</string>
+    <string name="artwork_type_card">Card</string>
+    <string name="vinyl_disc_chip_fmt">Vinyl %1$d</string>
+    <string name="vinyl_badge_short_fmt">VINYL %1$d</string>
+    <string name="collector_desk_title">Collector\'s Edition Desk</string>
+    <string name="collector_desk_subtitle">Interactive booklet, 3D cards &amp; stickers from album folder</string>
+    <string name="booklet_reader_title">Booklet Scans</string>
+    <string name="booklet_page_indicator_fmt">Page %1$d of %2$d</string>
+    <string name="collector_card_title">3D Collector Photocard</string>
+    <string name="collector_card_flip_hint">Flip 180°</string>
+    <string name="sticker_pack_title">Album Stickers (Tap to peel)</string>
+    <string name="album_gallery_assign_role_hint">Tap the badge on any card to assign it as Disc, Booklet, Card or Sticker</string>
+    <string name="action_searching_short">Searching…</string>
+    <string name="action_fetch_discogs">Discogs</string>
+    <string name="artwork_remote_source_tag">Discogs/CAA</string>
+    <string name="album_specs_avg_suffix">avg</string>
+    <string name="player_vinyl_mode_cd">Vinyl Mode</string>
+    <string name="online_canvas_enabled_label">Online Canvas: ON</string>
+    <string name="online_canvas_disabled_label">Online Canvas: OFF</string>
+    <string name="saavn_stream_quality_badge">JioSaavn • MP4A 320kbps</string>
+    <string name="saavn_service_name">JioSaavn</string>
+    <string name="seek_10s_short">10s</string>
+    <string name="signal_path_dialog_title">Audio Signal Path</string>
+    <string name="signal_path_step_source">1. Source Stream</string>
+    <string name="signal_path_step_engine">2. Audio Engine &amp; DSP</string>
+    <string name="signal_path_engine_desc">Media3 ExoPlayer • JamesDSP 32-bit Float Pipeline</string>
+    <string name="signal_path_step_output">3. Output Endpoint</string>
+    <string name="action_switch_audio_output">Switch Output</string>
 </resources>
