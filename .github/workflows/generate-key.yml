@@ -1,0 +1,20 @@
+name: Generate Keystore
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  create-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Android Keystore
+        run: |
+          keytool -genkey -v -keystore release.keystore -alias pargelium -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Pargelium, OU=Android, O=AlcInt, C=RU" -storepass pargelium2026 -keypass pargelium2026
+          base64 -w 0 release.keystore > keystore_base64.txt
+
+      - name: Upload Base64 as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keystore_base64_txt
+          path: keystore_base64.txt
+          retention-days: 1
