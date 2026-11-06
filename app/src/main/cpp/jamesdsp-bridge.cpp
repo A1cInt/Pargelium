@@ -8,6 +8,9 @@
 
 extern "C" {
 #include "jdsp_header.h"
+
+extern void JDSP_LiveProgSetConfig(int enabled, int mode, const float *params, int paramCount, float sampleRate);
+extern void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleRate);
 }
 
 #define TAG "JamesDSP-JNI"
@@ -121,8 +124,6 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeProcess(
     if (handle == 0 || numFrames <= 0) return;
     NativeJdspEngine *engine = reinterpret_cast<NativeJdspEngine *>(handle);
 
-    // Если другой поток прямо сейчас пересчитывает тяжелый FIR/Convolver,
-    // не блокируем аудио-нить ExoPlayer во избежание щелчков:
     if (pthread_mutex_trylock(&engine->lock) != 0) {
         if (fabsf(preAmpMultiplier - 1.0f) > 0.001f) {
             jfloat *buf = (jfloat *)env->GetPrimitiveArrayCritical(buffer, nullptr);
@@ -142,6 +143,9 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeProcess(
         pthread_mutex_unlock(&engine->lock);
         return;
     }
+
+    /* Сначала прогоняем буфер через наш EEL2 Liveprog, если он активен */
+    JDSP_LiveProgProcessInterleaved(buf, numFrames, engine->sampleRate);
 
     JamesDSPLib *jdsp = &engine->jdsp;
     int offsetFrame = 0;
@@ -344,7 +348,6 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetTube(
     pthread_mutex_lock(&engine->lock);
 
     if (enabled && driveDb > 0.05f) {
-        // В VacuumTube.c функция VacuumTubeSetGain делит входной аргумент на 100.0 (db2mag(dbGain / 100.0))
         double scaledGain = (double)driveDb * 100.0;
         if (scaledGain > 1200.0) scaledGain = 1200.0;
         VacuumTubeSetGain(&engine->jdsp, scaledGain);
@@ -482,7 +485,7 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetConvolver(
     pthread_mutex_lock(&engine->lock);
 
     int status = 0;
-    if (enabled && impulseSamples != nullptr && frameCount > 0 && (channels == 1 || channels == 2)) {
+    if (enabled && impulseSamples != nullptr && frameCount > 0 && (channels == 1 || channels == 2 || channels == 4)) {
         jfloat *imp = env->GetFloatArrayElements(impulseSamples, nullptr);
         if (imp) {
             Convolver1DDisable(&engine->jdsp);
@@ -502,6 +505,50 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetConvolver(
 
     pthread_mutex_unlock(&engine->lock);
     return status;
+}
+
+JNIEXPORT void JNICALL
+Java_com_alcint_pargelium_audio_JamesDspController_nativeSetLiveprog(
+        JNIEnv *env,
+        jobject thiz,
+        jlong handle,
+        jboolean enabled,
+        jint mode,
+        jfloatArray params,
+        jstring eelCode
+) {
+    if (handle == 0) return;
+    NativeJdspEngine *engine = reinterpret_cast<NativeJdspEngine *>(handle);
+    pthread_mutex_lock(&engine->lock);
+
+    if (eelCode != nullptr) {
+        const char *rawCode = env->GetStringUTFChars(eelCode, nullptr);
+        if (rawCode) {
+            LiveProgStringParser(&engine->jdsp, rawCode);
+            env->ReleaseStringUTFChars(eelCode, rawCode);
+        }
+    }
+
+    float pArr[8] = { 0 };
+    int pLen = 0;
+    if (params != nullptr) {
+        pLen = env->GetArrayLength(params);
+        if (pLen > 8) pLen = 8;
+        jfloat *elements = env->GetFloatArrayElements(params, nullptr);
+        if (elements) {
+            for (int i = 0; i < pLen; ++i) pArr[i] = elements[i];
+            env->ReleaseFloatArrayElements(params, elements, JNI_ABORT);
+        }
+    }
+
+    JDSP_LiveProgSetConfig(enabled ? 1 : 0, mode, pArr, pLen, engine->sampleRate);
+    if (enabled) {
+        LiveProgEnable(&engine->jdsp);
+    } else {
+        LiveProgDisable(&engine->jdsp);
+    }
+
+    pthread_mutex_unlock(&engine->lock);
 }
 
 JNIEXPORT void JNICALL
