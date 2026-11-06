@@ -6,7 +6,14 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.util.UUID
 
-data class PlaylistModel(val id: String = UUID.randomUUID().toString(), val name: String, val trackIds: List<Long>, val coverUri: String? = null, val bannerUri: String? = null, val createdAt: Long = System.currentTimeMillis())
+data class PlaylistModel(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val trackIds: List<Long>,
+    val coverUri: String? = null,
+    val bannerUri: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
 data class PlayEvent(val trackId: Long, val timestamp: Long)
 data class TrackBookmark(val id: String = UUID.randomUUID().toString(), val name: String, val timeMs: Long)
 
@@ -150,6 +157,15 @@ object PrefsManager {
     fun saveUserEqEnabled(enabled: Boolean) = prefs.edit().putBoolean("user_eq_enabled", enabled).apply()
     fun getUserEqEnabled(): Boolean = prefs.getBoolean("user_eq_enabled", false)
 
+    fun saveEq15BandMode(enabled: Boolean) = prefs.edit().putBoolean("dsp_eq_15band_mode", enabled).apply()
+    fun getEq15BandMode(): Boolean = prefs.getBoolean("dsp_eq_15band_mode", true)
+
+    fun saveEqFilterMode(mode: Int) = prefs.edit().putInt("dsp_eq_filter_mode", mode).apply()
+    fun getEqFilterMode(): Int = prefs.getInt("dsp_eq_filter_mode", 0)
+
+    fun saveEqInterpolationMode(mode: Int) = prefs.edit().putInt("dsp_eq_interp_mode", mode).apply()
+    fun getEqInterpolationMode(): Int = prefs.getInt("dsp_eq_interp_mode", 0)
+
     fun saveUserEqGains(gains: FloatArray) = prefs.edit().putString("user_eq_gains", gains.joinToString(",")).apply()
 
     fun getUserEqGains(): FloatArray {
@@ -157,12 +173,64 @@ object PrefsManager {
         if (cachedUserEqGains != null && cachedUserEqGainsStr == str) return cachedUserEqGains!!
         cachedUserEqGainsStr = str
         cachedUserEqGains = try {
-            str.split(",").map { it.toFloat() }.toFloatArray()
+            val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
+            if (parsed.size >= 10) parsed else FloatArray(10) { 0f }
         } catch (e: Exception) {
             FloatArray(10) { 0f }
         }
         return cachedUserEqGains!!
     }
+
+    fun saveUserEqGains15(gains: FloatArray) = prefs.edit().putString("user_eq_gains_15", gains.joinToString(",")).apply()
+
+    fun getUserEqGains15(): FloatArray {
+        val str = prefs.getString("user_eq_gains_15", "") ?: ""
+        return try {
+            val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
+            if (parsed.size == 15) parsed else FloatArray(15) { 0f }
+        } catch (_: Exception) {
+            FloatArray(15) { 0f }
+        }
+    }
+
+    fun saveCustomGraphicEqString(str: String) = prefs.edit().putString("dsp_custom_graphiceq", str).apply()
+    fun getCustomGraphicEqString(): String = prefs.getString("dsp_custom_graphiceq", "") ?: ""
+
+    // Compander (7 bands)
+    fun saveCompanderEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_compander_enabled", enabled).apply()
+    fun getCompanderEnabled(): Boolean = prefs.getBoolean("dsp_compander_enabled", false)
+    fun saveCompanderTimeConstant(tc: Float) = prefs.edit().putFloat("dsp_compander_tc", tc).apply()
+    fun getCompanderTimeConstant(): Float = prefs.getFloat("dsp_compander_tc", 0.22f)
+    fun saveCompanderGranularity(gran: Int) = prefs.edit().putInt("dsp_compander_gran", gran).apply()
+    fun getCompanderGranularity(): Int = prefs.getInt("dsp_compander_gran", 2)
+    fun saveCompanderTfResolution(res: Int) = prefs.edit().putInt("dsp_compander_tfres", res).apply()
+    fun getCompanderTfResolution(): Int = prefs.getInt("dsp_compander_tfres", 0)
+    fun saveCompanderGains(gains: FloatArray) = prefs.edit().putString("dsp_compander_gains", gains.joinToString(",")).apply()
+    fun getCompanderGains(): FloatArray {
+        val str = prefs.getString("dsp_compander_gains", "") ?: ""
+        return try {
+            val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
+            if (parsed.size == 7) parsed else FloatArray(7) { 0f }
+        } catch (_: Exception) {
+            FloatArray(7) { 0f }
+        }
+    }
+
+    // ViPER-DDC
+    fun saveDdcEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_ddc_enabled", enabled).apply()
+    fun getDdcEnabled(): Boolean = prefs.getBoolean("dsp_ddc_enabled", false)
+    fun saveDdcPresetId(id: String) = prefs.edit().putString("dsp_ddc_preset_id", id).apply()
+    fun getDdcPresetId(): String = prefs.getString("dsp_ddc_preset_id", "dt770_80") ?: "dt770_80"
+    fun saveCustomVdcContent(vdc: String?) {
+        if (vdc == null) prefs.edit().remove("dsp_custom_vdc").apply() else prefs.edit().putString("dsp_custom_vdc", vdc).apply()
+    }
+    fun getCustomVdcContent(): String? = prefs.getString("dsp_custom_vdc", null)
+
+    // Convolver
+    fun saveConvolverEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_convolver_enabled", enabled).apply()
+    fun getConvolverEnabled(): Boolean = prefs.getBoolean("dsp_convolver_enabled", false)
+    fun saveConvolverPresetId(id: Int) = prefs.edit().putInt("dsp_convolver_preset_id", id).apply()
+    fun getConvolverPresetId(): Int = prefs.getInt("dsp_convolver_preset_id", 0)
 
     fun saveBassEnabled(enabled: Boolean) = prefs.edit().putBoolean("bass_enabled", enabled).apply()
     fun getBassEnabled(): Boolean = prefs.getBoolean("bass_enabled", false)
@@ -302,12 +370,13 @@ object PrefsManager {
     fun saveBs2bMode(mode: Int) = prefs.edit().putInt("dsp_bs2b_mode", mode).apply()
 
     // Master Limiter
-    fun getLimThreshold(): Float = prefs.getFloat("dsp_lim_threshold", -0.1f)
+    fun getLimThreshold(): Float = prefs.getFloat("dsp_lim_threshold", -0.5f)
     fun saveLimThreshold(th: Float) = prefs.edit().putFloat("dsp_lim_threshold", th).apply()
     fun getLimRelease(): Float = prefs.getFloat("dsp_lim_release", 60.0f)
     fun saveLimRelease(rel: Float) = prefs.edit().putFloat("dsp_lim_release", rel).apply()
     fun getPostGain(): Float = prefs.getFloat("dsp_post_gain", 0.0f)
     fun savePostGain(gain: Float) = prefs.edit().putFloat("dsp_post_gain", gain).apply()
+
     private const val KEY_NAV_BAR_STYLE = "nav_bar_style"
 
     fun saveNavBarStyle(style: Int) {
@@ -315,7 +384,6 @@ object PrefsManager {
     }
 
     fun getNavBarStyle(): Int {
-        // 0 = Liquid (по умолчанию), 1 = Material
         return prefs.getInt(KEY_NAV_BAR_STYLE, 0)
     }
 
@@ -326,7 +394,6 @@ object PrefsManager {
     }
 
     fun getPlayerButtonStyle(): Int {
-        // 0 = Liquid Glass (по умолчанию), 1 = Expressive/Material, 2 = Default
         return prefs.getInt(KEY_PLAYER_BUTTON_STYLE, 0)
     }
 }
