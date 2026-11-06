@@ -71,12 +71,13 @@ fun VideoBackground(
 
     val videoAlpha by animateFloatAsState(
         targetValue = if (isFirstFrameRendered) 1f else 0f,
-        animationSpec = tween(450),
+        animationSpec = tween(400),
         label = "videoFadeIn"
     )
 
     val exoPlayer = remember(appContext) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(8000)
             .setReadTimeoutMs(10000)
@@ -93,7 +94,7 @@ fun VideoBackground(
         }
 
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1500, 5000, 500, 1000)
+            .setBufferDurationsMs(1500, 5000, 400, 800)
             .build()
 
         ExoPlayer.Builder(appContext)
@@ -116,6 +117,10 @@ fun VideoBackground(
         isFirstFrameRendered = false
         exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
         exoPlayer.prepare()
+        if (isPlaying && isLifecycleResumed) {
+            exoPlayer.playWhenReady = true
+            exoPlayer.play()
+        }
     }
 
     LaunchedEffect(isPlaying, isLifecycleResumed) {
@@ -166,11 +171,18 @@ fun VideoBackground(
                     if (videoSize.width > 0 && videoSize.height > 0) {
                         val ratio = (videoSize.width * videoSize.pixelWidthHeightRatio) / videoSize.height
                         aspectRatioFrame.setAspectRatio(ratio)
+                        isFirstFrameRendered = true
                     }
                 }
 
                 override fun onRenderedFirstFrame() {
                     isFirstFrameRendered = true
+                }
+
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY && exoPlayer.videoSize.width > 0) {
+                        isFirstFrameRendered = true
+                    }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
