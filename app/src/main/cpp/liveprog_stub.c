@@ -12,14 +12,17 @@
 
 int XLITTLE_ENDIAN = 1;
 
-/* ==========================================================================
- * 1. Быстрое преобразование Хартли (O(N log N) Radix-2 FHT) и ресемплер
- * ========================================================================== */
-
 static int isPowerOfTwo(int n) {
     return (n > 0) && ((n & (n - 1)) == 0);
 }
 
+/**
+ * Точное преобразование Хартли H[k] = sum_{n=0}^{N-1} x[n] * (cos(2*pi*k*n/N) + sin(2*pi*k*n/N))
+ * Так как стандартный прямой FFT считает sum x[n] * (cos(...) - i*sin(...)),
+ * то Re(FFT) = sum x[n]*cos(...), а Im(FFT) = -sum x[n]*sin(...).
+ * Поэтому cas(theta) = cos(theta) + sin(theta) = Re(FFT) - Im(FFT) при отрицательной экспоненте,
+ * либо мы сразу используем положительный угол +2*pi/len и берем Re + Im!
+ */
 void discreteHartleyTransform(float *x, int n) {
     if (!x || n <= 1) return;
 
@@ -49,7 +52,7 @@ void discreteHartleyTransform(float *x, int n) {
     }
 
     for (int i = 0; i < n; ++i) {
-        re[i] = (double)x[i];
+        re[i] = isfinite(x[i]) ? (double)x[i] : 0.0;
     }
 
     int j = 0;
@@ -69,14 +72,16 @@ void discreteHartleyTransform(float *x, int n) {
 
     for (int len = 2; len <= n; len <<= 1) {
         int halfLen = len >> 1;
-        double angle = -6.28318530717958647692 / (double)len;
+        double angle = 6.28318530717958647692 / (double)len;
         double wLenRe = cos(angle);
         double wLenIm = sin(angle);
 
         for (int i = 0; i < n; i += len) {
-            double wRe = 1.0;
-            double wIm = 0.0;
             for (int k = 0; k < halfLen; ++k) {
+                double theta = angle * (double)k;
+                double wRe = cos(theta);
+                double wIm = sin(theta);
+
                 int evenIdx = i + k;
                 int oddIdx = i + k + halfLen;
 
@@ -89,16 +94,13 @@ void discreteHartleyTransform(float *x, int n) {
                 im[evenIdx] = uIm + vIm;
                 re[oddIdx] = uRe - vRe;
                 im[oddIdx] = uIm - vIm;
-
-                double nextWRe = wRe * wLenRe - wIm * wLenIm;
-                wIm = wRe * wLenIm + wIm * wLenRe;
-                wRe = nextWRe;
             }
         }
     }
 
     for (int k = 0; k < n; ++k) {
-        x[k] = (float)(re[k] - im[k]);
+        double val = re[k] + im[k];
+        x[k] = isfinite(val) ? (float)val : 0.0f;
     }
 
     free(re);
@@ -145,24 +147,18 @@ void JamesDSPOfflineResampling(float const *in, float *out, size_t lenIn, size_t
     }
 }
 
-/* ==========================================================================
- * 2. Нативный движок EEL2 Liveprog (hadamVerb.eel, hpfloat.eel и др.)
- * ========================================================================== */
-
 #define FDN_DELAY_LEN 8192
 
 typedef struct {
     int enabled;
-    int activeMode; /* 0: hadamVerb.eel, 1: hpfloat.eel, 2: subharmonic.eel, 3: exciter.eel, 4: transient.eel, 5: bitcrusher.eel */
+    int activeMode;
     float params[8];
     float sampleRate;
 
-    /* Состояние для hadamVerb.eel (8x8 Hadamard FDN Reverb) */
     float fdnLines[8][FDN_DELAY_LEN];
     int fdnWriteIdx[8];
     float fdnLpState[8];
 
-    /* Состояние для hpfloat.eel / subharmonic.eel / exciter.eel */
     double b0, b1, b2, a1, a2;
     double x1L, x2L, y1L, y2L;
     double x1R, x2R, y1R, y2R;
@@ -170,7 +166,6 @@ typedef struct {
     float prevSubInL, prevSubInR;
     float subEnvL, subEnvR;
 
-    /* Состояние для Transient Shaper & Bitcrusher */
     float fastEnvL, slowEnvL;
     float fastEnvR, slowEnvR;
     float holdSampleL, holdSampleR;
@@ -180,8 +175,9 @@ typedef struct {
 static PargeliumLiveProgState gLiveProg = {
     .enabled = 0,
     .activeMode = 0,
-    .params = { 0.35f, 0.72f, 0.45f, 0.50f, 80.0f, 0.707f, 0.0f, 0.0f },
-    .sampleRate = 48000.0f
+    .params = { 0.35f, 0.72f, 0.45f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f },
+    .sampleRate = 48000.0f,
+    .b0 = 1.0, .b1 = 0.0, .b2 = 0.0, .a1 = 0.0, .a2 = 0.0
 };
 
 static const int kFdnLengths[8] = { 1087, 1283, 1511, 1789, 2081, 2411, 2797, 3203 };
@@ -189,10 +185,10 @@ static const int kFdnLengths[8] = { 1087, 1283, 1511, 1789, 2081, 2411, 2797, 32
 static void updateLiveProgBiquad(float sr, float freqHz, float qVal, int isLowPass) {
     if (sr < 8000.0f) sr = 48000.0f;
     double f = (double)freqHz;
-    if (f < 15.0) f = 15.0;
+    if (!isfinite(f) || f < 15.0) f = 55.0;
     if (f > sr * 0.45) f = sr * 0.45;
     double q = (double)qVal;
-    if (q < 0.2) q = 0.2;
+    if (!isfinite(q) || q < 0.25) q = 0.707;
     if (q > 8.0) q = 8.0;
 
     double w0 = 2.0 * 3.14159265358979323846 * f / (double)sr;
@@ -223,18 +219,15 @@ void JDSP_LiveProgSetConfig(int enabled, int mode, const float *params, int para
     if (params && paramCount > 0) {
         int count = paramCount > 8 ? 8 : paramCount;
         for (int i = 0; i < count; ++i) {
-            gLiveProg.params[i] = params[i];
+            gLiveProg.params[i] = isfinite(params[i]) ? params[i] : 0.0f;
         }
     }
 
     if (mode == 1) {
-        /* hpfloat.eel: params[0] = Cutoff Hz, params[1] = Q, params[2] = Output Gain dB */
         updateLiveProgBiquad(gLiveProg.sampleRate, gLiveProg.params[0], gLiveProg.params[1], 0);
     } else if (mode == 2) {
-        /* subharmonic.eel: params[0] = Crossover Hz */
         updateLiveProgBiquad(gLiveProg.sampleRate, gLiveProg.params[0], 0.85f, 1);
     } else if (mode == 3) {
-        /* exciter.eel: params[0] = Highpass Crossover Hz */
         updateLiveProgBiquad(gLiveProg.sampleRate, gLiveProg.params[0], 0.707f, 0);
     }
 }
@@ -245,23 +238,18 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
     int mode = gLiveProg.activeMode;
 
     if (mode == 0) {
-        /* hadamVerb.eel — 8x8 Hadamard FDN Reverb */
         float wetMix = gLiveProg.params[0];
         float decay = gLiveProg.params[1];
         float damp = gLiveProg.params[2];
         float roomScale = gLiveProg.params[3];
 
-        if (wetMix < 0.0f) wetMix = 0.0f;
-        if (wetMix > 1.0f) wetMix = 1.0f;
-        if (decay < 0.1f) decay = 0.1f;
-        if (decay > 0.96f) decay = 0.96f;
-        if (damp < 0.05f) damp = 0.05f;
-        if (damp > 0.9f) damp = 0.9f;
-        if (roomScale < 0.35f) roomScale = 0.35f;
-        if (roomScale > 1.8f) roomScale = 1.8f;
+        if (wetMix < 0.0f || wetMix > 1.0f) wetMix = 0.35f;
+        if (decay < 0.1f || decay > 0.96f) decay = 0.72f;
+        if (damp < 0.05f || damp > 0.9f) damp = 0.42f;
+        if (roomScale < 0.35f || roomScale > 1.8f) roomScale = 1.0f;
 
         float dryGain = 1.0f - wetMix * 0.35f;
-        float normFactor = 0.35355339f * decay; /* 1 / sqrt(8) * decay */
+        float normFactor = 0.35355339f * decay;
 
         for (int f = 0; f < numFrames; ++f) {
             float inL = buffer[f * 2];
@@ -277,11 +265,11 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
                 if (rIdx < 0) rIdx += FDN_DELAY_LEN;
 
                 float raw = gLiveProg.fdnLines[c][rIdx];
+                if (!isfinite(raw)) raw = 0.0f;
                 gLiveProg.fdnLpState[c] = raw * (1.0f - damp) + gLiveProg.fdnLpState[c] * damp;
                 rd[c] = gLiveProg.fdnLpState[c];
             }
 
-            /* Быстрое ортогональное преобразование Адамара 8x8 */
             float s0 = rd[0] + rd[1], s1 = rd[0] - rd[1];
             float s2 = rd[2] + rd[3], s3 = rd[2] - rd[3];
             float s4 = rd[4] + rd[5], s5 = rd[4] - rd[5];
@@ -319,8 +307,9 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
             buffer[f * 2 + 1] = inR * dryGain + wetR * wetMix;
         }
     } else if (mode == 1) {
-        /* hpfloat.eel — High-Pass Biquad Filter */
         float gainLinear = powf(10.0f, gLiveProg.params[2] / 20.0f);
+        if (!isfinite(gainLinear) || gainLinear < 0.1f || gainLinear > 4.0f) gainLinear = 1.0f;
+
         for (int f = 0; f < numFrames; ++f) {
             double inL = (double)buffer[f * 2];
             double inR = (double)buffer[f * 2 + 1];
@@ -329,6 +318,9 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
                           - gLiveProg.a1 * gLiveProg.y1L - gLiveProg.a2 * gLiveProg.y2L;
             double outR = gLiveProg.b0 * inR + gLiveProg.b1 * gLiveProg.x1R + gLiveProg.b2 * gLiveProg.x2R
                           - gLiveProg.a1 * gLiveProg.y1R - gLiveProg.a2 * gLiveProg.y2R;
+
+            if (!isfinite(outL)) outL = inL;
+            if (!isfinite(outR)) outR = inR;
 
             gLiveProg.x2L = gLiveProg.x1L; gLiveProg.x1L = inL;
             gLiveProg.y2L = gLiveProg.y1L; gLiveProg.y1L = outL;
@@ -340,11 +332,9 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
             buffer[f * 2 + 1] = (float)outR * gainLinear;
         }
     } else if (mode == 2) {
-        /* subharmonic.eel — Subharmonic Octave-Down Bass Synth */
         float subMix = gLiveProg.params[1];
         float punch = gLiveProg.params[2];
-        if (subMix < 0.0f) subMix = 0.0f;
-        if (subMix > 1.0f) subMix = 1.0f;
+        if (subMix < 0.0f || subMix > 1.0f) subMix = 0.45f;
 
         for (int f = 0; f < numFrames; ++f) {
             double inL = (double)buffer[f * 2];
@@ -354,6 +344,9 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
                                  - gLiveProg.a1 * gLiveProg.y1L - gLiveProg.a2 * gLiveProg.y2L);
             float lowR = (float)(gLiveProg.b0 * inR + gLiveProg.b1 * gLiveProg.x1R + gLiveProg.b2 * gLiveProg.x2R
                                  - gLiveProg.a1 * gLiveProg.y1R - gLiveProg.a2 * gLiveProg.y2R);
+
+            if (!isfinite(lowL)) lowL = 0.0f;
+            if (!isfinite(lowR)) lowR = 0.0f;
 
             gLiveProg.x2L = gLiveProg.x1L; gLiveProg.x1L = inL;
             gLiveProg.y2L = gLiveProg.y1L; gLiveProg.y1L = lowL;
@@ -377,7 +370,6 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
             buffer[f * 2 + 1] = (float)inR + gLiveProg.subEnvR * subMix * 0.65f;
         }
     } else if (mode == 3) {
-        /* exciter.eel — Harmonic Clarity & Presence Exciter */
         float drive = 1.0f + gLiveProg.params[1] * 4.0f;
         float mix = gLiveProg.params[2];
         for (int f = 0; f < numFrames; ++f) {
@@ -388,6 +380,9 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
                            - gLiveProg.a1 * gLiveProg.y1L - gLiveProg.a2 * gLiveProg.y2L;
             double highR = gLiveProg.b0 * inR + gLiveProg.b1 * gLiveProg.x1R + gLiveProg.b2 * gLiveProg.x2R
                            - gLiveProg.a1 * gLiveProg.y1R - gLiveProg.a2 * gLiveProg.y2R;
+
+            if (!isfinite(highL)) highL = 0.0;
+            if (!isfinite(highR)) highR = 0.0;
 
             gLiveProg.x2L = gLiveProg.x1L; gLiveProg.x1L = inL;
             gLiveProg.y2L = gLiveProg.y1L; gLiveProg.y1L = highL;
@@ -401,9 +396,8 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
             buffer[f * 2 + 1] = (float)inR + harmR * mix * 0.35f;
         }
     } else if (mode == 4) {
-        /* transient.eel — Transient Attack & Sustain Designer */
-        float attackGain = gLiveProg.params[0];  /* -1.0 .. +1.0 */
-        float sustainGain = gLiveProg.params[1]; /* -1.0 .. +1.0 */
+        float attackGain = gLiveProg.params[0];
+        float sustainGain = gLiveProg.params[1];
 
         for (int f = 0; f < numFrames; ++f) {
             float inL = buffer[f * 2];
@@ -436,14 +430,12 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
             buffer[f * 2 + 1] = inR * gainR;
         }
     } else if (mode == 5) {
-        /* bitcrusher.eel — Vintage DAC Bitcrusher & Downsampler */
         float bits = gLiveProg.params[0];
         int downsample = (int)gLiveProg.params[1];
         float wet = gLiveProg.params[2];
-        if (bits < 4.0f) bits = 4.0f;
-        if (bits > 16.0f) bits = 16.0f;
-        if (downsample < 1) downsample = 1;
-        if (downsample > 24) downsample = 24;
+        if (bits < 4.0f || bits > 16.0f) bits = 12.0f;
+        if (downsample < 1 || downsample > 24) downsample = 2;
+        if (wet < 0.0f || wet > 1.0f) wet = 0.5f;
 
         float steps = powf(2.0f, bits - 1.0f);
         float invSteps = 1.0f / steps;
@@ -466,10 +458,12 @@ void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float sampleR
 }
 
 void LiveProgEnable(void *jdsp) {
+    (void)jdsp;
     gLiveProg.enabled = 1;
 }
 
 void LiveProgDisable(void *jdsp) {
+    (void)jdsp;
     gLiveProg.enabled = 0;
 }
 
