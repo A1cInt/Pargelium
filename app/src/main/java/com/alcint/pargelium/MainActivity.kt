@@ -1,30 +1,33 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
 package com.alcint.pargelium
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.Settings
 import android.view.WindowManager
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.media3.common.util.UnstableApi
 import com.alcint.pargelium.library.LibraryScreen
+import com.alcint.pargelium.onboarding.OnboardingScreen
+import com.alcint.pargelium.onboarding.isPargeliumThemeLight
+import com.alcint.pargelium.onboarding.rememberPargeliumExpressiveColorScheme
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
@@ -43,10 +46,6 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
-        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.isAppearanceLightStatusBars = false
-        insetsController.isAppearanceLightNavigationBars = false
-
         val intent = Intent(this, PlaybackService::class.java)
         startService(intent)
 
@@ -54,21 +53,50 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             val backdrop = rememberLayerBackdrop()
+            var isOnboardingDone by remember { mutableStateOf(PrefsManager.isOnboardingCompleted()) }
+            var activeThemeMode by remember { mutableIntStateOf(PrefsManager.getThemeMode()) }
 
-            CompositionLocalProvider(LocalBackdrop provides backdrop) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    RequestFilePermissionEffect(
-                        onPermissionGranted = {
-                            AudioRepository.clearCache()
+            val colorScheme = rememberPargeliumExpressiveColorScheme(activeThemeMode)
+            val isLight = isPargeliumThemeLight(activeThemeMode)
+
+            LaunchedEffect(isLight) {
+                val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+                insetsController.isAppearanceLightStatusBars = isLight
+                insetsController.isAppearanceLightNavigationBars = isLight
+            }
+
+            MaterialExpressiveTheme(
+                colorScheme = colorScheme,
+                motionScheme = MotionScheme.expressive()
+            ) {
+                CompositionLocalProvider(LocalBackdrop provides backdrop) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Crossfade(
+                            targetState = isOnboardingDone,
+                            animationSpec = tween(380),
+                            label = "onboardingTransition"
+                        ) { completed ->
+                            if (!completed) {
+                                OnboardingScreen(
+                                    onThemePreviewChanged = { newMode ->
+                                        activeThemeMode = newMode
+                                    },
+                                    onComplete = {
+                                        activeThemeMode = PrefsManager.getThemeMode()
+                                        AudioRepository.clearCache()
+                                        isOnboardingDone = true
+                                    }
+                                )
+                            } else {
+                                LibraryScreen(
+                                    onSecureRequest = { isSecure -> setSecureMode(isSecure) }
+                                )
+                            }
                         }
-                    )
-
-                    LibraryScreen(
-                        onSecureRequest = { isSecure -> setSecureMode(isSecure) }
-                    )
+                    }
                 }
             }
         }
@@ -88,32 +116,5 @@ fun hasAllFilesPermission(context: Context): Boolean {
         Environment.isExternalStorageManager()
     } else {
         true
-    }
-}
-
-@Composable
-fun RequestFilePermissionEffect(onPermissionGranted: () -> Unit) {
-    val context = LocalContext.current
-
-    val storagePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (hasAllFilesPermission(context)) {
-            onPermissionGranted()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        if (!hasAllFilesPermission(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                }
-                storagePermissionLauncher.launch(intent)
-            } catch (_: Exception) {
-                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                storagePermissionLauncher.launch(intent)
-            }
-        }
     }
 }

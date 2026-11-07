@@ -4,11 +4,16 @@ package com.alcint.pargelium.player
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -115,37 +121,16 @@ fun KaraokeLine(
     activeColor: Color = Color.White,
     inactiveColor: Color = Color.White.copy(alpha = 0.35f)
 ) {
-    val wordsToRender = remember(line, nextLineTimeMs) {
-        if (line.words.isNotEmpty()) {
-            line.words
-        } else {
-            val wordsOnly = line.text.split(Regex("\\s+")).filter { it.isNotEmpty() }
-            val maxDuration = nextLineTimeMs?.let { it - line.timeMs } ?: 4000L
-            val estimatedLineDurationMs = maxDuration.coerceIn(500L, 7000L)
-            val step = estimatedLineDurationMs / wordsOnly.size.coerceAtLeast(1)
-
-            wordsOnly.mapIndexed { index, w ->
-                SyllableWord(
-                    text = w,
-                    startMs = line.timeMs + (index * step),
-                    endMs = line.timeMs + ((index + 1) * step)
-                )
-            }
-        }
-    }
+    val hasWordSync = line.words.isNotEmpty()
+    val wordsToRender = remember(line) { line.words }
 
     val fullNormalizedText = remember(wordsToRender, line.text) {
         if (wordsToRender.isEmpty()) {
             line.text
         } else {
             buildString {
-                wordsToRender.forEachIndexed { index, word ->
-                    append(word.text)
-                    if (index < wordsToRender.lastIndex && !word.text.endsWith(" ")) {
-                        append(" ")
-                    }
-                }
-            }
+                wordsToRender.forEach { word -> append(word.text) }
+            }.trim()
         }
     }
 
@@ -165,7 +150,7 @@ fun KaraokeLine(
         SpanStyle(color = inactiveColor)
     }
 
-    if (isActive && wordsToRender.isNotEmpty()) {
+    if (isActive && hasWordSync) {
         val lastWordEndMs = remember(wordsToRender) {
             wordsToRender.maxOfOrNull { it.endMs } ?: (line.timeMs + 4000L)
         }
@@ -174,28 +159,25 @@ fun KaraokeLine(
         val latestExternalPos by rememberUpdatedState(currentPositionProvider())
 
         LaunchedEffect(latestExternalPos) {
-            if (abs(quantizedPosition - latestExternalPos) > 450L) {
+            if (abs(quantizedPosition - latestExternalPos) > 350L) {
                 quantizedPosition = latestExternalPos
             }
         }
 
-        // Оптимизированный цикл: обновляет UI с шагом ~24 мс вместо 120 Гц, снижая нагрузку на GC в 3 раза
+        // Энергоэффективный таймер 30 FPS (32 мс) вместо 120 Гц VSYNC
         LaunchedEffect(isActive, isPlaying, lastWordEndMs) {
             if (isActive && isPlaying) {
-                var internalPos = quantizedPosition
-                var lastFrameTime = withFrameNanos { it }
+                var lastTickMs = SystemClock.elapsedRealtime()
                 while (isActive && isPlaying) {
-                    val frameTime = withFrameNanos { it }
-                    val deltaMs = (frameTime - lastFrameTime) / 1_000_000L
-                    lastFrameTime = frameTime
-                    if (internalPos <= lastWordEndMs + 200L) {
-                        internalPos += deltaMs
-                        if (abs(internalPos - quantizedPosition) >= 24L) {
-                            quantizedPosition = internalPos
-                        }
+                    delay(32L)
+                    val now = SystemClock.elapsedRealtime()
+                    val delta = (now - lastTickMs).coerceIn(0L, 100L)
+                    lastTickMs = now
+                    if (quantizedPosition <= lastWordEndMs + 200L) {
+                        quantizedPosition += delta
                     } else {
-                        delay(120L)
-                        lastFrameTime = withFrameNanos { it }
+                        delay(150L)
+                        lastTickMs = SystemClock.elapsedRealtime()
                     }
                 }
             }
@@ -205,11 +187,7 @@ fun KaraokeLine(
             buildAnnotatedString {
                 for (index in wordsToRender.indices) {
                     val word = wordsToRender[index]
-                    val wordText = if (index < wordsToRender.lastIndex && !word.text.endsWith(" ")) {
-                        word.text + " "
-                    } else {
-                        word.text
-                    }
+                    val wordText = word.text
 
                     val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
                     val progress = when {
@@ -253,7 +231,9 @@ fun KaraokeLine(
     } else {
         Text(
             text = fullNormalizedText,
-            style = baseTextStyle,
+            style = baseTextStyle.copy(
+                shadow = if (isActive) activeShadow else null
+            ),
             color = if (isActive) activeColor else inactiveColor,
             modifier = Modifier
                 .fillMaxWidth()
@@ -265,50 +245,28 @@ fun KaraokeLine(
 @Composable
 private fun TranslationLine(
     translation: String,
-    lineTimeMs: Long,
-    nextLineTimeMs: Long?,
     isActive: Boolean,
-    isPast: Boolean,
-    currentPositionProvider: () -> Long
+    isPast: Boolean
 ) {
-    val activeColor = remember { Color.White.copy(alpha = 0.85f) }
+    val activeColor = remember { Color.White.copy(alpha = 0.86f) }
+    val pastColor = remember { Color.White.copy(alpha = 0.38f) }
     val inactiveColor = remember { Color.White.copy(alpha = 0.32f) }
-    val baseStyle = MaterialTheme.typography.titleMedium.copy(
-        fontStyle = FontStyle.Italic,
-        textAlign = TextAlign.Center
+
+    Text(
+        text = translation,
+        style = MaterialTheme.typography.titleMedium.copy(
+            fontStyle = FontStyle.Italic,
+            textAlign = TextAlign.Center
+        ),
+        color = when {
+            isActive -> activeColor
+            isPast -> pastColor
+            else -> inactiveColor
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp)
     )
-
-    if (isActive) {
-        val pos = currentPositionProvider()
-        val lineDuration = (nextLineTimeMs?.let { it - lineTimeMs } ?: 4000L).coerceAtLeast(1L)
-        val transProgress = ((pos - lineTimeMs).toFloat() / lineDuration).coerceIn(0f, 1f)
-        val p1 = (transProgress - 0.05f).coerceIn(0f, 1f)
-        val p2 = (transProgress + 0.05f).coerceIn(0f, 1f)
-
-        val transBrush = Brush.horizontalGradient(
-            0.0f to activeColor,
-            p1 to activeColor,
-            p2 to inactiveColor,
-            1.0f to inactiveColor
-        )
-
-        Text(
-            text = translation,
-            style = baseStyle.merge(TextStyle(brush = transBrush)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp)
-        )
-    } else {
-        Text(
-            text = translation,
-            style = baseStyle,
-            color = if (isPast) activeColor.copy(alpha = 0.45f) else inactiveColor,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp)
-        )
-    }
 }
 
 @Composable
@@ -319,7 +277,8 @@ fun LyricsView(
     onLineClick: (Long) -> Unit,
     onSearchOnline: () -> Unit,
     isSearching: Boolean,
-    contentPadding: PaddingValues
+    contentPadding: PaddingValues,
+    creditUrl: String? = null
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -427,12 +386,6 @@ fun LyricsView(
 
                 val isNextToBecomeActive = (index == activeIndex + 1) || (index == 0 && activeIndex == -1)
 
-                val showCountdown by remember(isNextToBecomeActive, isBigGap, line.timeMs) {
-                    derivedStateOf {
-                        isNextToBecomeActive && isBigGap && (line.timeMs - currentPositionState.value) > 0L
-                    }
-                }
-
                 val interactionSource = remember { MutableInteractionSource() }
 
                 Column(
@@ -460,7 +413,7 @@ fun LyricsView(
                 ) {
                     if (line.text.isNotBlank()) {
                         AnimatedVisibility(
-                            visible = showCountdown,
+                            visible = isNextToBecomeActive && isBigGap,
                             enter = expandVertically(tween(280)) + fadeIn(tween(280)),
                             exit = fadeOut(tween(220)) + shrinkVertically(tween(280))
                         ) {
@@ -492,13 +445,53 @@ fun LyricsView(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 TranslationLine(
                                     translation = line.translation,
-                                    lineTimeMs = line.timeMs,
-                                    nextLineTimeMs = nextLineTimeMs,
                                     isActive = isActive,
-                                    isPast = isPast,
-                                    currentPositionProvider = { currentPositionState.value }
+                                    isPast = isPast
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // Обязательная атрибуция со ссылкой на lrc.red согласно условиям использования API
+            item(key = "lrc_red_credit_footer") {
+                val targetLink = creditUrl ?: "https://lrc.red"
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 20.dp, bottom = 36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.10f),
+                        modifier = Modifier
+                            .border(0.5.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(50))
+                            .clip(RoundedCornerShape(50))
+                            .clickable {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(targetLink)))
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.lyrics_credit_lrcred),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.72f)
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.OpenInNew,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.65f),
+                                modifier = Modifier.size(12.dp)
+                            )
                         }
                     }
                 }

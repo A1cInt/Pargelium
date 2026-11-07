@@ -23,11 +23,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -51,6 +52,11 @@ fun FullPlayerDraggableWrapper(
     content: @Composable () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val isVisibleOnScreen by remember(containerHeightPx) {
+        derivedStateOf { playerOffsetY.value < containerHeightPx - 1f }
+    }
+
+    if (!isVisibleOnScreen) return
 
     Box(
         modifier = Modifier
@@ -65,7 +71,6 @@ fun FullPlayerDraggableWrapper(
                 scaleX = scale
                 scaleY = scale
             }
-            .shadow(20.dp, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .zIndex(2f)

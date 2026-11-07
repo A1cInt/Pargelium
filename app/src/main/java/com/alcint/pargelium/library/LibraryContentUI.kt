@@ -1,4 +1,5 @@
 @file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
     androidx.compose.material3.ExperimentalMaterial3Api::class,
     androidx.compose.animation.ExperimentalSharedTransitionApi::class,
     androidx.compose.foundation.ExperimentalFoundationApi::class
@@ -6,37 +7,20 @@
 package com.alcint.pargelium.library
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -58,37 +42,15 @@ import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.rounded.Album
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Casino
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.People
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.ViewComfy
-import androidx.compose.material.icons.rounded.ViewModule
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -99,7 +61,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -219,13 +180,14 @@ fun LibraryTopBar(
                 ) {
                     FilledTonalIconButton(
                         onClick = onSearchClose,
+                        shapes = IconButtonDefaults.shapes(),
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         )
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(id = R.string.action_back)
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
@@ -311,7 +273,7 @@ fun LibraryTopBar(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "$albumsCount alb • $tracksCount trk",
+                                    text = stringResource(id = R.string.library_header_stats_fmt, albumsCount, tracksCount),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold,
@@ -330,6 +292,7 @@ fun LibraryTopBar(
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onToggleBentoSpotlight()
                             },
+                            shapes = IconButtonDefaults.shapes(),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = if (showBentoSpotlight) {
                                     MaterialTheme.colorScheme.primaryContainer
@@ -340,7 +303,7 @@ fun LibraryTopBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.AutoAwesome,
-                                contentDescription = "Sonic Deck",
+                                contentDescription = stringResource(id = R.string.cd_sonic_deck),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -351,6 +314,7 @@ fun LibraryTopBar(
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onToggleGridDensity()
                                 },
+                                shapes = IconButtonDefaults.shapes(),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                 )
@@ -361,7 +325,7 @@ fun LibraryTopBar(
                                         GridDensity.COZY -> Icons.Rounded.GridView
                                         GridDensity.SPACIOUS -> Icons.Rounded.ViewModule
                                     },
-                                    contentDescription = "Grid Density",
+                                    contentDescription = stringResource(id = R.string.cd_grid_density),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -370,13 +334,14 @@ fun LibraryTopBar(
                         Box {
                             FilledTonalIconButton(
                                 onClick = { sortMenuExpanded = true },
+                                shapes = IconButtonDefaults.shapes(),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                                 )
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.Sort,
-                                    contentDescription = "Sort",
+                                    contentDescription = stringResource(id = R.string.cd_sort),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -387,8 +352,13 @@ fun LibraryTopBar(
                                 shape = RoundedCornerShape(18.dp)
                             ) {
                                 SortOption.entries.forEach { option ->
+                                    val optionLabel = when (option) {
+                                        SortOption.TITLE -> stringResource(id = R.string.sort_by_title)
+                                        SortOption.ARTIST -> stringResource(id = R.string.sort_by_artist)
+                                        SortOption.DURATION -> stringResource(id = R.string.sort_by_duration)
+                                    }
                                     DropdownMenuItem(
-                                        text = { Text(option.name) },
+                                        text = { Text(optionLabel, fontWeight = if (sortOption == option) FontWeight.ExtraBold else FontWeight.Medium) },
                                         trailingIcon = {
                                             if (sortOption == option) {
                                                 Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -405,13 +375,14 @@ fun LibraryTopBar(
 
                         FilledTonalIconButton(
                             onClick = onSearchOpen,
+                            shapes = IconButtonDefaults.shapes(),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             )
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
+                                contentDescription = stringResource(id = R.string.search_hint),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -444,8 +415,13 @@ private fun ExpressiveLibraryPillTabs(
     tracksCount: Int,
     onTabSelected: (Int) -> Unit
 ) {
+    val motionScheme = MaterialTheme.motionScheme
+    val w0 by animateFloatAsState(if (selectedTab == 0) 1.2f else 0.9f, motionScheme.defaultSpatialSpec(), label = "w0")
+    val w1 by animateFloatAsState(if (selectedTab == 1) 1.2f else 0.9f, motionScheme.defaultSpatialSpec(), label = "w1")
+    val w2 by animateFloatAsState(if (selectedTab == 2) 1.2f else 0.9f, motionScheme.defaultSpatialSpec(), label = "w2")
+
     Surface(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -461,7 +437,7 @@ private fun ExpressiveLibraryPillTabs(
                 label = stringResource(id = R.string.tab_albums),
                 badgeCount = albumsCount,
                 onClick = { onTabSelected(0) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(w0)
             )
             ExpressiveTabPill(
                 selected = selectedTab == 1,
@@ -469,7 +445,7 @@ private fun ExpressiveLibraryPillTabs(
                 label = stringResource(id = R.string.tab_artists),
                 badgeCount = artistsCount,
                 onClick = { onTabSelected(1) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(w1)
             )
             ExpressiveTabPill(
                 selected = selectedTab == 2,
@@ -477,7 +453,7 @@ private fun ExpressiveLibraryPillTabs(
                 label = stringResource(id = R.string.tab_tracks),
                 badgeCount = tracksCount,
                 onClick = { onTabSelected(2) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(w2)
             )
         }
     }
@@ -492,16 +468,30 @@ private fun ExpressiveTabPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val motionScheme = MaterialTheme.motionScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
     val cornerRadius by animateDpAsState(
-        targetValue = if (selected) 18.dp else 12.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        targetValue = when {
+            isPressed -> 12.dp
+            selected -> 20.dp
+            else -> 14.dp
+        },
+        animationSpec = motionScheme.fastSpatialSpec(),
         label = "tabCorner"
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        animationSpec = motionScheme.fastEffectsSpec(),
+        label = "tabBg"
     )
 
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(cornerRadius),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        color = bgColor,
         shadowElevation = if (selected) 2.dp else 0.dp,
         modifier = modifier
     ) {
@@ -538,10 +528,6 @@ private fun ExpressiveTabPill(
     }
 }
 
-/**
- * Уникальная фича: Sonic Aura Bento Deck.
- * Экспрессивная витрина медиатеки с "Mystery Vinyl Spin" (случайный альбом) и быстрым доступом к избранным релизам.
- */
 @Composable
 private fun SonicAuraBentoDeck(
     albums: List<AlbumModel>,
@@ -553,7 +539,23 @@ private fun SonicAuraBentoDeck(
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val spotlightAlbums = remember(albums) {
+    val motionScheme = MaterialTheme.motionScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val bentoScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = motionScheme.fastSpatialSpec(),
+        label = "bentoScale"
+    )
+    val bentoCorner by animateDpAsState(
+        targetValue = if (isPressed) 32.dp else 26.dp,
+        animationSpec = motionScheme.fastSpatialSpec(),
+        label = "bentoCorner"
+    )
+
+    // Фиксируем витрину по количеству альбомов, чтобы при смене сортировки она не вызывала лишних рекомпозиций
+    val spotlightAlbums = remember(albums.size) {
         if (albums.size <= 8) albums else albums.shuffled().take(8)
     }
 
@@ -568,11 +570,13 @@ private fun SonicAuraBentoDeck(
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onMysteryAlbumPlay(albums.random())
             },
-            shape = RoundedCornerShape(26.dp),
+            interactionSource = interactionSource,
+            shape = RoundedCornerShape(bentoCorner),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp)
+                .scale(bentoScale)
         ) {
             Box(
                 modifier = Modifier
@@ -605,7 +609,7 @@ private fun SonicAuraBentoDeck(
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
-                                text = "MYSTERY VINYL SPIN",
+                                text = stringResource(id = R.string.bento_mystery_vinyl_badge),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -620,18 +624,18 @@ private fun SonicAuraBentoDeck(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${albums.size} albums • $totalTracksCount tracks ready",
+                            text = stringResource(id = R.string.bento_mystery_vinyl_sub_fmt, albums.size, totalTracksCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     Surface(
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                         shadowElevation = 6.dp,
-                        modifier = Modifier.size(46.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Rounded.PlayArrow, contentDescription = null)
@@ -666,15 +670,14 @@ private fun SonicAuraBentoDeck(
                             model = remember(coverUri) {
                                 ImageRequest.Builder(context)
                                     .data(coverUri)
-                                    .size(200)
-                                    .crossfade(true)
+                                    .size(160)
+                                    .crossfade(false)
                                     .build()
                             },
                             contentDescription = album.title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(48.dp)
-                                .shadow(4.dp, RoundedCornerShape(14.dp))
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         )

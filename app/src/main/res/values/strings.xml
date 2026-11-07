@@ -533,4 +533,67 @@
     <string name="data_clear_artwork_cache">Clear fetched release artworks</string>
     <string name="data_clear_artwork_cache_desc">Delete downloaded Discogs, CAA &amp; artist photos</string>
     <string name="msg_artwork_cache_cleared">Remote artwork cache cleared</string>
+
+    <string name="lyrics_credit_lrcred">Lyrics provided by lrc.red</string>
+    <string name="continuous_mix_title">Continuous Mix (Crossfade)</string>
+    <string name="continuous_mix_desc">Seamless equal-power DJ transition between tracks</string>
+    <string name="continuous_mix_overlap_label">Overlap Duration</string>
+    <string name="continuous_mix_seconds_fmt">%1$d sec</string>
+
+    <string name="queue_position_up_next_fmt">%1$d / %2$d • %3$d up next</string>
+    <string name="player_seek_plus_10s">+10 sec</string>
+    <string name="player_seek_minus_10s">-10 sec</string>
+
+    <!-- Onboarding Setup Wizard -->
+    <string name="onboarding_welcome_badge">PARGELIUM SETUP</string>
+    <string name="onboarding_step_lang_title">Choose Your Language</string>
+    <string name="onboarding_step_style_title">Interface &amp; Control Style</string>
+    <string name="onboarding_step_theme_title">Theme &amp; Audio Engine</string>
+    <string name="onboarding_step_perm_title">Permissions &amp; Access</string>
+    <string name="onboarding_lang_detected_badge">Auto-Detected</string>
+    <string name="onboarding_lang_question_fmt">We detected %1$s on your device. Use this language?</string>
+    <string name="onboarding_lang_confirm_btn_fmt">Continue in %1$s</string>
+    <string name="onboarding_lang_search_hint">Search 27 languages…</string>
+    <string name="onboarding_style_subtitle">Choose how the navigation bar, glass surfaces, and player transport buttons look and feel.</string>
+    <string name="onboarding_style_liquid_title">Liquid Glass</string>
+    <string name="onboarding_style_liquid_desc">Refractive real-time blur, floating glass capsule &amp; translucent controls</string>
+    <string name="onboarding_style_m3e_title">Material 3 Expressive</string>
+    <string name="onboarding_style_m3e_desc">Morphing squircle shapes, spring physics &amp; adaptive dynamic colors</string>
+    <string name="onboarding_style_classic_title">Classic Minimal</string>
+    <string name="onboarding_style_classic_desc">Clean high-contrast pill indicator &amp; solid circular buttons</string>
+    <string name="onboarding_theme_section_label">Color Palette &amp; Theme</string>
+    <string name="onboarding_audio_features_label">Audio &amp; Playback Features</string>
+    <string name="onboarding_perm_subtitle">Grant permissions so Pargelium can scan your lossless library, load local TTML/LRC lyrics, and detect headphones.</string>
+    <string name="onboarding_perm_all_files_title">All Files Access</string>
+    <string name="onboarding_perm_all_files_desc">Required to read local .ttml / .lrc lyrics, album booklet scans, vinyl disc art, and custom JamesDSP files (.vdc, .eel, .wav).</string>
+    <string name="onboarding_perm_media_title">Audio &amp; Media Library</string>
+    <string name="onboarding_perm_media_desc">Allows scanning FLAC, WAV, MP3 tracks, album covers, and local Canvas videos.</string>
+    <string name="onboarding_perm_bt_title">Bluetooth Headphone Detection</string>
+    <string name="onboarding_perm_bt_desc">Used to identify connected Bluetooth headphones and automatically apply their AutoEQ profile.</string>
+    <string name="onboarding_perm_status_granted">Granted</string>
+    <string name="onboarding_perm_status_required">Required</string>
+    <string name="onboarding_perm_grant_btn">Grant Permission</string>
+    <string name="onboarding_btn_next">Continue</string>
+    <string name="onboarding_btn_finish">Start Listening</string>
+
+    <string name="library_header_stats_fmt">%1$d alb • %2$d trk</string>
+    <string name="cd_sonic_deck">Sonic Deck</string>
+    <string name="cd_grid_density">Grid Density</string>
+    <string name="cd_sort">Sort</string>
+    <string name="sort_by_title">By Title</string>
+    <string name="sort_by_artist">By Artist</string>
+    <string name="sort_by_duration">By Duration / Count</string>
+    <string name="bento_mystery_vinyl_badge">MYSTERY VINYL SPIN</string>
+    <string name="bento_mystery_vinyl_sub_fmt">%1$d albums • %2$d tracks ready</string>
+
+    <string name="duration_hours_mins_fmt">%1$dh %2$dm</string>
+    <string name="duration_mins_fmt">%1$dm</string>
+    <string name="album_hero_flip_to_back">Back</string>
+    <string name="album_hero_flip_to_front">Front</string>
+    <string name="back_cover_side_a">BACK COVER • TRACKLIST</string>
+    <string name="back_cover_box_title">Release Box Backplates &amp; Inlays</string>
+    <string name="back_cover_box_subtitle">3D Jewel Case &amp; Vinyl Sleeve back covers with spine</string>
+    <string name="booklet_mode_spread">2-Page Spread</string>
+    <string name="booklet_mode_single">1-Page</string>
+    <string name="booklet_tap_to_zoom">Tap to zoom</string>
 </resources>

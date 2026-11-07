@@ -35,7 +35,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -143,7 +145,6 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var isPlaying by remember { mutableStateOf(false) }
     var trackDuration by remember { mutableLongStateOf(1L) }
     var trackMetadata by remember { mutableStateOf("") }
-    var currentAlbumArt: Uri? by remember { mutableStateOf(null) }
     var repeatMode by remember { mutableIntStateOf(Player.REPEAT_MODE_OFF) }
     var currentQueueIndex by remember { mutableIntStateOf(-1) }
 
@@ -156,6 +157,16 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val currentTrackState by rememberUpdatedState(currentTrack)
     val allTracksState by rememberUpdatedState(allTracks)
     val updatedAllArtists by rememberUpdatedState(allArtists)
+
+    // Синхронное вычисление обложки без промежуточного обнуления (убирает прыжки цветов Monet)
+    val currentAlbumArt: Uri? = remember(currentTrack?.id, currentTrack?.albumId, currentTrack?.coverUrl) {
+        val track = currentTrack ?: return@remember null
+        when {
+            !track.coverUrl.isNullOrEmpty() && track.coverUrl != "null" -> Uri.parse(track.coverUrl)
+            track.albumId != 0L && track.albumId != -1L -> AudioRepository.getAlbumArtUri(track.albumId)
+            else -> null
+        }
+    }
 
     LaunchedEffect(isProfileOpen) {
         if (!isProfileOpen) {
@@ -278,24 +289,20 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         }
     }
 
-    LaunchedEffect(currentTrack) {
+    LaunchedEffect(currentTrack?.id, currentTrack?.uri) {
         val track = currentTrack
         if (track != null) {
             if (!track.coverUrl.isNullOrEmpty() && track.coverUrl != "null") {
-                currentAlbumArt = Uri.parse(track.coverUrl)
                 val sourceName = if (track.source == "local") context.getString(R.string.tab_online_radio) else track.source.uppercase()
                 trackMetadata = "$sourceName • ${context.getString(R.string.streaming)}"
             } else if (track.albumId != 0L && track.albumId != -1L) {
-                currentAlbumArt = AudioRepository.getAlbumArtUri(track.albumId)
                 trackMetadata = withContext(Dispatchers.IO) {
                     AudioRepository.getTrackMetadata(context, track.uri)
                 }
             } else {
                 trackMetadata = context.getString(R.string.status_live_broadcast)
-                currentAlbumArt = null
             }
         } else {
-            currentAlbumArt = null
             trackMetadata = ""
         }
     }
@@ -314,7 +321,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             }
             val loadedTracks = withContext(Dispatchers.IO) { AudioRepository.getAudioTracks(context, forceScan) }
 
-            val (loadedAlbums, loadedArtists, idMap) = withContext(Dispatchers.Default) {
+            // Фаза 1: Мгновенное построение альбомов и артистов без блокирующего обхода папок
+            val (loadedAlbums, quickArtists, idMap) = withContext(Dispatchers.Default) {
                 val albums = AudioRepository.processAlbums(loadedTracks)
                 val albumsByArtist = albums.groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
 
@@ -322,11 +330,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                     .groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
                     .map { (name, artistTracks) ->
                         val artistAlbums = albumsByArtist[name]?.sortedBy { it.title } ?: emptyList()
-                        val (folderAvatar, folderBanner, folderLogo) = ArtistRepository.resolveQuickFolderAssets(
-                            context = context,
-                            artistName = name,
-                            tracks = artistTracks
-                        )
+                        val savedMeta = PrefsManager.getArtistMetadata(name)
                         val firstAlbumId = artistAlbums.firstOrNull()?.id ?: artistTracks.firstOrNull()?.albumId
                         val fallbackCover = if (firstAlbumId != null && firstAlbumId > 0L) {
                             AudioRepository.getAlbumArtUri(firstAlbumId)
@@ -336,9 +340,9 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             name = name,
                             tracks = artistTracks.sortedBy { it.title },
                             albums = artistAlbums,
-                            customAvatarUri = folderAvatar,
-                            customBannerUri = folderBanner,
-                            customLogoUri = folderLogo,
+                            customAvatarUri = savedMeta.avatarUri,
+                            customBannerUri = savedMeta.bannerUri,
+                            customLogoUri = null,
                             fallbackCoverUri = fallbackCover
                         )
                     }
@@ -350,9 +354,36 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             allTracks = loadedTracks
             tracksById = idMap
             allAlbums = loadedAlbums
-            allArtists = loadedArtists
+            allArtists = quickArtists
             isLoading = false
             isRefreshing = false
+
+            // Фаза 2: Тихая фоновая подгрузка локальных аватарок и логотипов из папок артистов в IO-потоке
+            val enrichedArtists = withContext(Dispatchers.IO) {
+                var anyChanged = false
+                val updated = quickArtists.map { artist ->
+                    val (folderAvatar, folderBanner, folderLogo) = ArtistRepository.resolveQuickFolderAssets(
+                        context = context,
+                        artistName = artist.name,
+                        tracks = artist.tracks
+                    )
+                    if (folderAvatar != artist.customAvatarUri || folderBanner != artist.customBannerUri || folderLogo != artist.customLogoUri) {
+                        anyChanged = true
+                        artist.copy(
+                            customAvatarUri = folderAvatar ?: artist.customAvatarUri,
+                            customBannerUri = folderBanner ?: artist.customBannerUri,
+                            customLogoUri = folderLogo ?: artist.customLogoUri
+                        )
+                    } else {
+                        artist
+                    }
+                }
+                if (anyChanged) updated else null
+            }
+
+            if (enrichedArtists != null) {
+                allArtists = enrichedArtists
+            }
         }
     }
 
@@ -579,7 +610,10 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val onRefreshCallback = remember { { loadTracks(true) } }
     val onShuffleAllCallback = remember { { shuffleAll() } }
 
-    MaterialTheme(colorScheme = targetScheme) {
+    MaterialExpressiveTheme(
+        colorScheme = targetScheme,
+        motionScheme = MotionScheme.expressive()
+    ) {
         SharedTransitionLayout {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
@@ -683,11 +717,17 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                             val onAlbumTrackSelect = remember(album) {
                                                                 { track: AudioTrack -> playTrack(track, album.tracks) }
                                                             }
+                                                            val matchedArtistAvatar = remember(album.artist, allArtists) {
+                                                                val pName = getPrimaryArtist(album.artist, unknownArtistStr)
+                                                                allArtists.find { it.name.equals(pName, ignoreCase = true) }
+                                                                    ?.let { resolveArtistCoverUri(it) }
+                                                            }
                                                             AlbumDetailView(
                                                                 album = album,
                                                                 animatedVisibilityScope = this@AnimatedContent,
                                                                 currentTrack = currentTrack,
                                                                 isPlaying = isPlaying,
+                                                                artistAvatarUri = matchedArtistAvatar,
                                                                 onBack = remember { { selectedAlbum = null } },
                                                                 onTrackSelect = onAlbumTrackSelect,
                                                                 onPlayPause = onPlayPauseCallback,
@@ -849,36 +889,34 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                 hiddenOffsetPx = hiddenOffsetPx,
                                 snapPlayer = { snapPlayer(it) }
                             ) {
-                                if (isFullPlayerVisible) {
-                                    PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
-                                        FullPlayerScreen(
-                                            track = activeTrack,
-                                            isPlaying = isPlaying,
-                                            currentPosition = currentPosProvider(),
-                                            duration = trackDuration,
-                                            metadata = trackMetadata,
-                                            seedColor = targetColor,
-                                            repeatMode = repeatMode,
-                                            playlist = currentPlaylist,
-                                            currentQueueIndex = currentQueueIndex,
-                                            onPlayPause = onPlayPauseCallback,
-                                            onSeek = onSeekCallback,
-                                            onSkipNext = onSkipNextCallback,
-                                            onSkipPrevious = onSkipPrevCallback,
-                                            onToggleRepeat = onToggleRepeatCallback,
-                                            onQueueItemClick = onQueueItemClickCallback,
-                                            onRemoveFromQueue = onRemoveFromQueueCallback,
-                                            onCollapse = remember { { snapPlayer(false) } },
-                                            currentTab = pagerState.currentPage,
-                                            onTabSelected = remember {
-                                                { newTab: Int ->
-                                                    scope.launch { pagerState.scrollToPage(newTab) }
-                                                    snapPlayer(false)
-                                                }
-                                            },
-                                            onArtistClick = handleArtistClick
-                                        )
-                                    }
+                                PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
+                                    FullPlayerScreen(
+                                        track = activeTrack,
+                                        isPlaying = isPlaying,
+                                        currentPosition = currentPosProvider(),
+                                        duration = trackDuration,
+                                        metadata = trackMetadata,
+                                        seedColor = targetColor,
+                                        repeatMode = repeatMode,
+                                        playlist = currentPlaylist,
+                                        currentQueueIndex = currentQueueIndex,
+                                        onPlayPause = onPlayPauseCallback,
+                                        onSeek = onSeekCallback,
+                                        onSkipNext = onSkipNextCallback,
+                                        onSkipPrevious = onSkipPrevCallback,
+                                        onToggleRepeat = onToggleRepeatCallback,
+                                        onQueueItemClick = onQueueItemClickCallback,
+                                        onRemoveFromQueue = onRemoveFromQueueCallback,
+                                        onCollapse = remember { { snapPlayer(false) } },
+                                        currentTab = pagerState.currentPage,
+                                        onTabSelected = remember {
+                                            { newTab: Int ->
+                                                scope.launch { pagerState.scrollToPage(newTab) }
+                                                snapPlayer(false)
+                                            }
+                                        },
+                                        onArtistClick = handleArtistClick
+                                    )
                                 }
                             }
                         }

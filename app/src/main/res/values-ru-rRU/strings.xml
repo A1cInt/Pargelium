@@ -516,4 +516,67 @@
     <string name="data_clear_artwork_cache">Очистить загруженные сканы и фото</string>
     <string name="data_clear_artwork_cache_desc">Удалить скачанные обложки Discogs и фото артистов</string>
     <string name="msg_artwork_cache_cleared">Кэш изображений очищен</string>
+
+    <string name="lyrics_credit_lrcred">Текст предоставлен lrc.red</string>
+    <string name="continuous_mix_title">Бесшовный микс (Crossfade)</string>
+    <string name="continuous_mix_desc">Плавное сведение треков без пауз</string>
+    <string name="continuous_mix_overlap_label">Длина наложения</string>
+    <string name="continuous_mix_seconds_fmt">%1$d сек</string>
+
+    <string name="queue_position_up_next_fmt">%1$d / %2$d • ещё %3$d в очереди</string>
+    <string name="player_seek_plus_10s">+10 сек</string>
+    <string name="player_seek_minus_10s">-10 сек</string>
+
+    <!-- Onboarding Setup Wizard -->
+    <string name="onboarding_welcome_badge">НАСТРОЙКА PARGELIUM</string>
+    <string name="onboarding_step_lang_title">Выберите язык</string>
+    <string name="onboarding_step_style_title">Стиль интерфейса и кнопок</string>
+    <string name="onboarding_step_theme_title">Тема и аудио-движок</string>
+    <string name="onboarding_step_perm_title">Разрешения и доступ</string>
+    <string name="onboarding_lang_detected_badge">Определен автоматически</string>
+    <string name="onboarding_lang_question_fmt">На устройстве выбран %1$s. Использовать этот язык?</string>
+    <string name="onboarding_lang_confirm_btn_fmt">Продолжить на: %1$s</string>
+    <string name="onboarding_lang_search_hint">Поиск среди 27 языков…</string>
+    <string name="onboarding_style_subtitle">Выберите стиль нижней панели навигации и кнопок управления в плеере.</string>
+    <string name="onboarding_style_liquid_title">Жидкое стекло (Liquid Glass)</string>
+    <string name="onboarding_style_liquid_desc">Преломление и размытие фона в реальном времени, парящие стеклянные кнопки</string>
+    <string name="onboarding_style_m3e_title">Material 3 Expressive</string>
+    <string name="onboarding_style_m3e_desc">Морфинг-формы с пружинной физикой и динамическими акцентами</string>
+    <string name="onboarding_style_classic_title">Классический минимализм</string>
+    <string name="onboarding_style_classic_desc">Компактная капсула навигации и контрастные круглые кнопки</string>
+    <string name="onboarding_theme_section_label">Цветовая палитра и тема</string>
+    <string name="onboarding_audio_features_label">Аудио и функции плеера</string>
+    <string name="onboarding_perm_subtitle">Выдайте разрешения, чтобы Pargelium мог сканировать FLAC-медиатеку, читать локальные .ttml/.lrc тексты и определять наушники.</string>
+    <string name="onboarding_perm_all_files_title">Доступ ко всем файлам</string>
+    <string name="onboarding_perm_all_files_desc">Нужен для чтения локальных текстов (.ttml, .lrc), сканов буклетов, накаток винила и загрузки файлов JamesDSP (.vdc, .eel, .wav).</string>
+    <string name="onboarding_perm_media_title">Аудиотека и медиафайлы</string>
+    <string name="onboarding_perm_media_desc">Позволяет находить треки FLAC, WAV, MP3, обложки альбомов и локальные видео-канвасы.</string>
+    <string name="onboarding_perm_bt_title">Определение Bluetooth-наушников</string>
+    <string name="onboarding_perm_bt_desc">Используется для распознавания подключенной модели наушников и авто-применения профиля AutoEQ.</string>
+    <string name="onboarding_perm_status_granted">Выдано</string>
+    <string name="onboarding_perm_status_required">Требуется</string>
+    <string name="onboarding_perm_grant_btn">Выдать разрешение</string>
+    <string name="onboarding_btn_next">Далее</string>
+    <string name="onboarding_btn_finish">Начать прослушивание</string>
+
+    <string name="library_header_stats_fmt">%1$d альб. • %2$d тр.</string>
+    <string name="cd_sonic_deck">Музыкальная витрина</string>
+    <string name="cd_grid_density">Размер сетки</string>
+    <string name="cd_sort">Сортировка</string>
+    <string name="sort_by_title">По названию</string>
+    <string name="sort_by_artist">По исполнителю</string>
+    <string name="sort_by_duration">По длительности / числу</string>
+    <string name="bento_mystery_vinyl_badge">СЛУЧАЙНАЯ ПЛАСТИНКА</string>
+    <string name="bento_mystery_vinyl_sub_fmt">%1$d альбомов • %2$d треков готово</string>
+
+    <string name="duration_hours_mins_fmt">%1$d ч %2$d мин</string>
+    <string name="duration_mins_fmt">%1$d мин</string>
+    <string name="album_hero_flip_to_back">Задник</string>
+    <string name="album_hero_flip_to_front">Обложка</string>
+    <string name="back_cover_side_a">ЗАДНИК КОРОБКИ • ТРЕКЛИСТ</string>
+    <string name="back_cover_box_title">Задники коробок и инлеи</string>
+    <string name="back_cover_box_subtitle">Обратная сторона CD-бокса и винилового конверта с корешком</string>
+    <string name="booklet_mode_spread">Разворот (2 стр.)</string>
+    <string name="booklet_mode_single">По 1 стр.</string>
+    <string name="booklet_tap_to_zoom">Нажмите для зума</string>
 </resources>

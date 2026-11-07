@@ -4,31 +4,75 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
+import com.alcint.pargelium.liquid.LiquidGlassSwitch
+import com.alcint.pargelium.settings.IconContainer
+import com.alcint.pargelium.settings.SettingsGroup
 import kotlinx.coroutines.*
-import kotlin.math.pow
+import kotlin.math.cos
+import kotlin.math.sin
 
 object ContinuousMixPrefs {
     private const val PREFS_NAME = "pargelium_mix_prefs"
     private const val PREF_MIX_ENABLED = "continuous_mix_enabled"
     private const val PREF_MIX_OVERLAP = "continuous_mix_overlap"
 
-    private fun getPrefs(context: Context): SharedPreferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    @Volatile
+    var cachedEnabled: Boolean = false
+        private set
 
-    fun isEnabled(context: Context): Boolean = getPrefs(context).getBoolean(PREF_MIX_ENABLED, false)
-    fun setEnabled(context: Context, enabled: Boolean) = getPrefs(context).edit().putBoolean(PREF_MIX_ENABLED, enabled).apply()
+    @Volatile
+    var cachedOverlapSeconds: Float = 8f
+        private set
 
-    fun getOverlapSeconds(context: Context): Float = getPrefs(context).getFloat(PREF_MIX_OVERLAP, 8f)
-    fun setOverlapSeconds(context: Context, seconds: Float) = getPrefs(context).edit().putFloat(PREF_MIX_OVERLAP, seconds).apply()
+    private var initialized = false
+    var onConfigChanged: (() -> Unit)? = null
+
+    private fun getPrefs(context: Context): SharedPreferences {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!initialized) {
+            cachedEnabled = prefs.getBoolean(PREF_MIX_ENABLED, false)
+            cachedOverlapSeconds = prefs.getFloat(PREF_MIX_OVERLAP, 8f)
+            initialized = true
+        }
+        return prefs
+    }
+
+    fun isEnabled(context: Context): Boolean {
+        getPrefs(context)
+        return cachedEnabled
+    }
+
+    fun setEnabled(context: Context, enabled: Boolean) {
+        cachedEnabled = enabled
+        getPrefs(context).edit().putBoolean(PREF_MIX_ENABLED, enabled).apply()
+        onConfigChanged?.invoke()
+    }
+
+    fun getOverlapSeconds(context: Context): Float {
+        getPrefs(context)
+        return cachedOverlapSeconds
+    }
+
+    fun setOverlapSeconds(context: Context, seconds: Float) {
+        cachedOverlapSeconds = seconds
+        getPrefs(context).edit().putFloat(PREF_MIX_OVERLAP, seconds).apply()
+        onConfigChanged?.invoke()
+    }
 }
 
 class ContinuousMixManager(
@@ -37,7 +81,6 @@ class ContinuousMixManager(
     private val mediaSourceFactory: MediaSource.Factory
 ) {
     private val appContext = context.applicationContext
-
     private var fadeOutPlayer: ExoPlayer? = null
 
     private var isMixing = false
@@ -47,77 +90,108 @@ class ContinuousMixManager(
     private var mixJob: Job? = null
     private var monitorJob: Job? = null
 
-    private var cachedEnabled = false
-    private var cachedOverlapMs = 8000L
-
-    init {
-        mainPlayer.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                if (isAutoSkipping) {
-                    isAutoSkipping = false
-                    return
-                }
-                if (isMixing && (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK || reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)) {
-                    abortMix()
-                }
+    private val playerListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (isAutoSkipping) {
+                isAutoSkipping = false
+                return
             }
-
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (!playWhenReady && isMixing) {
-                    fadeOutPlayer?.pause()
-                } else if (playWhenReady && isMixing) {
-                    fadeOutPlayer?.play()
-                }
+            if (isMixing && (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK || reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)) {
+                abortMix()
             }
-        })
-    }
+        }
 
-    fun start() {
-        updatePrefs()
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            syncMonitorState()
+        }
 
-        monitorJob = mixScope.launch {
-            while (isActive) {
-                if (!isMixing) {
-                    updatePrefs()
-                }
-                checkMixLogic()
-
-                delay(200)
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (!playWhenReady && isMixing) {
+                fadeOutPlayer?.pause()
+            } else if (playWhenReady && isMixing) {
+                fadeOutPlayer?.play()
             }
+            syncMonitorState()
         }
     }
 
-    private fun updatePrefs() {
-        cachedEnabled = ContinuousMixPrefs.isEnabled(appContext)
-        if (cachedEnabled) {
-            cachedOverlapMs = (ContinuousMixPrefs.getOverlapSeconds(appContext) * 1000).toLong()
+    init {
+        ContinuousMixPrefs.isEnabled(appContext)
+        mainPlayer.addListener(playerListener)
+        ContinuousMixPrefs.onConfigChanged = {
+            syncMonitorState()
+        }
+    }
+
+    fun start() {
+        syncMonitorState()
+    }
+
+    /**
+     * Запускает корутину мониторинга ТОЛЬКО когда кроссфейд включен и плеер реально воспроизводит трек.
+     * На паузе или при выключенном миксе корутина полностью остановлена (0% нагрузки на батарею).
+     */
+    private fun syncMonitorState() {
+        val shouldMonitor = ContinuousMixPrefs.cachedEnabled && mainPlayer.isPlaying
+        if (!shouldMonitor) {
+            monitorJob?.cancel()
+            monitorJob = null
+            return
+        }
+        if (monitorJob?.isActive == true) return
+
+        monitorJob = mixScope.launch {
+            while (isActive && ContinuousMixPrefs.cachedEnabled && mainPlayer.isPlaying) {
+                val sleepMs = if (!isMixing) {
+                    checkMixLogicAndGetNextDelay()
+                } else {
+                    500L
+                }
+                delay(sleepMs)
+            }
         }
     }
 
     fun stop() {
+        ContinuousMixPrefs.onConfigChanged = null
+        mainPlayer.removeListener(playerListener)
+        monitorJob?.cancel()
+        monitorJob = null
         mixScope.coroutineContext.cancelChildren()
         abortMix()
     }
 
-    private fun checkMixLogic() {
-        if (!cachedEnabled || isMixing) return
-        if (mainPlayer.playbackState != Player.STATE_READY || !mainPlayer.playWhenReady) return
+    private fun checkMixLogicAndGetNextDelay(): Long {
+        if (!ContinuousMixPrefs.cachedEnabled || isMixing) return 1500L
+        if (mainPlayer.playbackState != Player.STATE_READY || !mainPlayer.playWhenReady) return 1500L
 
         val nextIndex = mainPlayer.nextMediaItemIndex
-        if (nextIndex == C.INDEX_UNSET) return
+        if (nextIndex == C.INDEX_UNSET) return 2000L
 
         val duration = mainPlayer.duration
         val currentPos = mainPlayer.currentPosition
-        if (duration == C.TIME_UNSET || currentPos == C.TIME_UNSET) return
+        if (duration == C.TIME_UNSET || currentPos == C.TIME_UNSET || duration <= 15_000L) return 2000L
 
+        val overlapMs = (ContinuousMixPrefs.cachedOverlapSeconds * 1000f).toLong()
         val remaining = duration - currentPos
 
-        if (remaining > 0 && remaining <= cachedOverlapMs + 500) {
-            startCrossfade(nextIndex, cachedOverlapMs)
+        return when {
+            remaining in 1..(overlapMs + 400L) -> {
+                startCrossfade(overlapMs)
+                500L
+            }
+            remaining > overlapMs + 6000L -> {
+                // Вдали от конца трека просыпаемся редко
+                2000L
+            }
+            else -> {
+                // В последние 6 секунд перед сведением проверяем каждые 250 мс
+                250L
+            }
         }
     }
 
-    private fun startCrossfade(nextIndex: Int, overlapMs: Long) {
+    private fun startCrossfade(overlapMs: Long) {
         isMixing = true
         isAutoSkipping = true
 
@@ -160,25 +234,22 @@ class ContinuousMixManager(
 
         withTimeoutOrNull(2000) {
             while (mainPlayer.playbackState != Player.STATE_READY) {
-                delay(20)
+                delay(25)
             }
         }
 
         while (mixScope.isActive && isMixing) {
             val elapsed = System.currentTimeMillis() - startTime
-            if (elapsed >= overlapMs) {
-                break
-            }
+            if (elapsed >= overlapMs) break
 
             val progress = (elapsed.toFloat() / overlapMs.toFloat()).coerceIn(0f, 1f)
-
-            val newVol = kotlin.math.sin(progress * Math.PI / 2).toFloat()
-            val oldVol = kotlin.math.cos(progress * Math.PI / 2).toFloat()
+            val newVol = sin(progress * Math.PI / 2).toFloat()
+            val oldVol = cos(progress * Math.PI / 2).toFloat()
 
             mainPlayer.volume = newVol
             fader.volume = oldVol
 
-            delay(30)
+            delay(40)
         }
 
         finishMix()
@@ -216,21 +287,28 @@ fun ContinuousMixSettingsCard(context: Context) {
     var isEnabled by remember { mutableStateOf(ContinuousMixPrefs.isEnabled(context)) }
     var overlapSeconds by remember { mutableFloatStateOf(ContinuousMixPrefs.getOverlapSeconds(context)) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-    ) {
+    SettingsGroup {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconContainer(
+                    icon = Icons.Rounded.GraphicEq,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Continuous Mix", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                     Text(
-                        text = "Умное бесшовное наложение треков (Crossfade)",
+                        text = stringResource(id = R.string.continuous_mix_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(id = R.string.continuous_mix_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
+                LiquidGlassSwitch(
                     checked = isEnabled,
                     onCheckedChange = {
                         isEnabled = it
@@ -240,9 +318,30 @@ fun ContinuousMixSettingsCard(context: Context) {
             }
 
             AnimatedVisibility(visible = isEnabled) {
-                Column {
-                    Spacer(Modifier.height(16.dp))
-                    Text("Длина наложения: ${overlapSeconds.toInt()} сек.", style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.continuous_mix_overlap_label),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.continuous_mix_seconds_fmt, overlapSeconds.toInt()),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                     Slider(
                         value = overlapSeconds,
                         onValueChange = { overlapSeconds = it },

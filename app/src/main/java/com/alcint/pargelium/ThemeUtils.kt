@@ -26,26 +26,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val DominantColorCache = LruCache<String, Color>(256)
-private const val COLOR_ANIM_DURATION_MS = 550
+private const val COLOR_ANIM_DURATION_MS = 420
 
 @Composable
 fun rememberDominantColor(uri: Uri?): Color {
     val context = LocalContext.current
     val cacheKey = remember(uri) { uri?.toString() ?: "" }
 
-    var color by remember(cacheKey) {
+    // Не сбрасываем цвет в Unspecified при смене трека, чтобы не было промежуточного скачка на дефолтный цвет
+    var color by remember {
         val cached = if (cacheKey.isNotEmpty()) DominantColorCache.get(cacheKey) else null
         mutableStateOf(cached ?: Color.Unspecified)
     }
 
     LaunchedEffect(cacheKey) {
         if (uri == null || cacheKey.isEmpty()) {
-            color = Color.Unspecified
             return@LaunchedEffect
         }
 
         DominantColorCache.get(cacheKey)?.let { cached ->
-            color = cached
+            if (color != cached) color = cached
             return@LaunchedEffect
         }
 
@@ -54,7 +54,7 @@ fun rememberDominantColor(uri: Uri?): Color {
                 val appContext = context.applicationContext
                 val request = ImageRequest.Builder(appContext)
                     .data(uri)
-                    .size(96)
+                    .size(64)
                     .scale(Scale.FILL)
                     .allowHardware(false)
                     .bitmapConfig(Bitmap.Config.RGB_565)
@@ -64,13 +64,11 @@ fun rememberDominantColor(uri: Uri?): Color {
 
                 val result = appContext.imageLoader.execute(request)
                 if (result is SuccessResult) {
-                    val bitmap = result.drawable.toBitmap(width = 96, height = 96, config = Bitmap.Config.RGB_565)
-                    val palette = withContext(Dispatchers.Default) {
-                        Palette.from(bitmap)
-                            .maximumColorCount(16)
-                            .clearFilters()
-                            .generate()
-                    }
+                    val bitmap = result.drawable.toBitmap(width = 64, height = 64, config = Bitmap.Config.RGB_565)
+                    val palette = Palette.from(bitmap)
+                        .maximumColorCount(12)
+                        .clearFilters()
+                        .generate()
 
                     val bestSwatch = palette.vibrantSwatch
                         ?: palette.lightVibrantSwatch
@@ -95,8 +93,8 @@ fun rememberDominantColor(uri: Uri?): Color {
 
         if (extractedColor != Color.Unspecified) {
             DominantColorCache.put(cacheKey, extractedColor)
+            color = extractedColor
         }
-        color = extractedColor
     }
 
     return color
@@ -135,27 +133,38 @@ fun boostColor(color: Color, isLightMode: Boolean): Color {
     return Color(ColorUtils.HSLToColor(hsl))
 }
 
+/**
+ * Вычисляет все HSL-сдвиги строго ОДИН раз для целевого цвета, исключая радужные переливы
+ * и многократное пересоздание ColorScheme во время переключения треков.
+ */
 @Composable
 fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Boolean): ColorScheme {
     val actualMode = if (themeMode == 0) (if (isSystemDark) 2 else 1) else themeMode
-    val targetSeed = if (seedColor != Color.Unspecified && seedColor != Color.Transparent) {
-        seedColor
-    } else {
-        Color(0xFFD0BCFF)
+    val isLight = actualMode == 1
+
+    val targetBoosted = remember(seedColor, isLight) {
+        val raw = if (seedColor != Color.Unspecified && seedColor != Color.Transparent) {
+            seedColor
+        } else {
+            Color(0xFFD0BCFF)
+        }
+        boostColor(raw, isLightMode = isLight)
     }
 
-    val animatedSeed by animateColorAsState(
-        targetValue = targetSeed,
-        animationSpec = tween(durationMillis = COLOR_ANIM_DURATION_MS, easing = FastOutSlowInEasing),
-        label = "dynamicThemeSeed"
-    )
+    val targetSecondary = remember(targetBoosted) {
+        shiftHue(targetBoosted, hueDeltaDegrees = 22f, saturationScale = 0.75f)
+    }
 
-    return remember(animatedSeed, actualMode) {
-        val isLight = actualMode == 1
-        val boosted = boostColor(animatedSeed, isLightMode = isLight)
-        val secondarySeed = shiftHue(boosted, hueDeltaDegrees = 22f, saturationScale = 0.75f)
-        val tertiarySeed = shiftHue(boosted, hueDeltaDegrees = 54f, saturationScale = 0.85f)
+    val targetTertiary = remember(targetBoosted) {
+        shiftHue(targetBoosted, hueDeltaDegrees = 54f, saturationScale = 0.85f)
+    }
 
+    val animSpec = remember { tween<Color>(durationMillis = COLOR_ANIM_DURATION_MS, easing = FastOutSlowInEasing) }
+    val boosted by animateColorAsState(targetValue = targetBoosted, animationSpec = animSpec, label = "primarySeed")
+    val secondarySeed by animateColorAsState(targetValue = targetSecondary, animationSpec = animSpec, label = "secSeed")
+    val tertiarySeed by animateColorAsState(targetValue = targetTertiary, animationSpec = animSpec, label = "tertSeed")
+
+    return remember(boosted, secondarySeed, tertiarySeed, actualMode) {
         fun makePalette(
             base: Color,
             bgRatio: Float,
@@ -191,7 +200,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
 
         when (actualMode) {
             1 -> {
-                // Светлая тема (Light Expressive)
                 p = makePalette(Color(0xFFFAFAFC), 0.03f, 0.07f, 0.12f, 0.17f, 0.25f)
                 primaryColor = mixColors(boosted, Color.Black, 0.78f)
                 onPrimaryColor = Color.White
@@ -209,7 +217,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onTertiaryContainerColor = mixColors(tertiarySeed, Color.Black, 0.45f)
             }
             3 -> {
-                // Чистый AMOLED (Pitch Black)
                 p = makePalette(Color.Black, 0.00f, 0.04f, 0.09f, 0.14f, 0.20f)
                 primaryColor = mixColors(boosted, Color.White, 0.82f)
                 onPrimaryColor = Color(0xFF0E0E11)
@@ -227,7 +234,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onTertiaryContainerColor = mixColors(tertiarySeed, Color.White, 0.92f)
             }
             4 -> {
-                // Глубокий индиго / Полночь (Deep Midnight)
                 p = makePalette(Color(0xFF0F1016), 0.08f, 0.13f, 0.18f, 0.24f, 0.32f)
                 primaryColor = mixColors(boosted, Color.White, 0.82f)
                 onPrimaryColor = Color(0xFF101014)
@@ -245,7 +251,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onTertiaryContainerColor = mixColors(tertiarySeed, Color.White, 0.92f)
             }
             5 -> {
-                // Насыщенная цветная тема (Vivid Colorful)
                 val baseColorful = mixColors(boosted, Color.Black, 0.28f)
                 p = makePalette(baseColorful, 0.14f, 0.24f, 0.34f, 0.44f, 0.54f)
                 primaryColor = Color.White
@@ -264,7 +269,6 @@ fun rememberPargeliumScheme(seedColor: Color, themeMode: Int, isSystemDark: Bool
                 onTertiaryContainerColor = Color.White
             }
             else -> {
-                // Стандартная темная тема (Material Dark Expressive)
                 p = makePalette(Color(0xFF121215), 0.05f, 0.09f, 0.14f, 0.20f, 0.28f)
                 primaryColor = mixColors(boosted, Color.White, 0.82f)
                 onPrimaryColor = Color(0xFF121215)

@@ -426,7 +426,7 @@ object PrefsManager {
     fun getAutoDetectHeadphones(): Boolean = prefs.getBoolean("auto_detect_headphones", true)
 
     fun saveThemeMode(mode: Int) = prefs.edit().putInt("theme_mode", mode).apply()
-    fun getThemeMode(): Int = prefs.getInt("theme_mode", 2)
+    fun getThemeMode(): Int = prefs.getInt("theme_mode", 0)
     fun saveSecureMode(enabled: Boolean) = prefs.edit().putBoolean("secure_mode", enabled).apply()
     fun getSecureMode(): Boolean = prefs.getBoolean("secure_mode", false)
     fun saveFossWearEnabled(enabled: Boolean) = prefs.edit().putBoolean("foss_wear_enabled", enabled).apply()
@@ -528,4 +528,9 @@ object PrefsManager {
     fun getPlayerButtonStyle(): Int {
         return prefs.getInt(KEY_PLAYER_BUTTON_STYLE, 0)
     }
+
+    fun isOnboardingCompleted(): Boolean = prefs.getBoolean("onboarding_completed_v1", false)
+
+    fun saveOnboardingCompleted(completed: Boolean) =
+        prefs.edit().putBoolean("onboarding_completed_v1", completed).apply()
 }

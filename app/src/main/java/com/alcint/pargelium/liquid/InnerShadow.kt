@@ -1,11 +1,9 @@
-// Adapted from Kyant0/AndroidLiquidGlass — https://github.com/Kyant0/AndroidLiquidGlass (Apache 2.0).
-// Mirrored from compose-miuix-ui example.
-
 package com.alcint.pargelium.liquid
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
@@ -27,7 +25,9 @@ import androidx.compose.ui.node.requireGraphicsContext
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toIntSize
 
 @Immutable
 data class InnerShadow(
@@ -56,9 +56,12 @@ private class InnerShadowElement(
     override fun create(): InnerShadowNode = InnerShadowNode(shape, shadow)
 
     override fun update(node: InnerShadowNode) {
-        node.shape = shape
-        node.shadow = shadow
-        node.invalidateDraw()
+        if (node.shape != shape || node.shadow !== shadow) {
+            node.shape = shape
+            node.shadow = shadow
+            node.markDirty()
+            node.invalidateDraw()
+        }
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -95,41 +98,67 @@ private class InnerShadowNode(
     private val clipPath = Path()
     private var prevRadius = Float.NaN
 
+    private var cachedSize: Size = Size.Unspecified
+    private var cachedLayoutDirection: LayoutDirection? = null
+    private var cachedShape: Shape? = null
+    private var cachedShadow: InnerShadow? = null
+    private var isLayerDirty: Boolean = true
+
+    fun markDirty() {
+        isLayerDirty = true
+    }
+
     override fun ContentDrawScope.draw() {
         drawContent()
 
-        val shadow = shadow() ?: return
+        val currentShadow = shadow() ?: return
+        if (currentShadow.alpha <= 0.005f || currentShadow.color.alpha <= 0.005f) return
+        if (size.width <= 0f || size.height <= 0f) return
+
         val layer = shadowLayer ?: return
+        val radius = currentShadow.radius.toPx()
+        val offsetX = currentShadow.offset.x.toPx()
+        val offsetY = currentShadow.offset.y.toPx()
 
-        val radius = shadow.radius.toPx()
-        val offsetX = shadow.offset.x.toPx()
-        val offsetY = shadow.offset.y.toPx()
+        val needsRebuild = isLayerDirty ||
+                cachedSize != size ||
+                cachedLayoutDirection != layoutDirection ||
+                cachedShape != shape ||
+                cachedShadow != currentShadow
 
-        val outline = shape.createOutline(size, layoutDirection, this)
-        clipPath.reset()
-        when (outline) {
-            is Outline.Rectangle -> clipPath.addRect(outline.rect)
-            is Outline.Rounded -> clipPath.addRoundRect(outline.roundRect)
-            is Outline.Generic -> clipPath.addPath(outline.path)
-        }
+        if (needsRebuild) {
+            cachedSize = size
+            cachedLayoutDirection = layoutDirection
+            cachedShape = shape
+            cachedShadow = currentShadow
+            isLayerDirty = false
 
-        paint.color = shadow.color
-        layer.alpha = shadow.alpha
-        layer.blendMode = shadow.blendMode
-        if (prevRadius != radius) {
-            layer.renderEffect = if (radius > 0f) BlurEffect(radius, radius, TileMode.Decal) else null
-            prevRadius = radius
-        }
+            val outline = shape.createOutline(size, layoutDirection, this)
+            clipPath.reset()
+            when (outline) {
+                is Outline.Rectangle -> clipPath.addRect(outline.rect)
+                is Outline.Rounded -> clipPath.addRoundRect(outline.roundRect)
+                is Outline.Generic -> clipPath.addPath(outline.path)
+            }
 
-        layer.record {
-            drawContext.canvas.let { canvas ->
-                canvas.save()
-                canvas.clipPath(clipPath)
-                canvas.drawOutline(outline, paint)
-                canvas.translate(offsetX, offsetY)
-                canvas.drawOutline(outline, ShadowMaskPaint)
-                canvas.translate(-offsetX, -offsetY)
-                canvas.restore()
+            paint.color = currentShadow.color
+            layer.alpha = currentShadow.alpha
+            layer.blendMode = currentShadow.blendMode
+            if (prevRadius != radius) {
+                layer.renderEffect = if (radius > 0f) BlurEffect(radius, radius, TileMode.Decal) else null
+                prevRadius = radius
+            }
+
+            layer.record(size = size.toIntSize()) {
+                drawContext.canvas.let { canvas ->
+                    canvas.save()
+                    canvas.clipPath(clipPath)
+                    canvas.drawOutline(outline, paint)
+                    canvas.translate(offsetX, offsetY)
+                    canvas.drawOutline(outline, ShadowMaskPaint)
+                    canvas.translate(-offsetX, -offsetY)
+                    canvas.restore()
+                }
             }
         }
 
@@ -142,6 +171,7 @@ private class InnerShadowNode(
     }
 
     override fun onAttach() {
+        isLayerDirty = true
         shadowLayer = requireGraphicsContext().createGraphicsLayer().apply {
             compositingStrategy = CompositingStrategy.Offscreen
         }
@@ -152,6 +182,8 @@ private class InnerShadowNode(
             requireGraphicsContext().releaseGraphicsLayer(layer)
             shadowLayer = null
         }
+        prevRadius = Float.NaN
+        isLayerDirty = true
     }
 }
 

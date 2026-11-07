@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import android.util.LruCache
+import android.util.Xml
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.gson.Gson
 import com.google.gson.JsonElement
@@ -14,18 +15,62 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
+import org.xmlpull.v1.XmlPullParser
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Url
 import java.io.File
+import java.io.StringReader
 import java.net.URLEncoder
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+
+private const val LRC_RED_CLIENT_IDENTITY =
+    "Pargelium/1.2 (https://github.com/A1cInt/Pargelium; 148353020+A1cInt@users.noreply.github.com)"
+
+data class LrcRedHit(
+    @SerializedName("isrc") val isrc: String?,
+    @SerializedName("title") val title: String?,
+    @SerializedName("artist") val artist: String?,
+    @SerializedName("album") val album: String?,
+    @SerializedName("year") val year: Int?,
+    @SerializedName("duration") val duration: Double?,
+    @SerializedName("cover") val cover: String?,
+    @SerializedName("color") val color: String?
+)
+
+data class LrcRedSearchResponse(
+    @SerializedName("hits") val hits: List<LrcRedHit>?,
+    @SerializedName("next") val next: String?
+)
+
+data class LrcRedFiles(
+    @SerializedName("ttml") val ttml: String?,
+    @SerializedName("lrc") val lrc: String?,
+    @SerializedName("lyricsfile") val lyricsfile: String?
+)
+
+data class LrcRedTrackResponse(
+    @SerializedName("isrc") val isrc: String?,
+    @SerializedName("title") val title: String?,
+    @SerializedName("artist") val artist: String?,
+    @SerializedName("album") val album: String?,
+    @SerializedName("duration") val duration: Double?,
+    @SerializedName("sync") val sync: String?,
+    @SerializedName("page") val page: String?,
+    @SerializedName("files") val files: LrcRedFiles?,
+    @SerializedName("cover") val cover: String?
+)
 
 data class BetterLyricsWord(
     @SerializedName("text") val text: String?,
@@ -86,6 +131,22 @@ data class MxLyrics(
 )
 
 interface LyricsNetworkApi {
+    @Headers("X-Client-ID: $LRC_RED_CLIENT_IDENTITY")
+    @GET("https://lrc.red/search.json")
+    suspend fun searchLrcRed(
+        @Query("q") query: String
+    ): LrcRedSearchResponse
+
+    @Headers("X-Client-ID: $LRC_RED_CLIENT_IDENTITY")
+    @GET("https://lrc.red/s/{isrc}.json")
+    suspend fun getLrcRedTrack(
+        @Path("isrc") isrc: String
+    ): LrcRedTrackResponse
+
+    @Headers("X-Client-ID: $LRC_RED_CLIENT_IDENTITY")
+    @GET
+    suspend fun downloadRawText(@Url url: String): ResponseBody
+
     @GET("https://lyrics-api.boidu.dev/lyrics")
     suspend fun getBetterLyrics(
         @Query("song") song: String,
@@ -137,22 +198,29 @@ interface LyricsNetworkApi {
 object LyricsManager {
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
         .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0")
-                .build()
-            chain.proceed(request)
+            val req = chain.request()
+            val host = req.url.host.lowercase(Locale.ROOT)
+            val builder = req.newBuilder()
+            if (host.contains("lrc.red")) {
+                builder.header("User-Agent", LRC_RED_CLIENT_IDENTITY)
+                builder.header("X-Client-ID", LRC_RED_CLIENT_IDENTITY)
+            } else {
+                builder.header("User-Agent", LRC_RED_CLIENT_IDENTITY)
+            }
+            chain.proceed(builder.build())
         }
         .build()
 
     private val gson = Gson()
     private val lyricListType = object : TypeToken<List<LyricLine>>() {}.type
-    private val memoryCache = LruCache<String, List<LyricLine>>(32)
+    private val memoryCache = LruCache<String, List<LyricLine>>(48)
+    private val trackCreditUrlMap = ConcurrentHashMap<Long, String>()
 
     private val api = Retrofit.Builder()
-        .baseUrl("http://localhost/")
+        .baseUrl("https://lrc.red/")
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
@@ -161,6 +229,9 @@ object LyricsManager {
     private val parenCleanupRegex = Regex("(?i)\\s*\\(?(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?\\)?")
     private val bracketCleanupRegex = Regex("(?i)\\s*\\[(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio).*?]")
     private val dashCleanupRegex = Regex("(?i)\\s*-.*?(Remaster|Edit|Mix|Version).*")
+    private val multiSpaceRegex = Regex("\\s+")
+
+    fun getCreditUrlForTrack(trackId: Long): String? = trackCreditUrlMap[trackId]
 
     private fun getCurrentAppLanguage(): String {
         val appLocales = AppCompatDelegate.getApplicationLocales()
@@ -180,28 +251,42 @@ object LyricsManager {
     }
 
     suspend fun getLyrics(context: Context, track: AudioTrack): List<LyricLine> = withContext(Dispatchers.IO) {
-        val localLrc = AudioRepository.findLrcContentForTrack(context, track)
+        val cacheKey = getCacheKey(track)
+        memoryCache.get(cacheKey)?.let { cached ->
+            if (cached.isNotEmpty()) return@withContext cached
+        }
+
+        val localContent = AudioRepository.findLrcContentForTrack(context, track)
             ?: findLocalLrcFile(context, track)
 
-        if (!localLrc.isNullOrBlank()) {
-            val parsed = AudioRepository.parseLyrics(localLrc)
+        if (!localContent.isNullOrBlank()) {
+            val parsed = parseRawLyricsOrTtml(localContent)
             if (parsed.isNotEmpty()) {
                 saveToCache(context, track, parsed)
                 return@withContext parsed
             }
         }
 
-        val cachedLyrics = loadFromCache(context, track)
-        if (!cachedLyrics.isNullOrEmpty()) {
-            return@withContext cachedLyrics
+        val diskCached = loadFromCache(context, track)
+        if (!diskCached.isNullOrEmpty()) {
+            return@withContext diskCached
         }
 
+        // 1. Приоритет №1: lrc.red (TTML -> LRC)
+        val lrcRedLyrics = fetchLrcRedOnline(context, track)
+        if (lrcRedLyrics.isNotEmpty()) {
+            saveToCache(context, track, lrcRedLyrics)
+            return@withContext lrcRedLyrics
+        }
+
+        // 2. Приоритет №2: BetterLyrics / LyricsPlus
         val betterLyrics = fetchBetterLyricsOnline(track)
         if (betterLyrics.isNotEmpty()) {
             saveToCache(context, track, betterLyrics)
             return@withContext betterLyrics
         }
 
+        // 3. Приоритет №3: LRCLIB / Musixmatch / Lyrics.ovh
         val fallbackOnline = fetchFallbackOnlineLyrics(track)
         if (fallbackOnline.isNotEmpty()) {
             saveToCache(context, track, fallbackOnline)
@@ -210,7 +295,7 @@ object LyricsManager {
 
         val embeddedLyrics = getEmbeddedLyrics(context, track.uri)
         if (!embeddedLyrics.isNullOrBlank()) {
-            val parsed = AudioRepository.parseLyrics(embeddedLyrics)
+            val parsed = parseRawLyricsOrTtml(embeddedLyrics)
             if (parsed.isNotEmpty()) {
                 saveToCache(context, track, parsed)
                 return@withContext parsed
@@ -221,6 +306,12 @@ object LyricsManager {
     }
 
     suspend fun searchLyricsOnline(context: Context, track: AudioTrack): List<LyricLine> = withContext(Dispatchers.IO) {
+        val lrcRedLyrics = fetchLrcRedOnline(context, track)
+        if (lrcRedLyrics.isNotEmpty()) {
+            saveToCache(context, track, lrcRedLyrics)
+            return@withContext lrcRedLyrics
+        }
+
         val betterLyrics = fetchBetterLyricsOnline(track)
         if (betterLyrics.isNotEmpty()) {
             saveToCache(context, track, betterLyrics)
@@ -234,6 +325,344 @@ object LyricsManager {
         }
 
         return@withContext emptyList()
+    }
+
+    /**
+     * Поиск и загрузка текстов с lrc.red с приоритетом послогового/пословного формата TTML (.ttml).
+     */
+    private suspend fun fetchLrcRedOnline(context: Context, track: AudioTrack): List<LyricLine> {
+        val validMetadata = track.artist.isNotBlank() && track.title.isNotBlank() && !track.artist.contains("Unknown", true)
+        if (!validMetadata) return emptyList()
+
+        val cleanArtist = cleanMetadata(track.artist)
+        val cleanTitle = cleanMetadata(track.title)
+        val targetDurationSec = track.duration / 1000.0
+
+        val queries = listOfNotNull(
+            "$cleanArtist $cleanTitle".trim().takeIf { it.isNotEmpty() },
+            "${track.artist} ${track.title}".trim().takeIf { it != "$cleanArtist $cleanTitle" },
+            cleanTitle.takeIf { it.isNotEmpty() }
+        )
+
+        var bestHit: LrcRedHit? = null
+        var bestScore = -1
+
+        for (query in queries) {
+            try {
+                val searchResp = api.searchLrcRed(query)
+                val hits = searchResp.hits.orEmpty()
+                for (hit in hits) {
+                    val isrc = hit.isrc?.trim().orEmpty()
+                    if (isrc.isEmpty()) continue
+
+                    val score = scoreLrcRedHit(hit, cleanTitle, cleanArtist, track.album, targetDurationSec)
+                    if (score > bestScore) {
+                        bestScore = score
+                        bestHit = hit
+                    }
+                }
+                if (bestScore >= 55 && bestHit != null) break
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {}
+        }
+
+        val chosenHit = bestHit?.takeIf { bestScore >= 25 } ?: return emptyList()
+        val isrc = chosenHit.isrc!!.trim()
+
+        var ttmlUrl = "https://lrc.red/s/$isrc.ttml"
+        var lrcUrl = "https://lrc.red/s/$isrc.lrc"
+        var pageUrl = "https://lrc.red/s/$isrc"
+
+        try {
+            val trackMeta = api.getLrcRedTrack(isrc)
+            trackMeta.page?.takeIf { it.isNotBlank() }?.let { pageUrl = it }
+            trackMeta.files?.ttml?.takeIf { it.isNotBlank() }?.let { ttmlUrl = it }
+            trackMeta.files?.lrc?.takeIf { it.isNotBlank() }?.let { lrcUrl = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {}
+
+        // 1. В приоритете загружаем именно TTML (.ttml)
+        try {
+            val rawTtml = api.downloadRawText(ttmlUrl).use { it.string() }
+            if (rawTtml.contains("<tt", ignoreCase = true) || rawTtml.contains("<p", ignoreCase = true)) {
+                val parsedTtml = parseTtmlLyrics(rawTtml)
+                if (parsedTtml.isNotEmpty()) {
+                    trackCreditUrlMap[track.id] = pageUrl
+                    saveCreditUrlToDisk(context, track, pageUrl)
+                    return parsedTtml
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {}
+
+        // 2. Если TTML недоступен для этого трека, пробуем .lrc с lrc.red
+        try {
+            val rawLrc = api.downloadRawText(lrcUrl).use { it.string() }
+            if (rawLrc.isNotBlank()) {
+                val parsedLrc = AudioRepository.parseLyrics(rawLrc)
+                if (parsedLrc.isNotEmpty()) {
+                    trackCreditUrlMap[track.id] = pageUrl
+                    saveCreditUrlToDisk(context, track, pageUrl)
+                    return parsedLrc
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {}
+
+        return emptyList()
+    }
+
+    private fun scoreLrcRedHit(
+        hit: LrcRedHit,
+        cleanTitle: String,
+        cleanArtist: String,
+        album: String,
+        targetDurationSec: Double
+    ): Int {
+        val hitTitle = cleanMetadata(hit.title.orEmpty()).lowercase(Locale.ROOT)
+        val hitArtist = cleanMetadata(hit.artist.orEmpty()).lowercase(Locale.ROOT)
+        val reqTitle = cleanTitle.lowercase(Locale.ROOT)
+        val reqArtist = cleanArtist.lowercase(Locale.ROOT)
+
+        var score = 0
+        when {
+            hitTitle == reqTitle -> score += 45
+            hitTitle.contains(reqTitle) || reqTitle.contains(hitTitle) -> score += 28
+            else -> return -10
+        }
+
+        val primaryArtist = reqArtist.split(",", "&", "/", ";").firstOrNull()?.trim().orEmpty()
+        when {
+            hitArtist == reqArtist -> score += 35
+            primaryArtist.isNotEmpty() && (hitArtist.contains(primaryArtist) || primaryArtist.contains(hitArtist)) -> score += 25
+            else -> score -= 12
+        }
+
+        if (album.isNotBlank() && !hit.album.isNullOrBlank()) {
+            if (hit.album.equals(album, ignoreCase = true)) score += 10
+        }
+
+        if (targetDurationSec > 5.0 && hit.duration != null && hit.duration > 0.0) {
+            val diff = abs(hit.duration - targetDurationSec)
+            when {
+                diff <= 2.5 -> score += 20
+                diff <= 6.0 -> score += 12
+                diff <= 15.0 -> score += 4
+                diff > 35.0 -> score -= 20
+            }
+        }
+
+        return score
+    }
+
+    fun parseRawLyricsOrTtml(rawContent: String): List<LyricLine> {
+        val trimmed = rawContent.trimStart()
+        if (trimmed.startsWith("<?xml", ignoreCase = true) ||
+            trimmed.startsWith("<tt", ignoreCase = true) ||
+            trimmed.contains("http://www.w3.org/ns/ttml", ignoreCase = true)
+        ) {
+            val ttmlLines = parseTtmlLyrics(trimmed)
+            if (ttmlLines.isNotEmpty()) return ttmlLines
+        }
+        return AudioRepository.parseLyrics(rawContent)
+    }
+
+    /**
+     * Быстрый парсер TTML (Apple Music / lrc.red формат) на базе XmlPullParser.
+     * Извлекает тайминги строк <p>, послоговые/пословные тайминги <span>, пробелы между словами,
+     * бэк-вокал (ttm:role="x-bg") и переводы (ttm:role="x-translation").
+     */
+    fun parseTtmlLyrics(ttmlContent: String): List<LyricLine> {
+        val lines = ArrayList<LyricLine>()
+        try {
+            val parser = Xml.newPullParser()
+            parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+            parser.setInput(StringReader(ttmlContent))
+
+            var inParagraph = false
+            var pBeginMs = 0L
+            var pEndMs = 0L
+            val pTextBuilder = StringBuilder()
+            val pTranslationBuilder = StringBuilder()
+            val pWords = ArrayList<SyllableWord>()
+
+            var activeSpanBeginMs = -1L
+            var activeSpanEndMs = -1L
+            val activeSpanText = StringBuilder()
+            var spanDepth = 0
+            var inTranslationSpan = false
+            var inBgVocalSpan = false
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        val tagName = parser.name.substringAfterLast(':').lowercase(Locale.ROOT)
+                        if (tagName == "p") {
+                            inParagraph = true
+                            pBeginMs = parseTtmlTimeMs(getAttr(parser, "begin")) ?: 0L
+                            pEndMs = parseTtmlTimeMs(getAttr(parser, "end")) ?: (pBeginMs + 3500L)
+                            pTextBuilder.setLength(0)
+                            pTranslationBuilder.setLength(0)
+                            pWords.clear()
+                            spanDepth = 0
+                            inTranslationSpan = false
+                            inBgVocalSpan = false
+                        } else if (inParagraph && tagName == "span") {
+                            spanDepth++
+                            val role = getAttr(parser, "ttm:role") ?: getAttr(parser, "role")
+                            if (role.equals("x-translation", ignoreCase = true)) {
+                                inTranslationSpan = true
+                            } else if (role.equals("x-bg", ignoreCase = true)) {
+                                inBgVocalSpan = true
+                            }
+
+                            val sBegin = parseTtmlTimeMs(getAttr(parser, "begin"))
+                            val sEnd = parseTtmlTimeMs(getAttr(parser, "end"))
+                            if (!inTranslationSpan && sBegin != null) {
+                                activeSpanBeginMs = sBegin
+                                activeSpanEndMs = sEnd ?: (sBegin + 300L)
+                                activeSpanText.setLength(0)
+                            }
+                        } else if (inParagraph && tagName == "br") {
+                            pTextBuilder.append(' ')
+                        }
+                    }
+
+                    XmlPullParser.TEXT -> {
+                        if (inParagraph) {
+                            val text = parser.text ?: ""
+                            if (inTranslationSpan) {
+                                pTranslationBuilder.append(text)
+                            } else if (activeSpanBeginMs >= 0L) {
+                                activeSpanText.append(text)
+                                pTextBuilder.append(text)
+                            } else {
+                                // Пробелы между </span> <span ...> означают границу между словами!
+                                if (text.any { it.isWhitespace() } && pWords.isNotEmpty()) {
+                                    val lastIdx = pWords.lastIndex
+                                    val lastWord = pWords[lastIdx]
+                                    if (!lastWord.text.endsWith(" ")) {
+                                        pWords[lastIdx] = lastWord.copy(text = lastWord.text + " ")
+                                    }
+                                }
+                                pTextBuilder.append(text)
+                            }
+                        }
+                    }
+
+                    XmlPullParser.END_TAG -> {
+                        val tagName = parser.name.substringAfterLast(':').lowercase(Locale.ROOT)
+                        if (inParagraph && tagName == "span") {
+                            if (!inTranslationSpan && activeSpanBeginMs >= 0L) {
+                                val rawSyllable = activeSpanText.toString()
+                                val hasTrailingSpace = rawSyllable.endsWith(" ")
+                                val cleanSyllable = rawSyllable.replace(multiSpaceRegex, " ").trim()
+                                if (cleanSyllable.isNotEmpty()) {
+                                    val finalSyllableText = if (hasTrailingSpace) "$cleanSyllable " else cleanSyllable
+                                    val endMs = activeSpanEndMs.coerceAtLeast(activeSpanBeginMs + 40L)
+                                    pWords.add(
+                                        SyllableWord(
+                                            text = finalSyllableText,
+                                            startMs = activeSpanBeginMs,
+                                            endMs = endMs
+                                        )
+                                    )
+                                }
+                                activeSpanBeginMs = -1L
+                                activeSpanEndMs = -1L
+                                activeSpanText.setLength(0)
+                            }
+                            spanDepth = (spanDepth - 1).coerceAtLeast(0)
+                            if (spanDepth == 0) {
+                                inTranslationSpan = false
+                                inBgVocalSpan = false
+                            }
+                        } else if (tagName == "p" && inParagraph) {
+                            inParagraph = false
+                            val normalizedLineText = if (pWords.isNotEmpty()) {
+                                buildString {
+                                    pWords.forEach { w -> append(w.text) }
+                                }.replace(multiSpaceRegex, " ").trim()
+                            } else {
+                                pTextBuilder.toString().replace(multiSpaceRegex, " ").trim()
+                            }
+
+                            if (normalizedLineText.isNotEmpty()) {
+                                val lineStartMs = if (pBeginMs > 0L) {
+                                    pBeginMs
+                                } else {
+                                    pWords.firstOrNull()?.startMs ?: 0L
+                                }
+                                val trans = pTranslationBuilder.toString().trim().takeIf { it.isNotEmpty() }
+                                lines.add(
+                                    LyricLine(
+                                        timeMs = lineStartMs,
+                                        text = normalizedLineText,
+                                        translation = trans,
+                                        words = pWords.toList()
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (e: Exception) {
+            Log.e("LyricsManager", "TTML parse error", e)
+        }
+
+        return lines.sortedBy { it.timeMs }
+    }
+
+    private fun getAttr(parser: XmlPullParser, name: String): String? {
+        for (i in 0 until parser.attributeCount) {
+            val attrName = parser.getAttributeName(i)
+            if (attrName.equals(name, ignoreCase = true) ||
+                attrName.substringAfterLast(':').equals(name, ignoreCase = true)
+            ) {
+                return parser.getAttributeValue(i)
+            }
+        }
+        return null
+    }
+
+    private fun parseTtmlTimeMs(raw: String?): Long? {
+        if (raw.isNullOrBlank()) return null
+        val s = raw.trim().lowercase(Locale.ROOT)
+        return try {
+            when {
+                s.endsWith("ms") -> s.removeSuffix("ms").trim().toDouble().toLong()
+                s.endsWith("s") -> (s.removeSuffix("s").trim().toDouble() * 1000.0).toLong()
+                s.endsWith("m") -> (s.removeSuffix("m").trim().toDouble() * 60_000.0).toLong()
+                s.endsWith("h") -> (s.removeSuffix("h").trim().toDouble() * 3_600_000.0).toLong()
+                s.contains(':') -> {
+                    val parts = s.split(':')
+                    when (parts.size) {
+                        2 -> {
+                            val min = parts[0].toLong()
+                            val sec = parts[1].toDouble()
+                            (min * 60_000L) + (sec * 1000.0).toLong()
+                        }
+                        3 -> {
+                            val hrs = parts[0].toLong()
+                            val min = parts[1].toLong()
+                            val sec = parts[2].toDouble()
+                            (hrs * 3_600_000L) + (min * 60_000L) + (sec * 1000.0).toLong()
+                        }
+                        else -> null
+                    }
+                }
+                else -> (s.toDouble() * 1000.0).toLong()
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private suspend fun fetchBetterLyricsOnline(track: AudioTrack): List<LyricLine> {
@@ -259,12 +688,12 @@ object LyricsManager {
                             val wEnd = wStart + (w.duration ?: 300L).coerceAtLeast(1L)
                             val wText = w.text?.trim() ?: ""
                             if (wText.isNotEmpty()) {
-                                wordsList.add(SyllableWord(wText, wStart, wEnd))
+                                wordsList.add(SyllableWord("$wText ", wStart, wEnd))
                             }
                         }
                     }
                     val finalText = text.trim().ifEmpty {
-                        wordsList.joinToString(" ") { it.text }
+                        wordsList.joinToString("") { it.text }.trim()
                     }
                     if (finalText.isNotEmpty()) {
                         result.add(LyricLine(lineStart, finalText, null, wordsList))
@@ -274,7 +703,7 @@ object LyricsManager {
                     return result.sortedBy { it.timeMs }
                 }
             } else if (!betterResp.lyrics.isNullOrBlank()) {
-                val parsed = AudioRepository.parseLyrics(betterResp.lyrics)
+                val parsed = parseRawLyricsOrTtml(betterResp.lyrics)
                 if (parsed.isNotEmpty()) return parsed
             }
         } catch (e: CancellationException) {
@@ -297,7 +726,7 @@ object LyricsManager {
                             val rawWord = w.string ?: ""
                             val trimmedWord = rawWord.trim()
                             if (trimmedWord.isNotEmpty()) {
-                                wordsList.add(SyllableWord(trimmedWord, wStart, wEnd))
+                                wordsList.add(SyllableWord("$trimmedWord ", wStart, wEnd))
                                 if (fullTextBuilder.isNotEmpty()) {
                                     fullTextBuilder.append(' ')
                                 }
@@ -370,7 +799,7 @@ object LyricsManager {
         }
 
         if (!rawLyrics.isNullOrBlank()) {
-            return AudioRepository.parseLyrics(rawLyrics)
+            return parseRawLyricsOrTtml(rawLyrics)
         }
 
         return emptyList()
@@ -498,6 +927,17 @@ object LyricsManager {
         return File(dir, "lyrics_${cacheKey.hashCode()}.json")
     }
 
+    private fun getCreditFile(context: Context, cacheKey: String): File {
+        val dir = context.getDir("lyrics_persistent_cache", Context.MODE_PRIVATE)
+        return File(dir, "lyrics_${cacheKey.hashCode()}.credit")
+    }
+
+    private fun saveCreditUrlToDisk(context: Context, track: AudioTrack, url: String) {
+        try {
+            getCreditFile(context, getCacheKey(track)).writeText(url)
+        } catch (_: Exception) {}
+    }
+
     private fun saveToCache(context: Context, track: AudioTrack, lines: List<LyricLine>) {
         val key = getCacheKey(track)
         memoryCache.put(key, lines)
@@ -510,6 +950,13 @@ object LyricsManager {
     private fun loadFromCache(context: Context, track: AudioTrack): List<LyricLine>? {
         val key = getCacheKey(track)
         memoryCache.get(key)?.let { return it }
+
+        val creditFile = getCreditFile(context, key)
+        if (creditFile.exists()) {
+            runCatching { creditFile.readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }?.let {
+                trackCreditUrlMap[track.id] = it
+            }
+        }
 
         val file = getCacheFile(context, key)
         if (file.exists() && file.length() > 0) {
@@ -527,11 +974,12 @@ object LyricsManager {
 
     fun clearCache(context: Context): Int {
         memoryCache.evictAll()
+        trackCreditUrlMap.clear()
         var deletedCount = 0
         try {
             val dir = context.getDir("lyrics_persistent_cache", Context.MODE_PRIVATE)
             dir.listFiles()?.forEach { file ->
-                if (file.name.startsWith("lyrics_") && (file.name.endsWith(".json") || file.name.endsWith(".lrc"))) {
+                if (file.name.startsWith("lyrics_")) {
                     if (file.delete()) deletedCount++
                 }
             }

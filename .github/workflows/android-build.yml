@@ -87,6 +87,7 @@ jobs:
 
       - name: Send Build Info & APK to Telegram Topic (t.me/AlcIntGroup/659)
         if: success()
+        shell: bash
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -98,30 +99,33 @@ jobs:
           BRANCH_NAME: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -z "$BOT_TOKEN" ]; then
-            echo "TELEGRAM_BOT_TOKEN secret is not configured. Skipping Telegram notification."
+          set -euo pipefail
+
+          if [[ -z "${BOT_TOKEN:-}" ]]; then
+            echo "TELEGRAM_BOT_TOKEN secret is not configured. Skipping Telegram upload."
             exit 0
           fi
 
           TARGET_CHAT="${CHAT_ID:-@AlcIntGroup}"
-          SHORT_SHA="${GITHUB_SHA::7}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
 
-          if [ "$BUILD_VARIANT" = "release" ] && [ -n "$SIGNED_REL_PATH" ] && [ -f "$SIGNED_REL_PATH" ]; then
-            APK_FILE="$SIGNED_REL_PATH"
+          APK_FILE=""
+          if [[ "${BUILD_VARIANT}" == "release" && -n "${SIGNED_REL_PATH:-}" && -f "${SIGNED_REL_PATH}" ]]; then
+            APK_FILE="${SIGNED_REL_PATH}"
           else
-            APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+            APK_FILE="$(find app/build/outputs/apk -type f -name "*.apk" | head -n 1)"
           fi
 
-          if [ -z "$APK_FILE" ] \vert{}\vert{} [ ! -f "$APK_FILE" ]; then
-            echo "APK file not found!"
+          if [[ -z "${APK_FILE}" || ! -f "${APK_FILE}" ]]; then
+            echo "Error: Built APK file not found in app/build/outputs/apk"
             exit 1
           fi
 
-          FINAL_APK="Pargelium-${BUILD_VARIANT}-${SHORT_SHA}.apk"
-          cp "$APK_FILE" "$FINAL_APK"
-          FILE_SIZE=$(du -h "$FINAL_APK" | cut -f1)
+          FINAL_APK="/tmp/Pargelium-${BUILD_VARIANT}-${SHORT_SHA}.apk"
+          cp "${APK_FILE}" "${FINAL_APK}"
+          FILE_SIZE="$(du -h "${FINAL_APK}" | cut -f1)"
 
-          CLEAN_MSG=$(echo "$COMMIT_MSG" | head -n 5 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+          CLEAN_MSG="$(printf '%s' "${COMMIT_MSG:-Update}" | head -n 5 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
 
           CAPTION="<b>Pargelium Cloud CI Build Completed</b>
 
@@ -136,9 +140,9 @@ jobs:
 
           <a href=\"${RUN_URL}\">View GitHub Actions Run</a>"
 
-          curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
-            -F "chat_id=${TARGET_CHAT}" \
-            -F "message_thread_id=${TOPIC_ID}" \
+          curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
+            --form-string "chat_id=${TARGET_CHAT}" \
+            --form-string "message_thread_id=${TOPIC_ID}" \
             -F "document=@${FINAL_APK}" \
-            -F "parse_mode=HTML" \
-            -F "caption=${CAPTION}"
+            --form-string "parse_mode=HTML" \
+            --form-string "caption=${CAPTION}"

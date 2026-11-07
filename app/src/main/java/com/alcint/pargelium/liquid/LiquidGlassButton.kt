@@ -1,7 +1,16 @@
 package com.alcint.pargelium.liquid
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -22,10 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -39,20 +52,34 @@ private val ButtonSpecularHighlight = Highlight(
     width = 1.2.dp,
     alpha = 1f,
     style = BloomStroke(
-        color = Color.White.copy(alpha = 0.25f),
+        color = Color.White.copy(alpha = 0.28f),
         innerBlurRadius = 2.dp,
         primaryLight = LightSource(
             position = LightPosition(0.5f, -0.4f, -0.1f),
             color = Color.White,
-            intensity = 1.2f
+            intensity = 1.25f
         ),
         secondaryLight = LightSource(
             position = LightPosition(0.5f, 0.8f, -0.4f),
             color = Color.White,
-            intensity = 0.5f
+            intensity = 0.55f
         ),
         dualPeak = true
     )
+)
+
+private val PlayButtonSpecularHighlight = ButtonSpecularHighlight.copy(width = 1.6.dp)
+
+private val DefaultIconInnerShadow = InnerShadow(
+    radius = 8.dp,
+    offset = DpOffset(0.dp, 3.dp),
+    color = Color.White.copy(alpha = 0.22f)
+)
+
+private val PlayButtonInnerShadow = InnerShadow(
+    radius = 12.dp,
+    offset = DpOffset(0.dp, 4.dp),
+    color = Color.White.copy(alpha = 0.55f)
 )
 
 @Composable
@@ -68,6 +95,7 @@ fun LiquidGlassIconButton(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val isInDark = isSystemInDarkTheme()
+    val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -77,15 +105,39 @@ fun LiquidGlassIconButton(
 
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.86f else 1f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 420f),
+        animationSpec = spring(dampingRatio = 0.62f, stiffness = 450f),
         label = "btnScale"
     )
 
-    // Тончайшая вуаль, чтобы стекло не темнело грязно
-    val surfaceColor = if (isActive) {
-        activeColor.copy(alpha = 0.22f)
-    } else {
-        if (isInDark) Color(0x221E1E22) else Color(0x35FFFFFF)
+    val surfaceColor = remember(isActive, activeColor, isInDark, isPressed) {
+        when {
+            isPressed -> (if (activeColor != Color.Transparent) activeColor else Color.White).copy(alpha = 0.26f)
+            isActive -> activeColor.copy(alpha = 0.22f)
+            isInDark -> Color(0x241E1E24)
+            else -> Color(0x36FFFFFF)
+        }
+    }
+
+    val cachedInnerShadow = remember(isActive, activeColor) {
+        if (isActive && activeColor != Color.Transparent) {
+            InnerShadow(
+                radius = 8.dp,
+                offset = DpOffset(0.dp, 3.dp),
+                color = activeColor.copy(alpha = 0.38f)
+            )
+        } else {
+            DefaultIconInnerShadow
+        }
+    }
+
+    val rimBrush = remember(isActive, activeColor, isPressed) {
+        val topTint = if (isActive && activeColor != Color.Transparent) activeColor else Color.White
+        Brush.verticalGradient(
+            colors = listOf(
+                topTint.copy(alpha = if (isPressed) 0.58f else 0.36f),
+                Color.White.copy(alpha = 0.08f)
+            )
+        )
     }
 
     Box(
@@ -101,34 +153,32 @@ fun LiquidGlassIconButton(
                 spotColor = if (isActive) activeColor.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.35f)
             )
             .clip(shape)
-            // НАСТОЯЩИЙ БЭКДРОП С ПРЕЛОМЛЕНИЕМ ИСПЫТАННЫЙ В BOTTOM BAR
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { shape },
                 effects = {
-                    blur(8.dp.toPx(), 8.dp.toPx())
+                    blur(7.dp.toPx(), 7.dp.toPx())
                     lens(
-                        refractionHeight = 16.dp.toPx(),
-                        refractionAmount = 14.dp.toPx(),
+                        refractionHeight = 15.dp.toPx(),
+                        refractionAmount = 13.dp.toPx(),
                         depthEffect = true,
-                        chromaticAberration = 0.03f
+                        chromaticAberration = 0.025f
                     )
                 },
                 highlight = { ButtonSpecularHighlight },
                 onDrawSurface = { drawRect(surfaceColor) }
             )
-            .innerShadow(shape) {
-                InnerShadow.Default.copy(
-                    radius = 8.dp,
-                    color = (if (isActive) activeColor else Color.White).copy(alpha = if (isActive) 0.35f else 0.20f)
-                )
-            }
+            .innerShadow(shape) { cachedInnerShadow }
+            .border(width = 0.8.dp, brush = rimBrush, shape = shape)
             .then(highlight.modifier)
             .then(highlight.gestureModifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -147,6 +197,7 @@ fun LiquidGlassPlayPauseButton(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val isInDark = isSystemInDarkTheme()
+    val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -155,15 +206,41 @@ fun LiquidGlassPlayPauseButton(
     }
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 400f),
+        targetValue = if (isPressed) 0.86f else 1f,
+        animationSpec = spring(dampingRatio = 0.60f, stiffness = 420f),
         label = "playScale"
     )
 
-    val shape = RoundedCornerShape(26.dp)
+    // Плавный морфинг линзы: круг на паузе -> сквиркл при воспроизведении -> компактный сквиркл при нажатии
+    val cornerRadius by animateDpAsState(
+        targetValue = when {
+            isPressed -> 20.dp
+            isPlaying -> 26.dp
+            else -> size / 2
+        },
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
+        label = "playCornerMorph"
+    )
 
-    // Кнопка Play теперь прозрачная линза с ярким акцентным отливом, а не кусок мела
-    val playSurface = if (isInDark) Color(0x40FFFFFF) else Color(0x65FFFFFF)
+    val shape = RoundedCornerShape(cornerRadius)
+
+    val playSurfaceBrush = remember(accentColor, isInDark, isPlaying) {
+        val baseWhite = if (isInDark) Color(0x42FFFFFF) else Color(0x64FFFFFF)
+        val accentTint = accentColor.copy(alpha = if (isPlaying) 0.34f else 0.20f)
+        Brush.linearGradient(
+            colors = listOf(baseWhite, accentTint)
+        )
+    }
+
+    val outerRimBrush = remember(accentColor, isPlaying) {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.72f),
+                accentColor.copy(alpha = if (isPlaying) 0.55f else 0.30f),
+                Color.White.copy(alpha = 0.18f)
+            )
+        )
+    }
 
     Box(
         modifier = modifier
@@ -173,9 +250,9 @@ fun LiquidGlassPlayPauseButton(
                 scaleY = scale
             }
             .shadow(
-                elevation = 20.dp,
+                elevation = if (isPlaying) 22.dp else 16.dp,
                 shape = shape,
-                spotColor = accentColor.copy(alpha = 0.55f),
+                spotColor = accentColor.copy(alpha = 0.65f),
                 ambientColor = Color.Black.copy(alpha = 0.45f)
             )
             .clip(shape)
@@ -185,39 +262,43 @@ fun LiquidGlassPlayPauseButton(
                 effects = {
                     blur(6.dp.toPx(), 6.dp.toPx())
                     lens(
-                        refractionHeight = 24.dp.toPx(),
-                        refractionAmount = 20.dp.toPx(),
+                        refractionHeight = 22.dp.toPx(),
+                        refractionAmount = 18.dp.toPx(),
                         depthEffect = true,
-                        chromaticAberration = 0.05f
+                        chromaticAberration = 0.04f
                     )
                 },
-                highlight = {
-                    ButtonSpecularHighlight.copy(
-                        width = 1.5.dp
-                    )
-                },
-                onDrawSurface = { drawRect(playSurface) }
+                highlight = { PlayButtonSpecularHighlight },
+                onDrawSurface = { drawRect(brush = playSurfaceBrush) }
             )
-            .innerShadow(shape) {
-                InnerShadow.Default.copy(
-                    radius = 12.dp,
-                    color = Color.White.copy(alpha = 0.60f)
-                )
-            }
+            .innerShadow(shape) { PlayButtonInnerShadow }
+            .border(width = 1.2.dp, brush = outerRimBrush, shape = shape)
             .then(highlight.modifier)
             .then(highlight.gestureModifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-            contentDescription = null,
-            modifier = Modifier.size(38.dp),
-            tint = Color.White
-        )
+        AnimatedContent(
+            targetState = isPlaying,
+            transitionSpec = {
+                (scaleIn(spring(dampingRatio = 0.65f, stiffness = 500f), initialScale = 0.55f) + fadeIn())
+                    .togetherWith(scaleOut(spring(stiffness = 500f), targetScale = 0.55f) + fadeOut())
+            },
+            label = "liquidPlayPauseIcon"
+        ) { playing ->
+            Icon(
+                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(38.dp),
+                tint = Color.White
+            )
+        }
     }
 }

@@ -5,6 +5,7 @@
 package com.alcint.pargelium.player
 
 import android.content.ContentUris
+import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
@@ -80,6 +81,18 @@ import kotlin.math.absoluteValue
 
 private val ALBUM_ART_URI: Uri = Uri.parse("content://media/external/audio/albumart")
 private val GlobalSeedColorCache = LruCache<String, Color>(128)
+
+@Volatile
+private var sharedAnimatedImageLoader: ImageLoader? = null
+
+private fun getSharedAnimatedImageLoader(context: Context): ImageLoader {
+    return sharedAnimatedImageLoader ?: synchronized(GlobalSeedColorCache) {
+        sharedAnimatedImageLoader ?: ImageLoader.Builder(context.applicationContext)
+            .components { add(ImageDecoderDecoder.Factory()) }
+            .build()
+            .also { sharedAnimatedImageLoader = it }
+    }
+}
 
 @Composable
 fun FullPlayerScreen(
@@ -323,11 +336,7 @@ fun FullPlayerScreen(
         }
     }
 
-    val imageLoader = remember(appContext) {
-        ImageLoader.Builder(appContext)
-            .components { add(ImageDecoderDecoder.Factory()) }
-            .build()
-    }
+    val imageLoader = remember(appContext) { getSharedAnimatedImageLoader(appContext) }
 
     if (showBookmarks) {
         BookmarksSheet(
@@ -366,7 +375,12 @@ fun FullPlayerScreen(
                         )
                         val remainingTracks = (playlist.size - (currentQueueIndex + 1)).coerceAtLeast(0)
                         Text(
-                            text = "${currentQueueIndex + 1} / ${playlist.size} • $remainingTracks up next",
+                            text = stringResource(
+                                id = R.string.queue_position_up_next_fmt,
+                                currentQueueIndex + 1,
+                                playlist.size,
+                                remainingTracks
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -529,7 +543,8 @@ fun FullPlayerScreen(
                                             }
                                         },
                                         isSearching = isSearchingLyricsOnline,
-                                        contentPadding = PaddingValues(top = 80.dp, bottom = 32.dp)
+                                        contentPadding = PaddingValues(top = 80.dp, bottom = 32.dp),
+                                        creditUrl = LyricsManager.getCreditUrlForTrack(track.id)
                                     )
                                 }
                             } else {
@@ -736,7 +751,8 @@ fun FullPlayerScreen(
                                             }
                                         },
                                         isSearching = isSearchingLyricsOnline,
-                                        contentPadding = PaddingValues(top = 100.dp, bottom = 250.dp)
+                                        contentPadding = PaddingValues(top = 100.dp, bottom = 250.dp),
+                                        creditUrl = LyricsManager.getCreditUrlForTrack(track.id)
                                     )
                                     LyricsHeaderBadge(
                                         track = track,
@@ -849,7 +865,13 @@ fun FullPlayerScreen(
                                                         modifier = Modifier.size(28.dp)
                                                     )
                                                     Text(
-                                                        text = if (seekRippleDirection > 0) "+10 sec" else "-10 sec",
+                                                        text = stringResource(
+                                                            id = if (seekRippleDirection > 0) {
+                                                                R.string.player_seek_plus_10s
+                                                            } else {
+                                                                R.string.player_seek_minus_10s
+                                                            }
+                                                        ),
                                                         style = MaterialTheme.typography.titleMedium,
                                                         fontWeight = FontWeight.ExtraBold
                                                     )
@@ -941,9 +963,11 @@ private fun PlayerArtworkDeck(
         label = "vinylShapeMorph"
     )
 
+    val isVisibleOnScreen = coverAlpha > 0.05f
     val rotationAnim = remember { Animatable(0f) }
-    LaunchedEffect(isVinylMode, isPlaying) {
-        if (isVinylMode && isPlaying) {
+
+    LaunchedEffect(isVinylMode, isPlaying, isVisibleOnScreen) {
+        if (isVinylMode && isPlaying && isVisibleOnScreen) {
             while (isActive) {
                 val start = rotationAnim.value % 360f
                 rotationAnim.snapTo(start)
@@ -955,6 +979,20 @@ private fun PlayerArtworkDeck(
         } else if (!isVinylMode && rotationAnim.value != 0f) {
             rotationAnim.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
         }
+    }
+
+    val cachedVinylShineBrush = remember {
+        Brush.sweepGradient(
+            colors = listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.16f),
+                Color.Transparent,
+                Color.Black.copy(alpha = 0.22f),
+                Color.Transparent,
+                Color.White.copy(alpha = 0.16f),
+                Color.Transparent
+            )
+        )
     }
 
     Box(
@@ -976,7 +1014,7 @@ private fun PlayerArtworkDeck(
                 )
             }
     ) {
-        if (isVinylMode && coverAlpha > 0.1f) {
+        if (isVinylMode && isVisibleOnScreen) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1040,18 +1078,7 @@ private fun PlayerArtworkDeck(
 
                 if (isVinylMode) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val shine = Brush.sweepGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.16f),
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.22f),
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.16f),
-                                Color.Transparent
-                            )
-                        )
-                        drawCircle(brush = shine)
+                        drawCircle(brush = cachedVinylShineBrush)
 
                         if (!hasAuthenticDiscArt) {
                             val grooveColor = Color.White.copy(alpha = 0.14f)
