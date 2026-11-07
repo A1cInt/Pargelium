@@ -21,12 +21,17 @@ extern void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float 
 
 #define TAG "JamesDSP-JNI"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
-#define MAX_BLOCK_SIZE 4096
+#define MAX_BLOCK_SIZE 2048
 
 struct NativeJdspEngine {
     JamesDSPLib jdsp;
     pthread_mutex_t lock;
     float sampleRate;
+    int lastCompGranularity;
+    int lastCompTfRes;
+    int eqInitialized;
+    int arbEqInitialized;
+    int compInitialized;
 };
 
 static pthread_mutex_t gGlobalAllocLock = PTHREAD_MUTEX_INITIALIZER;
@@ -87,6 +92,8 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeInit(JNIEnv *env, jobje
     if (targetRate < 8000.0f) targetRate = 48000.0f;
     if (targetRate > 192000.0f) targetRate = 192000.0f;
     engine->sampleRate = targetRate;
+    engine->lastCompGranularity = -1;
+    engine->lastCompTfRes = -1;
 
     JamesDSPInit(&engine->jdsp, MAX_BLOCK_SIZE, targetRate);
     JLimiterSetCoefficients(&engine->jdsp, -0.5, 60.0);
@@ -130,17 +137,12 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeProcess(
     if (handle == 0 || numFrames <= 0) return;
     NativeJdspEngine *engine = reinterpret_cast<NativeJdspEngine *>(handle);
 
+    float safePreAmp = preAmpMultiplier;
+    if (!isfinite(safePreAmp) || safePreAmp < 0.05f || safePreAmp > 4.0f) {
+        safePreAmp = 1.0f;
+    }
+
     if (pthread_mutex_trylock(&engine->lock) != 0) {
-        if (fabsf(preAmpMultiplier - 1.0f) > 0.001f) {
-            jfloat *buf = (jfloat *)env->GetPrimitiveArrayCritical(buffer, nullptr);
-            if (buf) {
-                int totalSamples = numFrames * 2;
-                for (int i = 0; i < totalSamples; ++i) {
-                    buf[i] *= preAmpMultiplier;
-                }
-                env->ReleasePrimitiveArrayCritical(buffer, buf, 0);
-            }
-        }
         return;
     }
 
@@ -160,30 +162,51 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeProcess(
             chunkFrames = MAX_BLOCK_SIZE;
         }
 
+        float inEnergy = 0.0f;
         for (int i = 0; i < chunkFrames; ++i) {
             int idx = (offsetFrame + i) * 2;
-            float l = buf[idx] * preAmpMultiplier;
-            float r = buf[idx + 1] * preAmpMultiplier;
+            float l = buf[idx] * safePreAmp;
+            float r = buf[idx + 1] * safePreAmp;
 
             if (!isfinite(l) || fabsf(l) < 1e-20f) l = 0.0f;
             if (!isfinite(r) || fabsf(r) < 1e-20f) r = 0.0f;
 
+            inEnergy += fabsf(l) + fabsf(r);
             jdsp->tmpBuffer[0][i] = l;
             jdsp->tmpBuffer[1][i] = r;
         }
 
         JamesDSPProcess(jdsp, (size_t)chunkFrames);
 
+        float outEnergy = 0.0f;
         for (int i = 0; i < chunkFrames; ++i) {
-            int idx = (offsetFrame + i) * 2;
             float outL = jdsp->tmpBuffer[0][i];
             float outR = jdsp->tmpBuffer[1][i];
+            if (isfinite(outL) && isfinite(outR)) {
+                outEnergy += fabsf(outL) + fabsf(outR);
+            }
+        }
 
-            if (!isfinite(outL)) outL = 0.0f;
-            if (!isfinite(outR)) outR = 0.0f;
+        // Если на входе есть звук, а после JamesDSPProcess получился NaN или полный 0 из-за переходного процесса FIR,
+        // сохраняем мягкий сухой сигнал, чтобы звук НИКОГДА не пропадал!
+        if (inEnergy > 0.001f && outEnergy < 1e-9f) {
+            for (int i = 0; i < chunkFrames; ++i) {
+                int idx = (offsetFrame + i) * 2;
+                buf[idx] *= safePreAmp;
+                buf[idx + 1] *= safePreAmp;
+            }
+        } else {
+            for (int i = 0; i < chunkFrames; ++i) {
+                int idx = (offsetFrame + i) * 2;
+                float outL = jdsp->tmpBuffer[0][i];
+                float outR = jdsp->tmpBuffer[1][i];
 
-            buf[idx] = outL;
-            buf[idx + 1] = outR;
+                if (!isfinite(outL)) outL = 0.0f;
+                if (!isfinite(outR)) outR = 0.0f;
+
+                buf[idx] = outL;
+                buf[idx + 1] = outR;
+            }
         }
 
         offsetFrame += chunkFrames;
@@ -206,8 +229,8 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetBass(
     pthread_mutex_lock(&engine->lock);
     if (enabled && gainDb > 0.05f) {
         float clampedDb = gainDb > 15.0f ? 15.0f : gainDb;
-        BassBoostSetParam(&engine->jdsp, clampedDb);
         BassBoostEnable(&engine->jdsp);
+        BassBoostSetParam(&engine->jdsp, clampedDb);
     } else {
         BassBoostDisable(&engine->jdsp);
     }
@@ -248,12 +271,23 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetCompander(
             int safeGran = granularity < 1 ? 1 : (granularity > 4 ? 4 : granularity);
             int safeTf = tfResolution < 0 ? 0 : (tfResolution > 3 ? 3 : tfResolution);
 
-            CompressorSetParam(&engine->jdsp, safeTc, safeGran, safeTf, 1);
+            char needRefresh = (!engine->compInitialized ||
+                                engine->lastCompGranularity != safeGran ||
+                                engine->lastCompTfRes != safeTf) ? 1 : 0;
+
+            if (!engine->compInitialized) {
+                CompressorEnable(&engine->jdsp, 1);
+                engine->compInitialized = 1;
+            }
+            CompressorSetParam(&engine->jdsp, safeTc, safeGran, safeTf, needRefresh);
             CompressorSetGain(&engine->jdsp, freqs, dGains, 1);
-            CompressorEnable(&engine->jdsp, 1);
+
+            engine->lastCompGranularity = safeGran;
+            engine->lastCompTfRes = safeTf;
         }
     } else {
         CompressorDisable(&engine->jdsp);
+        engine->compInitialized = 0;
     }
 
     pthread_mutex_unlock(&engine->lock);
@@ -296,13 +330,19 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetEqualizer(
             }
 
             int safeInterp = (interpolationMode == 1) ? 1 : 0;
+            // По умолчанию в MultimodalEqualizer: 0 = MinPhase FIR, 1 = Exact LinPhase, 2..6 = IIR
             int safeOpMode = filterMode < 0 ? 0 : (filterMode > 6 ? 6 : filterMode);
 
+            // ВАЖНО: Сначала включаем MultimodalEqualizerEnable, затем рассчитываем фильтр!
+            if (!engine->eqInitialized) {
+                MultimodalEqualizerEnable(&engine->jdsp, 1);
+                engine->eqInitialized = 1;
+            }
             MultimodalEqualizerAxisInterpolation(&engine->jdsp, safeInterp, safeOpMode, stdFreqs, dGains);
-            MultimodalEqualizerEnable(&engine->jdsp, 1);
         }
     } else {
         MultimodalEqualizerDisable(&engine->jdsp);
+        engine->eqInitialized = 0;
     }
 
     pthread_mutex_unlock(&engine->lock);
@@ -325,16 +365,21 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetArbitraryEq(
         if (rawStr && strlen(rawStr) > 3) {
             char *mutableCopy = strdup(rawStr);
             if (mutableCopy) {
+                if (!engine->arbEqInitialized) {
+                    ArbitraryResponseEqualizerEnable(&engine->jdsp, 1);
+                    engine->arbEqInitialized = 1;
+                }
                 ArbitraryResponseEqualizerStringParser(&engine->jdsp, mutableCopy);
-                ArbitraryResponseEqualizerEnable(&engine->jdsp, 1);
                 free(mutableCopy);
             }
         } else {
             ArbitraryResponseEqualizerDisable(&engine->jdsp);
+            engine->arbEqInitialized = 0;
         }
         if (rawStr) env->ReleaseStringUTFChars(graphicEqString, rawStr);
     } else {
         ArbitraryResponseEqualizerDisable(&engine->jdsp);
+        engine->arbEqInitialized = 0;
     }
 
     pthread_mutex_unlock(&engine->lock);
@@ -400,12 +445,11 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetStereoWide(
     pthread_mutex_lock(&engine->lock);
 
     if (enabled) {
-        float normalized = (float)width / 100.0f;
-        if (normalized < 0.0f) normalized = 0.0f;
-        if (normalized > 1.0f) normalized = 1.0f;
-        StereoEnhancementDisable(&engine->jdsp);
-        StereoEnhancementSetParam(&engine->jdsp, normalized);
+        float normalized = ((float)width / 100.0f) * 0.85f;
+        if (normalized < 0.05f) normalized = 0.05f;
+        if (normalized > 0.90f) normalized = 0.90f;
         StereoEnhancementEnable(&engine->jdsp);
+        StereoEnhancementSetParam(&engine->jdsp, normalized);
     } else {
         StereoEnhancementDisable(&engine->jdsp);
     }
@@ -427,9 +471,8 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetCrossfeed(
 
     if (enabled) {
         int safeMode = mode < 0 ? 0 : (mode > 5 ? 5 : mode);
-        CrossfeedDisable(&engine->jdsp);
-        CrossfeedChangeMode(&engine->jdsp, safeMode);
         CrossfeedEnable(&engine->jdsp, 1);
+        CrossfeedChangeMode(&engine->jdsp, safeMode);
     } else {
         CrossfeedDisable(&engine->jdsp);
     }
