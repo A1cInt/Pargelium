@@ -37,6 +37,9 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.MoreExecutors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class PargeliumWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -45,14 +48,20 @@ class PargeliumWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class PargeliumWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val appContext = context.applicationContext
+        val (title, artist, isPlaying, bitmap) = withContext(Dispatchers.IO) {
+            PrefsManager.init(appContext)
+            val t = PrefsManager.getWidgetTitle()
+            val a = PrefsManager.getWidgetArtist()
+            val playing = PrefsManager.getWidgetIsPlaying()
+            val coverFile = File(appContext.cacheDir, "widget_cover.png")
+            val bmp = if (coverFile.exists()) {
+                runCatching { BitmapFactory.decodeFile(coverFile.absolutePath) }.getOrNull()
+            } else null
+            WidgetSnapshot(t, a, playing, bmp)
+        }
+
         provideContent {
-            val title = PrefsManager.getWidgetTitle()
-            val artist = PrefsManager.getWidgetArtist()
-            val isPlaying = PrefsManager.getWidgetIsPlaying()
-
-            val coverFile = File(context.cacheDir, "widget_cover.png")
-            val bitmap = if (coverFile.exists()) BitmapFactory.decodeFile(coverFile.absolutePath) else null
-
             Box(
                 modifier = GlanceModifier
                     .fillMaxSize()
@@ -120,6 +129,13 @@ class PargeliumWidget : GlanceAppWidget() {
             }
         }
     }
+
+    private data class WidgetSnapshot(
+        val title: String,
+        val artist: String,
+        val isPlaying: Boolean,
+        val bitmap: android.graphics.Bitmap?
+    )
 }
 
 class WidgetPlayAction : ActionCallback {
@@ -154,10 +170,10 @@ private fun sendCommand(context: Context, command: String) {
                     "NEXT" -> controller.seekToNext()
                     "PREV" -> controller.seekToPrevious()
                 }
-                controller.release()
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (_: Exception) {
+            } finally {
+                MediaController.releaseFuture(controllerFuture)
             }
-        }, { it.run() })
+        }, MoreExecutors.directExecutor())
     }
 }

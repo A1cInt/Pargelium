@@ -514,4 +514,23 @@
         <item>HRTF Crossfeed Medium</item>
         <item>HRTF Crossfeed Strong</item>
     </string-array>
+
+    <string name="settings_search_hint">Search settings…</string>
+    <string name="settings_bento_playback_sub">Crossfade &amp; gapless mix</string>
+    <string name="settings_section_system_and_data">System &amp; Storage</string>
+    <string name="settings_player_btn_style">Player Button Style</string>
+    <string name="design_style_liquid_desc">Refractive glass bar with blur</string>
+    <string name="design_style_expressive_desc">Material 3 Expressive adaptive bar</string>
+    <string name="design_style_pill_desc">Compact floating capsule indicator</string>
+    <string name="design_btn_liquid_desc">Translucent glass transport controls</string>
+    <string name="design_btn_expressive_desc">Morphing squircle expressive buttons</string>
+    <string name="design_btn_classic_title">Classic Filled</string>
+    <string name="design_btn_classic_desc">High-contrast tonal circle buttons</string>
+    <string name="data_storage_overview_title">Cached Media &amp; Assets</string>
+    <string name="data_clear_canvas_cache">Clear Spotify Canvas cache</string>
+    <string name="data_clear_canvas_cache_desc">Delete downloaded background looping videos</string>
+    <string name="msg_canvas_cache_cleared">Canvas video cache cleared</string>
+    <string name="data_clear_artwork_cache">Clear fetched release artworks</string>
+    <string name="data_clear_artwork_cache_desc">Delete downloaded Discogs, CAA &amp; artist photos</string>
+    <string name="msg_artwork_cache_cleared">Remote artwork cache cleared</string>
 </resources>

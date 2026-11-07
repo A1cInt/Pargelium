@@ -24,9 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.media3.common.util.UnstableApi
+import com.alcint.pargelium.library.LibraryScreen
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import com.alcint.pargelium.library.LibraryScreen
 
 val LocalBackdrop = staticCompositionLocalOf<LayerBackdrop> { error("No Backdrop provided") }
 
@@ -34,12 +34,9 @@ val LocalBackdrop = staticCompositionLocalOf<LayerBackdrop> { error("No Backdrop
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
-
         super.onCreate(savedInstanceState)
 
-        PrefsManager.init(this)
-        PlaylistDatabase.init(this)
-
+        PrefsManager.init(applicationContext)
         setSecureMode(PrefsManager.getSecureMode())
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -66,7 +63,6 @@ class MainActivity : AppCompatActivity() {
                     RequestFilePermissionEffect(
                         onPermissionGranted = {
                             AudioRepository.clearCache()
-                            LyricsManager.clearCache(this)
                         }
                     )
 
@@ -80,12 +76,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun setSecureMode(enabled: Boolean) {
         if (enabled) {
-            window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
-
-        window.attributes = window.attributes
     }
 }
 
@@ -109,29 +103,17 @@ fun RequestFilePermissionEffect(onPermissionGranted: () -> Unit) {
         }
     }
 
-    fun requestPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                try {
-                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                    }
-                    storagePermissionLauncher.launch(intent)
-                } catch (e: Exception) {
-                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                    storagePermissionLauncher.launch(intent)
-                }
-            } else {
-                onPermissionGranted()
-            }
-        } else {
-            onPermissionGranted()
-        }
-    }
-
     LaunchedEffect(Unit) {
-        if (!hasAllFilesPermission(context)) {
-            requestPermission()
+        if (!hasAllFilesPermission(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                }
+                storagePermissionLauncher.launch(intent)
+            } catch (_: Exception) {
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                storagePermissionLauncher.launch(intent)
+            }
         }
     }
 }

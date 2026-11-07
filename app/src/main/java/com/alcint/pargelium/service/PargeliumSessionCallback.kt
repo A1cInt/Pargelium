@@ -9,11 +9,17 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
 class PargeliumSessionCallback : MediaLibrarySession.Callback {
-    override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+    override fun onConnect(
+        session: MediaSession,
+        controller: MediaSession.ControllerInfo
+    ): MediaSession.ConnectionResult {
         val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
             .add(Player.COMMAND_SET_REPEAT_MODE)
             .add(Player.COMMAND_SET_SHUFFLE_MODE)
             .add(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+            .add(Player.COMMAND_SEEK_TO_NEXT)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
             .build()
 
         return MediaSession.ConnectionResult.accept(

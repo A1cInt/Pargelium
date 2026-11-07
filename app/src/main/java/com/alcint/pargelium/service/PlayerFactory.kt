@@ -27,12 +27,12 @@ data class PlayerComponents(val player: ExoPlayer, val mediaSourceFactory: Defau
 
 object PlayerFactory {
     private val SAAVN_HEADERS = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
     )
 
     fun create(context: Context, customProcessor: CustomAudioProcessor): PlayerComponents {
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(50000, 50000, 2500, 5000)
+            .setBufferDurationsMs(15_000, 30_000, 1_500, 3_000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -47,14 +47,18 @@ object PlayerFactory {
                 eventListener: AudioRendererEventListener,
                 out: ArrayList<Renderer>
             ) {
-                val myAudioSink = DefaultAudioSink.Builder()
+                val myAudioSink = DefaultAudioSink.Builder(context)
                     .setAudioProcessors(arrayOf(customProcessor))
                     .setEnableFloatOutput(false)
                     .build()
 
                 val renderer = MediaCodecAudioRenderer(
-                    context, mediaCodecSelector, enableDecoderFallback,
-                    eventHandler, eventListener, myAudioSink
+                    context,
+                    mediaCodecSelector,
+                    enableDecoderFallback,
+                    eventHandler,
+                    eventListener,
+                    myAudioSink
                 )
                 out.add(renderer)
             }
@@ -62,12 +66,13 @@ object PlayerFactory {
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(8_000)
+            .setReadTimeoutMs(12_000)
 
         val baseDataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
         val resolvingDataSourceFactory = ResolvingDataSource.Factory(baseDataSourceFactory) { dataSpec ->
             val uri = dataSpec.uri
-
             if (uri.scheme == "saavn") {
                 val trackId = uri.schemeSpecificPart.toLongOrNull() ?: return@Factory dataSpec
                 try {
@@ -76,9 +81,7 @@ object PlayerFactory {
                         .setUri(streamUri)
                         .setHttpRequestHeaders(SAAVN_HEADERS)
                         .build()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                } catch (_: Exception) {}
             }
             dataSpec
         }
@@ -89,8 +92,10 @@ object PlayerFactory {
         val player = ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .setHandleAudioBecomingNoisy(true)
+            .setSeekBackIncrementMs(10_000L)
+            .setSeekForwardIncrementMs(10_000L)
             .build()
 
         return PlayerComponents(player, mediaSourceFactory)

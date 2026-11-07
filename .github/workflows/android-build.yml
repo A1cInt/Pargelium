@@ -86,10 +86,10 @@ jobs:
           retention-days: 30
 
       - name: Send Build Info & APK to Telegram Topic (t.me/AlcIntGroup/659)
-        if: success() && secrets.TELEGRAM_BOT_TOKEN != ''
+        if: success()
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '@AlcIntGroup' }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TOPIC_ID: "659"
           BUILD_VARIANT: ${{ github.event.inputs.build_type || 'debug' }}
           SIGNED_REL_PATH: ${{ steps.sign_app.outputs.signedReleaseFile }}
@@ -98,14 +98,21 @@ jobs:
           BRANCH_NAME: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          if [ -z "$BOT_TOKEN" ]; then
+            echo "TELEGRAM_BOT_TOKEN secret is not configured. Skipping Telegram notification."
+            exit 0
+          fi
+
+          TARGET_CHAT="${CHAT_ID:-@AlcIntGroup}"
           SHORT_SHA="${GITHUB_SHA::7}"
+
           if [ "$BUILD_VARIANT" = "release" ] && [ -n "$SIGNED_REL_PATH" ] && [ -f "$SIGNED_REL_PATH" ]; then
             APK_FILE="$SIGNED_REL_PATH"
           else
             APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
           fi
 
-          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+          if [ -z "$APK_FILE" ] \vert{}\vert{} [ ! -f "$APK_FILE" ]; then
             echo "APK file not found!"
             exit 1
           fi
@@ -130,7 +137,7 @@ jobs:
           <a href=\"${RUN_URL}\">View GitHub Actions Run</a>"
 
           curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
-            -F "chat_id=${CHAT_ID}" \
+            -F "chat_id=${TARGET_CHAT}" \
             -F "message_thread_id=${TOPIC_ID}" \
             -F "document=@${FINAL_APK}" \
             -F "parse_mode=HTML" \

@@ -1,6 +1,7 @@
 package com.alcint.pargelium.service
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Handler
 import androidx.core.graphics.drawable.toBitmap
@@ -33,8 +34,10 @@ class PlaybackStateSyncManager(
     private var wearUpdateJob: Job? = null
 
     private var lastWearTitle = ""
+    private var lastWearArtist = ""
     private var lastWearIsPlaying = false
     private var lastWearPos = -1L
+    private var lastEncodedCoverUrl: String? = null
 
     init {
         fossApiManager = FossWearApiManager(context, serviceScope) { command ->
@@ -60,56 +63,63 @@ class PlaybackStateSyncManager(
         val pos = player.currentPosition
         val dur = if (player.duration != C.TIME_UNSET && player.duration > 0) player.duration else 1L
 
-        if (!force && title == lastWearTitle && isPlaying == lastWearIsPlaying && abs(pos - lastWearPos) < 1000) return
+        val metadataOrPlayStateChanged = title != lastWearTitle || artist != lastWearArtist || isPlaying != lastWearIsPlaying
+        if (!force && !metadataOrPlayStateChanged && abs(pos - lastWearPos) < 1500L) return
 
         lastWearTitle = title
+        lastWearArtist = artist
         lastWearIsPlaying = isPlaying
         lastWearPos = pos
+
+        val trackId = currentItem?.mediaId?.toLongOrNull() ?: 0L
+        val saavnTrack = SaavnApi.trackCache[trackId]
+        val imageUrl: Any? = saavnTrack?.coverUrl?.takeIf { it.isNotEmpty() }
+            ?: currentItem?.mediaMetadata?.artworkUri
+        val imageUrlKey = imageUrl?.toString()
 
         wearUpdateJob?.cancel()
         wearUpdateJob = serviceScope.launch(Dispatchers.IO) {
             val coverFile = File(context.cacheDir, "widget_cover.png")
-            try {
-                val trackId = currentItem?.mediaId?.toLongOrNull() ?: 0L
-                val saavnTrack = SaavnApi.trackCache[trackId]
-                val imageUrl: Any? = saavnTrack?.coverUrl?.takeIf { it.isNotEmpty() }
-                    ?: currentItem?.mediaMetadata?.artworkUri
+            var coverChanged = false
 
-                if (imageUrl != null) {
-                    val request = ImageRequest.Builder(context)
-                        .data(imageUrl)
-                        .size(300)
-                        .allowHardware(false)
-                        .build()
+            if (imageUrlKey != lastEncodedCoverUrl || (imageUrlKey != null && !coverFile.exists())) {
+                lastEncodedCoverUrl = imageUrlKey
+                coverChanged = true
+                try {
+                    if (imageUrl != null) {
+                        val request = ImageRequest.Builder(context)
+                            .data(imageUrl)
+                            .size(256)
+                            .allowHardware(false)
+                            .build()
 
-                    val result = context.imageLoader.execute(request)
-                    val bitmap = result.drawable?.toBitmap()
+                        val result = context.imageLoader.execute(request)
+                        val bitmap = result.drawable?.toBitmap()
 
-                    if (bitmap != null) {
-                        FileOutputStream(coverFile).use { out ->
-                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                        if (bitmap != null) {
+                            FileOutputStream(coverFile).use { out ->
+                                bitmap.compress(Bitmap.CompressFormat.PNG, 90, out)
+                            }
+                        } else {
+                            coverFile.delete()
                         }
                     } else {
                         coverFile.delete()
                     }
-                } else {
+                } catch (_: Exception) {
                     coverFile.delete()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                coverFile.delete()
             }
 
-            PrefsManager.saveWidgetState(title, artist, isPlaying)
-
-            try {
-                PargeliumWidget().updateAll(context)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            if (metadataOrPlayStateChanged || coverChanged || force) {
+                PrefsManager.saveWidgetState(title, artist, isPlaying)
+                try {
+                    PargeliumWidget().updateAll(context)
+                } catch (_: Exception) {}
             }
 
             if (PrefsManager.getFossWearEnabled()) {
-                delay(250)
+                delay(200)
                 fossApiManager?.updatePlaybackState(title, artist, isPlaying, pos, dur, Color.DKGRAY)
             }
         }

@@ -497,4 +497,23 @@
         <item>HRTF Кроссфид Средний</item>
         <item>HRTF Кроссфид Сильный</item>
     </string-array>
+
+    <string name="settings_search_hint">Поиск по настройкам…</string>
+    <string name="settings_bento_playback_sub">Кроссфейд и бесшовный микс</string>
+    <string name="settings_section_system_and_data">Система и хранилище</string>
+    <string name="settings_player_btn_style">Стиль кнопок плеера</string>
+    <string name="design_style_liquid_desc">Преломляющее жидкое стекло с размытием</string>
+    <string name="design_style_expressive_desc">Адаптивная панель Material 3 Expressive</string>
+    <string name="design_style_pill_desc">Компактная парящая капсула</string>
+    <string name="design_btn_liquid_desc">Полупрозрачные стеклянные кнопки управления</string>
+    <string name="design_btn_expressive_desc">Морфинг-кнопки Material 3 Expressive</string>
+    <string name="design_btn_classic_title">Классический</string>
+    <string name="design_btn_classic_desc">Контрастные круглые кнопки</string>
+    <string name="data_storage_overview_title">Занято кэшем медиа</string>
+    <string name="data_clear_canvas_cache">Очистить кэш Spotify Canvas</string>
+    <string name="data_clear_canvas_cache_desc">Удалить сохраненные фоновые видеоролики</string>
+    <string name="msg_canvas_cache_cleared">Кэш видео-канвасов очищен</string>
+    <string name="data_clear_artwork_cache">Очистить загруженные сканы и фото</string>
+    <string name="data_clear_artwork_cache_desc">Удалить скачанные обложки Discogs и фото артистов</string>
+    <string name="msg_artwork_cache_cleared">Кэш изображений очищен</string>
 </resources>

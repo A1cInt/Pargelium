@@ -1,6 +1,8 @@
 package com.alcint.pargelium.library
 
 import androidx.compose.runtime.*
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.alcint.pargelium.AudioTrack
 import com.alcint.pargelium.PrefsManager
@@ -12,24 +14,24 @@ fun HeadlessPlaybackTracker(
     currentTrack: AudioTrack?,
     isPlaying: Boolean
 ) {
-    var hasCountedPlay by remember(currentTrack) { mutableStateOf(false) }
+    var hasCountedPlay by remember(currentTrack?.id) { mutableStateOf(false) }
 
-    LaunchedEffect(isPlaying, currentTrack) {
-        var lastSaveTime = System.currentTimeMillis()
+    LaunchedEffect(isPlaying, currentTrack?.id, playerController) {
+        val player = playerController ?: return@LaunchedEffect
+        val track = currentTrack ?: return@LaunchedEffect
+
         while (isPlaying) {
-            playerController?.let {
-                val pos = it.currentPosition
-                if (!hasCountedPlay && pos > 40000 && currentTrack != null) {
-                    PrefsManager.recordPlay(currentTrack.id)
-                    hasCountedPlay = true
-                }
-                val now = System.currentTimeMillis()
-                if (now - lastSaveTime > 3000) {
-                    PrefsManager.saveLastPosition(pos)
-                    lastSaveTime = now
-                }
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            val dur = player.duration
+            val thresholdMs = if (dur in 1..60_000L) (dur / 2L).coerceAtLeast(10_000L) else 30_000L
+
+            if (!hasCountedPlay && pos >= thresholdMs) {
+                PrefsManager.recordPlay(track.id)
+                hasCountedPlay = true
             }
-            delay(1000)
+
+            PrefsManager.saveLastPosition(pos)
+            delay(if (hasCountedPlay) 4000L else 1500L)
         }
     }
 }
@@ -42,10 +44,37 @@ fun PlayerPositionProvider(
 ) {
     var pos by remember { mutableLongStateOf(playerController?.currentPosition ?: 0L) }
 
+    DisposableEffect(playerController) {
+        val player = playerController ?: return@DisposableEffect onDispose {}
+        pos = player.currentPosition.coerceAtLeast(0L)
+
+        val listener = object : Player.Listener {
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                pos = newPosition.positionMs.coerceAtLeast(0L)
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                pos = player.currentPosition.coerceAtLeast(0L)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                pos = player.currentPosition.coerceAtLeast(0L)
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+
     LaunchedEffect(isPlaying, playerController) {
+        val player = playerController ?: return@LaunchedEffect
+        pos = player.currentPosition.coerceAtLeast(0L)
         while (isPlaying) {
-            playerController?.let { pos = it.currentPosition }
-            delay(500)
+            pos = player.currentPosition.coerceAtLeast(0L)
+            delay(400L)
         }
     }
 

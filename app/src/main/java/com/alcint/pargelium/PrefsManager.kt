@@ -26,7 +26,7 @@ data class ArtistMetadata(
 data class JamesDspFullSnapshot(
     val name: String,
     val eq15Enabled: Boolean = false,
-    val eqFilterMode: Int = 0,
+    val eqFilterMode: Int = 2,
     val eqInterpMode: Int = 0,
     val eqGains15: List<Float> = List(15) { 0f },
     val companderEnabled: Boolean = false,
@@ -144,20 +144,28 @@ object PrefsManager {
     fun saveBannerUri(uri: String) = prefs.edit().putString("user_banner", uri).apply()
     fun getBannerUri(): String? = prefs.getString("user_banner", null)
 
+    private var cachedPlayEvents: MutableList<PlayEvent>? = null
+
     fun recordPlay(trackId: Long) {
-        val events = getPlayEvents().toMutableList()
+        val events = (cachedPlayEvents ?: getPlayEvents().toMutableList()).also { cachedPlayEvents = it }
         events.add(PlayEvent(trackId, System.currentTimeMillis()))
+        if (events.size > 2500) {
+            events.subList(0, events.size - 2500).clear()
+        }
         prefs.edit().putString("play_events_v2", gson.toJson(events)).apply()
     }
 
     fun getPlayEvents(): List<PlayEvent> {
+        cachedPlayEvents?.let { return it }
         val json = prefs.getString("play_events_v2", "[]")
         val type = object : TypeToken<List<PlayEvent>>() {}.type
-        return try {
-            gson.fromJson(json, type)
+        val loaded: List<PlayEvent> = try {
+            gson.fromJson(json, type) ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }
+        cachedPlayEvents = loaded.toMutableList()
+        return loaded
     }
 
     fun getTopTracksIds(days: Int): Map<Long, Int> {
@@ -196,12 +204,17 @@ object PrefsManager {
     fun getEq15BandMode(): Boolean = prefs.getBoolean("dsp_eq_15band_mode", true)
 
     fun saveEqFilterMode(mode: Int) = prefs.edit().putInt("dsp_eq_filter_mode", mode).apply()
-    fun getEqFilterMode(): Int = prefs.getInt("dsp_eq_filter_mode", 0)
+    fun getEqFilterMode(): Int = prefs.getInt("dsp_eq_filter_mode", 2)
 
     fun saveEqInterpolationMode(mode: Int) = prefs.edit().putInt("dsp_eq_interp_mode", mode).apply()
     fun getEqInterpolationMode(): Int = prefs.getInt("dsp_eq_interp_mode", 0)
 
-    fun saveUserEqGains(gains: FloatArray) = prefs.edit().putString("user_eq_gains", gains.joinToString(",")).apply()
+    fun saveUserEqGains(gains: FloatArray) {
+        val str = gains.joinToString(",")
+        cachedUserEqGainsStr = str
+        cachedUserEqGains = gains.copyOf()
+        prefs.edit().putString("user_eq_gains", str).apply()
+    }
 
     fun getUserEqGains(): FloatArray {
         val str = prefs.getString("user_eq_gains", "") ?: ""
@@ -216,22 +229,35 @@ object PrefsManager {
         return cachedUserEqGains!!
     }
 
-    fun saveUserEqGains15(gains: FloatArray) = prefs.edit().putString("user_eq_gains_15", gains.joinToString(",")).apply()
+    private var cachedUserEqGains15: FloatArray? = null
+    private var cachedUserEqGains15Str: String? = null
+
+    fun saveUserEqGains15(gains: FloatArray) {
+        val str = gains.joinToString(",")
+        cachedUserEqGains15Str = str
+        cachedUserEqGains15 = gains.copyOf()
+        prefs.edit().putString("user_eq_gains_15", str).apply()
+    }
 
     fun getUserEqGains15(): FloatArray {
         val str = prefs.getString("user_eq_gains_15", "") ?: ""
-        return try {
+        if (cachedUserEqGains15 != null && cachedUserEqGains15Str == str) return cachedUserEqGains15!!
+        cachedUserEqGains15Str = str
+        cachedUserEqGains15 = try {
             val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
             if (parsed.size == 15) parsed else FloatArray(15) { 0f }
         } catch (_: Exception) {
             FloatArray(15) { 0f }
         }
+        return cachedUserEqGains15!!
     }
 
     fun saveCustomGraphicEqString(str: String) = prefs.edit().putString("dsp_custom_graphiceq", str).apply()
     fun getCustomGraphicEqString(): String = prefs.getString("dsp_custom_graphiceq", "") ?: ""
 
-    // Compander (7 bands)
+    private var cachedCompanderGains: FloatArray? = null
+    private var cachedCompanderGainsStr: String? = null
+
     fun saveCompanderEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_compander_enabled", enabled).apply()
     fun getCompanderEnabled(): Boolean = prefs.getBoolean("dsp_compander_enabled", false)
     fun saveCompanderTimeConstant(tc: Float) = prefs.edit().putFloat("dsp_compander_tc", tc).apply()
@@ -240,15 +266,25 @@ object PrefsManager {
     fun getCompanderGranularity(): Int = prefs.getInt("dsp_compander_gran", 2)
     fun saveCompanderTfResolution(res: Int) = prefs.edit().putInt("dsp_compander_tfres", res).apply()
     fun getCompanderTfResolution(): Int = prefs.getInt("dsp_compander_tfres", 0)
-    fun saveCompanderGains(gains: FloatArray) = prefs.edit().putString("dsp_compander_gains", gains.joinToString(",")).apply()
+
+    fun saveCompanderGains(gains: FloatArray) {
+        val str = gains.joinToString(",")
+        cachedCompanderGainsStr = str
+        cachedCompanderGains = gains.copyOf()
+        prefs.edit().putString("dsp_compander_gains", str).apply()
+    }
+
     fun getCompanderGains(): FloatArray {
         val str = prefs.getString("dsp_compander_gains", "") ?: ""
-        return try {
+        if (cachedCompanderGains != null && cachedCompanderGainsStr == str) return cachedCompanderGains!!
+        cachedCompanderGainsStr = str
+        cachedCompanderGains = try {
             val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
             if (parsed.size == 7) parsed else FloatArray(7) { 0f }
         } catch (_: Exception) {
             FloatArray(7) { 0f }
         }
+        return cachedCompanderGains!!
     }
 
     // ViPER-DDC
@@ -276,14 +312,26 @@ object PrefsManager {
     fun getConvolverInvertPhase(): Boolean = prefs.getBoolean("dsp_convolver_inv_phase", false)
 
     // EEL2 Liveprog
+    private var cachedLiveprogParams: FloatArray? = null
+    private var cachedLiveprogParamsStr: String? = null
+
     fun saveLiveprogEnabled(enabled: Boolean) = prefs.edit().putBoolean("dsp_liveprog_enabled", enabled).apply()
     fun getLiveprogEnabled(): Boolean = prefs.getBoolean("dsp_liveprog_enabled", false)
     fun saveLiveprogScriptId(id: Int) = prefs.edit().putInt("dsp_liveprog_script_id", id).apply()
     fun getLiveprogScriptId(): Int = prefs.getInt("dsp_liveprog_script_id", 0)
-    fun saveLiveprogParams(params: FloatArray) = prefs.edit().putString("dsp_liveprog_params", params.joinToString(",")).apply()
+
+    fun saveLiveprogParams(params: FloatArray) {
+        val str = params.joinToString(",")
+        cachedLiveprogParamsStr = str
+        cachedLiveprogParams = params.copyOf()
+        prefs.edit().putString("dsp_liveprog_params", str).apply()
+    }
+
     fun getLiveprogParams(): FloatArray {
         val str = prefs.getString("dsp_liveprog_params", "") ?: ""
-        return try {
+        if (cachedLiveprogParams != null && cachedLiveprogParamsStr == str) return cachedLiveprogParams!!
+        cachedLiveprogParamsStr = str
+        cachedLiveprogParams = try {
             val parsed = str.split(",").map { it.toFloat() }.toFloatArray()
             if (parsed.size >= 4) {
                 FloatArray(8) { idx -> parsed.getOrElse(idx) { 0f } }
@@ -293,7 +341,9 @@ object PrefsManager {
         } catch (_: Exception) {
             floatArrayOf(0.35f, 0.74f, 0.42f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f)
         }
+        return cachedLiveprogParams!!
     }
+
     fun saveCustomEelCode(code: String?) {
         if (code == null) prefs.edit().remove("dsp_custom_eel_code").apply() else prefs.edit().putString("dsp_custom_eel_code", code).apply()
     }
