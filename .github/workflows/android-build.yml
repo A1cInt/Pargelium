@@ -82,5 +82,56 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Pargelium-Release-${{ github.sha }}
-          path: ${{steps.sign_app.outputs.signedReleaseFile}}
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
           retention-days: 30
+
+      - name: Send Build Info & APK to Telegram Topic (t.me/AlcIntGroup/659)
+        if: success() && secrets.TELEGRAM_BOT_TOKEN != ''
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || '@AlcIntGroup' }}
+          TOPIC_ID: "659"
+          BUILD_VARIANT: ${{ github.event.inputs.build_type || 'debug' }}
+          SIGNED_REL_PATH: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.actor }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          if [ "$BUILD_VARIANT" = "release" ] && [ -n "$SIGNED_REL_PATH" ] && [ -f "$SIGNED_REL_PATH" ]; then
+            APK_FILE="$SIGNED_REL_PATH"
+          else
+            APK_FILE=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          fi
+
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "APK file not found!"
+            exit 1
+          fi
+
+          FINAL_APK="Pargelium-${BUILD_VARIANT}-${SHORT_SHA}.apk"
+          cp "$APK_FILE" "$FINAL_APK"
+          FILE_SIZE=$(du -h "$FINAL_APK" | cut -f1)
+
+          CLEAN_MSG=$(echo "$COMMIT_MSG" | head -n 5 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+
+          CAPTION="<b>Pargelium Cloud CI Build Completed</b>
+
+          <b>Variant:</b> <code>${BUILD_VARIANT^^}</code>
+          <b>Branch:</b> <code>${BRANCH_NAME}</code>
+          <b>Commit:</b> <code>${SHORT_SHA}</code>
+          <b>Author:</b> <code>${COMMIT_AUTHOR}</code>
+          <b>Size:</b> <code>${FILE_SIZE}</code>
+
+          <b>Changelog:</b>
+          <pre>${CLEAN_MSG}</pre>
+
+          <a href=\"${RUN_URL}\">View GitHub Actions Run</a>"
+
+          curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
+            -F "chat_id=${CHAT_ID}" \
+            -F "message_thread_id=${TOPIC_ID}" \
+            -F "document=@${FINAL_APK}" \
+            -F "parse_mode=HTML" \
+            -F "caption=${CAPTION}"

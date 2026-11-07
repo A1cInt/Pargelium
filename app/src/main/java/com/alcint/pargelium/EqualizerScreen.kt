@@ -5,7 +5,6 @@ import android.content.Context
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,6 +67,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -82,8 +82,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.util.Locale
 import kotlin.math.abs
 
@@ -100,6 +98,11 @@ fun EqualizerScreen(seedColor: Color) {
 
     var isEnabled by remember { mutableStateOf(PrefsManager.getEnabled()) }
     var autoHeadroomEnabled by remember { mutableStateOf(JamesDspController.isAutoHeadroomEnabled) }
+
+    var userFilesVersion by remember { mutableIntStateOf(0) }
+    val allVdcPresets = remember(userFilesVersion) { JamesDspController.getAllVdcPresets() }
+    val allEelScripts = remember(userFilesVersion) { JamesDspController.getAllEelScripts() }
+    val allImpulsePresets = remember(userFilesVersion) { JamesDspController.getAllImpulsePresets() }
 
     // 1. AutoEQ & Arbitrary Response EQ (GraphicEQ)
     var autoEqEnabled by remember { mutableStateOf(PrefsManager.getAutoEqEnabled()) }
@@ -129,17 +132,15 @@ fun EqualizerScreen(seedColor: Color) {
     val eqLabels15 = remember {
         listOf("25", "40", "63", "100", "160", "250", "400", "630", "1k", "1.6k", "2.5k", "4k", "6.3k", "10k", "16k")
     }
-    val eqFilterModeLabels = remember {
-        listOf(
-            "FIR Min Phase",
-            "FIR Linear Phase",
-            "IIR 4th Order",
-            "IIR 6th Order",
-            "IIR 8th Order",
-            "IIR 10th Order",
-            "IIR 12th Order"
-        )
-    }
+    val eqFilterModeLabels = listOf(
+        stringResource(id = R.string.dsp_eq_filter_fir_min),
+        stringResource(id = R.string.dsp_eq_filter_fir_lin),
+        stringResource(id = R.string.dsp_eq_filter_iir_4),
+        stringResource(id = R.string.dsp_eq_filter_iir_6),
+        stringResource(id = R.string.dsp_eq_filter_iir_8),
+        stringResource(id = R.string.dsp_eq_filter_iir_10),
+        stringResource(id = R.string.dsp_eq_filter_iir_12)
+    )
     var activePresetName by remember { mutableStateOf<String?>(null) }
 
     // 3. Dynamic Range Compander (7 bands)
@@ -152,23 +153,21 @@ fun EqualizerScreen(seedColor: Color) {
         mutableStateListOf(*FloatArray(7) { idx -> saved.getOrElse(idx) { 0f } }.toTypedArray())
     }
     val companderLabels = remember { listOf("95", "200", "400", "800", "1.6k", "3.4k", "7.5k") }
-    val companderTfLabels = remember { listOf("Uniform", "Low Latency", "High Res", "Extreme") }
+    val companderTfLabels = listOf(
+        stringResource(id = R.string.dsp_compander_tf_uniform),
+        stringResource(id = R.string.dsp_compander_tf_low_lat),
+        stringResource(id = R.string.dsp_compander_tf_high_res),
+        stringResource(id = R.string.dsp_compander_tf_extreme)
+    )
 
     // 4. Dynamic Bass Boost
     var bassEnabled by remember { mutableStateOf(PrefsManager.getBassEnabled()) }
     var bass by remember { mutableFloatStateOf(PrefsManager.getBass().toFloat()) }
 
-    // 5. Reverberation (Progenitor 2 - все 12 пресетов JamesDSP)
+    // 5. Reverberation (Progenitor 2)
     var roomEnabled by remember { mutableStateOf(PrefsManager.getRoom()) }
     var reverbMode by remember { mutableIntStateOf(PrefsManager.getReverbMode()) }
-    val reverbModesList = remember {
-        listOf(
-            "Small Hall", "Medium Hall", "Large Hall",
-            "Small Room", "Medium Room", "Large Room",
-            "Medium ER1", "Medium ER2", "Plate High",
-            "Plate Low", "Long Reverb 1", "Long Reverb 2"
-        )
-    }
+    val reverbModesList = stringArrayResource(id = R.array.reverb_modes).toList()
 
     // 6. Vacuum Tube (Analog Modeling)
     var tubeEnabled by remember { mutableStateOf(PrefsManager.getTubeEnabled()) }
@@ -178,24 +177,14 @@ fun EqualizerScreen(seedColor: Color) {
     var stereoWideEnabled by remember { mutableStateOf(PrefsManager.getStereoWideEnabled()) }
     var stereoWidth by remember { mutableFloatStateOf(PrefsManager.getStereoWidth()) }
 
-    // 8. BS2B & HRTF Crossfeed (все 6 режимов из libjamesdsp)
+    // 8. BS2B & HRTF Crossfeed
     var bs2bEnabled by remember { mutableStateOf(PrefsManager.getBs2bEnabled()) }
     var bs2bMode by remember { mutableIntStateOf(PrefsManager.getBs2bMode()) }
-    val bs2bModesList = remember {
-        listOf(
-            "BS2B Chu Moy (700Hz / 4.5dB)",
-            "BS2B Jan Meier (650Hz / 9.5dB)",
-            "BS2B Default (700Hz / 6.0dB)",
-            "HRTF Crossfeed Weak",
-            "HRTF Crossfeed Medium",
-            "HRTF Crossfeed Strong"
-        )
-    }
+    val bs2bModesList = stringArrayResource(id = R.array.bs2b_modes).toList()
 
     // 9. ViPER-DDC (.vdc)
     var ddcEnabled by remember { mutableStateOf(PrefsManager.getDdcEnabled()) }
     var selectedVdcId by remember { mutableStateOf(PrefsManager.getDdcPresetId()) }
-    var hasCustomVdc by remember { mutableStateOf(!PrefsManager.getCustomVdcContent().isNullOrBlank()) }
 
     // 10. Convolver (1D Impulse Response + IR Conditioning)
     var convolverEnabled by remember { mutableStateOf(PrefsManager.getConvolverEnabled()) }
@@ -204,7 +193,6 @@ fun EqualizerScreen(seedColor: Color) {
     var convolverPreDelay by remember { mutableFloatStateOf(PrefsManager.getConvolverPreDelayMs()) }
     var convolverTailTrim by remember { mutableFloatStateOf(PrefsManager.getConvolverTailTrim()) }
     var convolverInvPhase by remember { mutableStateOf(PrefsManager.getConvolverInvertPhase()) }
-    var customIrName by remember { mutableStateOf(JamesDspController.customImpulseName) }
     var irWaveform by remember { mutableStateOf(JamesDspController.currentIrWaveformPreview) }
 
     // 11. EEL2 Liveprog (Programmable DSP Engine)
@@ -235,19 +223,17 @@ fun EqualizerScreen(seedColor: Color) {
     val vdcFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
-                val content = try {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        BufferedReader(InputStreamReader(stream)).readText()
-                    }
-                } catch (_: Exception) { null }
-
+                val imported = JamesDspController.importUserVdc(context, uri)
                 withContext(Dispatchers.Main) {
-                    if (!content.isNullOrBlank()) {
-                        JamesDspController.setCustomVdcContent(content)
-                        JamesDspController.setDdcEnabled(true)
+                    if (imported != null) {
+                        userFilesVersion++
+                        selectedVdcId = imported.id
                         ddcEnabled = true
-                        hasCustomVdc = true
-                        Toast.makeText(context, "ViPER-DDC (.vdc) loaded", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.dsp_toast_vdc_loaded, imported.name),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
@@ -257,20 +243,21 @@ fun EqualizerScreen(seedColor: Color) {
     val eelFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
-                val code = try {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        BufferedReader(InputStreamReader(stream)).readText()
-                    }
-                } catch (_: Exception) { null }
-
+                val imported = JamesDspController.importUserEel(context, uri)
                 withContext(Dispatchers.Main) {
-                    if (!code.isNullOrBlank()) {
-                        customEelCodeText = code
-                        JamesDspController.setLiveprogParams(liveprogParams.toFloatArray(), code)
-                        JamesDspController.setLiveprogEnabled(true)
+                    if (imported != null) {
+                        userFilesVersion++
+                        liveprogScriptId = imported.id
+                        customEelCodeText = imported.eelSource
+                        imported.parameters.forEach { p ->
+                            liveprogParams[p.index] = p.defaultVal
+                        }
                         liveprogEnabled = true
-                        showEelSourceEditor = true
-                        Toast.makeText(context, "EEL2 Liveprog script loaded", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.dsp_toast_eel_loaded, imported.fileName),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
@@ -280,25 +267,24 @@ fun EqualizerScreen(seedColor: Color) {
     val irWavPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
-                var fileName: String? = null
-                try {
-                    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
-                        if (c.moveToFirst()) {
-                            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                            if (idx != -1) fileName = c.getString(idx)
-                        }
-                    }
-                } catch (_: Exception) {}
-
-                val ok = JamesDspController.loadImpulseFromUri(context, uri, fileName)
+                val imported = JamesDspController.importUserImpulse(context, uri)
                 withContext(Dispatchers.Main) {
-                    if (ok) {
+                    if (imported != null) {
+                        userFilesVersion++
+                        convolverPresetId = imported.id
                         convolverEnabled = true
-                        customIrName = JamesDspController.customImpulseName
                         irWaveform = JamesDspController.currentIrWaveformPreview
-                        Toast.makeText(context, "Impulse Response loaded: ${customIrName ?: "WAV"}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.dsp_toast_ir_loaded, imported.name),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     } else {
-                        Toast.makeText(context, "Unsupported IR format (use 16/24/32-bit WAV)", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.dsp_toast_ir_invalid),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
@@ -306,7 +292,11 @@ fun EqualizerScreen(seedColor: Color) {
     }
 
     LaunchedEffect(Unit) {
-        JamesDspController.syncFromPrefs()
+        withContext(Dispatchers.IO) {
+            JamesDspController.refreshUserFiles(context)
+            JamesDspController.syncFromPrefs()
+        }
+        userFilesVersion++
         irWaveform = JamesDspController.currentIrWaveformPreview
         try {
             isAutoEqListLoading = true
@@ -353,14 +343,15 @@ fun EqualizerScreen(seedColor: Color) {
     }
 
     if (showSaveSnapshotDialog) {
+        val defaultProfilePrefix = stringResource(id = R.string.dsp_profile_default_prefix)
         AlertDialog(
             onDismissRequest = { showSaveSnapshotDialog = false },
-            title = { Text("Save JamesDSP Profile", fontWeight = FontWeight.ExtraBold) },
+            title = { Text(stringResource(id = R.string.dsp_save_profile_title), fontWeight = FontWeight.ExtraBold) },
             text = {
                 OutlinedTextField(
                     value = snapshotNameInput,
                     onValueChange = { snapshotNameInput = it },
-                    label = { Text("Profile Name (e.g. AirPods Pro Bass)") },
+                    label = { Text(stringResource(id = R.string.dsp_save_profile_hint)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -369,7 +360,7 @@ fun EqualizerScreen(seedColor: Color) {
             confirmButton = {
                 Button(
                     onClick = {
-                        val name = snapshotNameInput.trim().ifEmpty { "Preset ${savedSnapshots.size + 1}" }
+                        val name = snapshotNameInput.trim().ifEmpty { "$defaultProfilePrefix ${savedSnapshots.size + 1}" }
                         val snap = JamesDspFullSnapshot(
                             name = name,
                             eq15Enabled = userEqEnabled,
@@ -411,7 +402,7 @@ fun EqualizerScreen(seedColor: Color) {
                         showSaveSnapshotDialog = false
                     }
                 ) {
-                    Text("Save")
+                    Text(stringResource(id = R.string.dsp_action_save))
                 }
             },
             dismissButton = {
@@ -451,7 +442,11 @@ fun EqualizerScreen(seedColor: Color) {
                         color = if (isEnabled) accentColor.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
-                            text = if (isEnabled) "JamesDSP • $activeModulesCount/11 ON" else "BYPASS",
+                            text = if (isEnabled) {
+                                stringResource(id = R.string.dsp_status_active_fmt, activeModulesCount)
+                            } else {
+                                stringResource(id = R.string.dsp_status_bypass)
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (isEnabled) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -503,7 +498,6 @@ fun EqualizerScreen(seedColor: Color) {
                 )
             }
 
-            // Полоса полных сохраненных профилей JamesDSP
             item(key = "dsp_snapshots_bar") {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -514,7 +508,7 @@ fun EqualizerScreen(seedColor: Color) {
                         AssistChip(
                             onClick = { showSaveSnapshotDialog = true },
                             leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            label = { Text("Save DSP Profile", fontWeight = FontWeight.Bold) },
+                            label = { Text(stringResource(id = R.string.dsp_save_profile_btn), fontWeight = FontWeight.Bold) },
                             shape = RoundedCornerShape(12.dp)
                         )
                     }
@@ -639,11 +633,13 @@ fun EqualizerScreen(seedColor: Color) {
                     accentColor = accentColor
                 )
 
+                val customCurveLabel = stringResource(id = R.string.dsp_custom_graphiceq_active)
+                val selectModelLabel = stringResource(id = R.string.click_to_select_model)
                 val autoEqDesc = buildString {
                     if (customGraphicEqStr.isNotBlank()) {
-                        append("Custom GraphicEQ Curve Active")
+                        append(customCurveLabel)
                     } else {
-                        append(currentProfile?.name ?: stringResource(id = R.string.click_to_select_model))
+                        append(currentProfile?.name ?: selectModelLabel)
                     }
                     if (connectedDeviceName != null) {
                         append("\n🎧 ${stringResource(id = R.string.connected_device_fmt, connectedDeviceName!!)}")
@@ -653,7 +649,7 @@ fun EqualizerScreen(seedColor: Color) {
                 EffectCardWithSettings(
                     title = stringResource(id = R.string.autoeq_title),
                     desc = autoEqDesc,
-                    badge = if (autoEqEnabled) "Arbitrary FIR" else null,
+                    badge = if (autoEqEnabled) stringResource(id = R.string.dsp_badge_arbitrary_fir) else null,
                     checked = autoEqEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -697,7 +693,7 @@ fun EqualizerScreen(seedColor: Color) {
                                 onClick = { showGraphicEqEditor = !showGraphicEqEditor },
                                 shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text("GraphicEQ", fontWeight = FontWeight.Bold)
+                                Text(stringResource(id = R.string.dsp_graphiceq_btn), fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -708,7 +704,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     customGraphicEqStr = it
                                     JamesDspController.setCustomGraphicEqString(it)
                                 },
-                                label = { Text("GraphicEQ: 20 0.0; 63 3.5; 1000 -1.2...") },
+                                label = { Text(stringResource(id = R.string.dsp_graphiceq_hint)) },
                                 singleLine = false,
                                 maxLines = 3,
                                 shape = RoundedCornerShape(14.dp),
@@ -718,10 +714,24 @@ fun EqualizerScreen(seedColor: Color) {
                     }
                 }
 
+                val splineLabel = if (eqInterpMode == 0) {
+                    stringResource(id = R.string.dsp_spline_pchip)
+                } else {
+                    stringResource(id = R.string.dsp_spline_makima)
+                }
+
                 EffectCardWithSettings(
-                    title = if (is15BandMode) "15-Band Multimodal Equalizer" else stringResource(id = R.string.ten_band_eq_title),
-                    desc = "${eqFilterModeLabels.getOrElse(eqFilterMode) { "FIR" }} • ${if (eqInterpMode == 0) "PCHIP" else "Makima Spline"}",
-                    badge = activePresetName ?: if (is15BandMode) "15 ISO" else "10 Band",
+                    title = if (is15BandMode) {
+                        stringResource(id = R.string.dsp_multimodal_15band_title)
+                    } else {
+                        stringResource(id = R.string.ten_band_eq_title)
+                    },
+                    desc = "${eqFilterModeLabels.getOrElse(eqFilterMode) { "" }} • $splineLabel",
+                    badge = activePresetName ?: if (is15BandMode) {
+                        stringResource(id = R.string.dsp_badge_15_iso)
+                    } else {
+                        stringResource(id = R.string.dsp_badge_10_band)
+                    },
                     checked = userEqEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -761,7 +771,16 @@ fun EqualizerScreen(seedColor: Color) {
                                     is15BandMode = next
                                     JamesDspController.setEq15BandMode(next)
                                 },
-                                label = { Text(if (is15BandMode) "15 ISO Bands" else "10 Bands", fontWeight = FontWeight.Bold) },
+                                label = {
+                                    Text(
+                                        text = if (is15BandMode) {
+                                            stringResource(id = R.string.dsp_badge_15_iso)
+                                        } else {
+                                            stringResource(id = R.string.dsp_badge_10_band)
+                                        },
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -773,7 +792,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     eqInterpMode = if (eqInterpMode == 0) 1 else 0
                                     JamesDspController.setEqInterpolationMode(eqInterpMode)
                                 },
-                                label = { Text(if (eqInterpMode == 0) "Spline: PCHIP" else "Spline: Makima") },
+                                label = { Text(splineLabel) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -851,10 +870,15 @@ fun EqualizerScreen(seedColor: Color) {
                                             activePresetName = null
                                             if (is15BandMode) {
                                                 userEqGains15[i] = newValue
-                                                JamesDspController.setEqualizerGains15(userEqGains15.toFloatArray())
+                                                // Для IIR-режимов обновляем мгновенно, для тяжелого FIR — по завершении жеста
+                                                if (eqFilterMode >= 2) {
+                                                    JamesDspController.setEqualizerGains15(userEqGains15.toFloatArray())
+                                                }
                                             } else {
                                                 userEqGains10[i] = newValue
-                                                JamesDspController.setEqualizerGains(userEqGains10.toFloatArray())
+                                                if (eqFilterMode >= 2) {
+                                                    JamesDspController.setEqualizerGains(userEqGains10.toFloatArray())
+                                                }
                                             }
                                         },
                                         onValueChangeFinished = {
@@ -918,14 +942,14 @@ fun EqualizerScreen(seedColor: Color) {
             item(key = "dsp_compander_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.Compress,
-                    title = "Dynamic Range Compander",
+                    title = stringResource(id = R.string.dsp_compander_section_title),
                     accentColor = accentColor
                 )
 
                 EffectCardWithSettings(
-                    title = "Multiband Compander (7-Band)",
-                    desc = "Time-frequency dynamic range compression & micro-detail booster",
-                    badge = if (companderEnabled) companderTfLabels.getOrElse(companderTfRes) { "Active" } else null,
+                    title = stringResource(id = R.string.dsp_compander_card_title),
+                    desc = stringResource(id = R.string.dsp_compander_card_desc),
+                    badge = if (companderEnabled) companderTfLabels.getOrElse(companderTfRes) { "" } else null,
                     checked = companderEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -945,37 +969,33 @@ fun EqualizerScreen(seedColor: Color) {
                     )
 
                     SettingSlider(
-                        name = "Time Constant (Release Speed)",
+                        name = stringResource(id = R.string.dsp_compander_time_constant),
                         value = companderTc,
                         range = 0.05f..1.0f,
                         unit = " s",
                         showDecimal = true,
                         accentColor = accentColor,
-                        onValueChange = {
-                            companderTc = it
+                        onValueChange = { companderTc = it },
+                        onValueChangeFinished = {
+                            PrefsManager.saveCompanderTimeConstant(companderTc)
                             JamesDspController.setCompanderParams(
                                 companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
                             )
-                        },
-                        onValueChangeFinished = {
-                            PrefsManager.saveCompanderTimeConstant(companderTc)
                         }
                     )
 
                     SettingSlider(
-                        name = "Granularity",
+                        name = stringResource(id = R.string.dsp_compander_granularity),
                         value = companderGranularity.toFloat(),
                         range = 1f..4f,
                         unit = "x",
                         accentColor = accentColor,
-                        onValueChange = {
-                            companderGranularity = it.toInt().coerceIn(1, 4)
+                        onValueChange = { companderGranularity = it.toInt().coerceIn(1, 4) },
+                        onValueChangeFinished = {
+                            PrefsManager.saveCompanderGranularity(companderGranularity)
                             JamesDspController.setCompanderParams(
                                 companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
                             )
-                        },
-                        onValueChangeFinished = {
-                            PrefsManager.saveCompanderGranularity(companderGranularity)
                         }
                     )
 
@@ -1031,12 +1051,13 @@ fun EqualizerScreen(seedColor: Color) {
                                         value = gVal,
                                         onValueChange = { newVal ->
                                             companderGains[i] = newVal
-                                            JamesDspController.setCompanderParams(
-                                                companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
-                                            )
                                         },
                                         onValueChangeFinished = {
-                                            PrefsManager.saveCompanderGains(companderGains.toFloatArray())
+                                            val arr = companderGains.toFloatArray()
+                                            PrefsManager.saveCompanderGains(arr)
+                                            JamesDspController.setCompanderParams(
+                                                companderTc, companderGranularity, companderTfRes, arr
+                                            )
                                         },
                                         valueRange = -12f..12f,
                                         colors = SliderDefaults.colors(
@@ -1066,16 +1087,15 @@ fun EqualizerScreen(seedColor: Color) {
             item(key = "dsp_liveprog_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.Code,
-                    title = "EEL2 Liveprog Programmable DSP",
+                    title = stringResource(id = R.string.dsp_liveprog_section_title),
                     accentColor = accentColor
                 )
 
-                val currentEelScript = JamesDspController.builtInEelScripts.getOrElse(liveprogScriptId) {
-                    JamesDspController.builtInEelScripts.first()
-                }
+                val currentEelScript = allEelScripts.find { it.id == liveprogScriptId }
+                    ?: allEelScripts.first()
 
                 EffectCardWithSettings(
-                    title = "Liveprog Script Engine (.eel)",
+                    title = stringResource(id = R.string.dsp_liveprog_card_title),
                     desc = "${currentEelScript.title} — ${currentEelScript.description}",
                     badge = if (liveprogEnabled) currentEelScript.fileName else null,
                     checked = liveprogEnabled,
@@ -1090,8 +1110,8 @@ fun EqualizerScreen(seedColor: Color) {
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(JamesDspController.builtInEelScripts, key = { it.id }) { script ->
-                            FilterChip(
+                        items(allEelScripts, key = { "${it.id}_${it.fileName}" }) { script ->
+                            InputChip(
                                 selected = liveprogScriptId == script.id,
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1103,6 +1123,24 @@ fun EqualizerScreen(seedColor: Color) {
                                     JamesDspController.setLiveprogScript(script.id)
                                 },
                                 label = { Text(script.fileName, fontWeight = FontWeight.Bold) },
+                                trailingIcon = if (script.isUserFile) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Delete,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clickable {
+                                                    JamesDspController.deleteUserFile(context, script.filePath)
+                                                    userFilesVersion++
+                                                    if (liveprogScriptId == script.id) {
+                                                        liveprogScriptId = 0
+                                                        JamesDspController.setLiveprogScript(0)
+                                                    }
+                                                }
+                                        )
+                                    }
+                                } else null,
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -1140,7 +1178,7 @@ fun EqualizerScreen(seedColor: Color) {
                         ) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Import .eel", fontWeight = FontWeight.Bold)
+                            Text(stringResource(id = R.string.dsp_import_eel_btn), fontWeight = FontWeight.Bold)
                         }
 
                         FilledTonalButton(
@@ -1149,7 +1187,12 @@ fun EqualizerScreen(seedColor: Color) {
                         ) {
                             Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(if (showEelSourceEditor) "Hide Code" else "EEL2 Editor", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = stringResource(
+                                    id = if (showEelSourceEditor) R.string.dsp_hide_code_btn else R.string.dsp_eel_editor_btn
+                                ),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
@@ -1160,7 +1203,7 @@ fun EqualizerScreen(seedColor: Color) {
                                 customEelCodeText = it
                                 JamesDspController.setLiveprogParams(liveprogParams.toFloatArray(), it)
                             },
-                            label = { Text("EEL2 Script (@init / @sample)") },
+                            label = { Text(stringResource(id = R.string.dsp_eel_editor_hint)) },
                             textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
                             minLines = 4,
                             maxLines = 8,
@@ -1184,7 +1227,7 @@ fun EqualizerScreen(seedColor: Color) {
                 EffectCardWithSettings(
                     title = stringResource(id = R.string.dynamic_bass_title),
                     desc = stringResource(id = R.string.dynamic_bass_desc),
-                    badge = if (bassEnabled) "+${bass.toInt()} dB" else null,
+                    badge = if (bassEnabled) "+${bass.toInt()} ${stringResource(id = R.string.unit_db)}" else null,
                     checked = bassEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -1214,7 +1257,7 @@ fun EqualizerScreen(seedColor: Color) {
                 EffectCardWithSettings(
                     title = stringResource(id = R.string.tube_title),
                     desc = stringResource(id = R.string.tube_desc),
-                    badge = if (tubeEnabled) String.format(Locale.US, "%.1f dB", tubeDrive) else null,
+                    badge = if (tubeEnabled) String.format(Locale.US, "%.1f %s", tubeDrive, stringResource(id = R.string.unit_db)) else null,
                     checked = tubeEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -1228,7 +1271,7 @@ fun EqualizerScreen(seedColor: Color) {
                         name = stringResource(id = R.string.setting_tube_drive),
                         value = tubeDrive,
                         range = 0f..12f,
-                        unit = " dB",
+                        unit = " ${stringResource(id = R.string.unit_db)}",
                         showDecimal = true,
                         accentColor = accentColor,
                         onValueChange = {
@@ -1247,20 +1290,17 @@ fun EqualizerScreen(seedColor: Color) {
             item(key = "dsp_ddc_and_convolver_section") {
                 SectionHeaderTitle(
                     icon = Icons.Rounded.Memory,
-                    title = "Convolver & ViPER-DDC",
+                    title = stringResource(id = R.string.dsp_ddc_convolver_section_title),
                     accentColor = accentColor
                 )
 
-                val activeVdcTitle = if (hasCustomVdc) {
-                    "Custom .vdc File"
-                } else {
-                    JamesDspController.builtInVdcPresets.find { it.id == selectedVdcId }?.name ?: "DT770 Pro"
-                }
+                val activeVdcTitle = allVdcPresets.find { it.id == selectedVdcId }?.name
+                    ?: allVdcPresets.first().name
 
                 EffectCardWithSettings(
-                    title = "ViPER-DDC (IIR Cascade)",
-                    desc = "Precision Second-Order Sections headphone correction ($activeVdcTitle)",
-                    badge = if (ddcEnabled) "SOS IIR" else null,
+                    title = stringResource(id = R.string.dsp_ddc_card_title),
+                    desc = "${stringResource(id = R.string.dsp_ddc_card_desc)} ($activeVdcTitle)",
+                    badge = if (ddcEnabled) stringResource(id = R.string.dsp_badge_sos_iir) else null,
                     checked = ddcEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -1275,13 +1315,12 @@ fun EqualizerScreen(seedColor: Color) {
                             .padding(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        JamesDspController.builtInVdcPresets.forEach { preset ->
-                            val isSelected = !hasCustomVdc && selectedVdcId == preset.id
+                        allVdcPresets.forEach { preset ->
+                            val isSelected = selectedVdcId == preset.id
                             Surface(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     selectedVdcId = preset.id
-                                    hasCustomVdc = false
                                     JamesDspController.setDdcPreset(preset.id)
                                 },
                                 shape = RoundedCornerShape(14.dp),
@@ -1297,8 +1336,25 @@ fun EqualizerScreen(seedColor: Color) {
                                         Text(preset.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                         Text(preset.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = accentColor)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (preset.isUserFile) {
+                                            IconButton(
+                                                onClick = {
+                                                    JamesDspController.deleteUserFile(context, preset.filePath)
+                                                    userFilesVersion++
+                                                    if (selectedVdcId == preset.id) {
+                                                        selectedVdcId = "dt770_80"
+                                                        JamesDspController.setDdcPreset("dt770_80")
+                                                    }
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                        if (isSelected) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = accentColor)
+                                        }
                                     }
                                 }
                             }
@@ -1311,19 +1367,18 @@ fun EqualizerScreen(seedColor: Color) {
                         ) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(if (hasCustomVdc) "Change Custom .vdc File" else "Import .vdc File from Storage", fontWeight = FontWeight.Bold)
+                            Text(stringResource(id = R.string.dsp_import_vdc_btn), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                val activeIrTitle = customIrName
-                    ?: JamesDspController.builtInImpulsePresets.find { it.id == convolverPresetId }?.name
-                    ?: "Studio Impulse"
+                val activeIrTitle = allImpulsePresets.find { it.id == convolverPresetId }?.name
+                    ?: allImpulsePresets.first().name
 
                 EffectCardWithSettings(
-                    title = "Convolver (Partitioned FFT IR Engine)",
-                    desc = "Impulse response convolution ($activeIrTitle)",
-                    badge = if (convolverEnabled) "${convolverWetMix.toInt()}% Wet" else null,
+                    title = stringResource(id = R.string.dsp_convolver_card_title),
+                    desc = "${stringResource(id = R.string.dsp_convolver_card_desc)} ($activeIrTitle)",
+                    badge = if (convolverEnabled) "${convolverWetMix.toInt()}%" else null,
                     checked = convolverEnabled,
                     accentColor = accentColor,
                     onChecked = {
@@ -1339,7 +1394,6 @@ fun EqualizerScreen(seedColor: Color) {
                             .padding(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // График формы импульса (IR Waveform Visualizer)
                         Canvas(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1368,51 +1422,48 @@ fun EqualizerScreen(seedColor: Color) {
                         }
 
                         SettingSlider(
-                            name = "IR Wet Mix",
+                            name = stringResource(id = R.string.dsp_convolver_wet_mix),
                             value = convolverWetMix,
                             range = 0f..100f,
                             unit = "%",
                             accentColor = accentColor,
-                            onValueChange = {
-                                convolverWetMix = it
+                            onValueChange = { convolverWetMix = it },
+                            onValueChangeFinished = {
                                 JamesDspController.setConvolverConditioning(
                                     convolverWetMix, convolverPreDelay, convolverTailTrim, convolverInvPhase
                                 )
                                 irWaveform = JamesDspController.currentIrWaveformPreview
-                            },
-                            onValueChangeFinished = {}
+                            }
                         )
 
                         SettingSlider(
-                            name = "IR Pre-Delay",
+                            name = stringResource(id = R.string.dsp_convolver_predelay),
                             value = convolverPreDelay,
                             range = 0f..80f,
-                            unit = " ms",
+                            unit = " ${stringResource(id = R.string.unit_ms)}",
                             accentColor = accentColor,
-                            onValueChange = {
-                                convolverPreDelay = it
+                            onValueChange = { convolverPreDelay = it },
+                            onValueChangeFinished = {
                                 JamesDspController.setConvolverConditioning(
                                     convolverWetMix, convolverPreDelay, convolverTailTrim, convolverInvPhase
                                 )
                                 irWaveform = JamesDspController.currentIrWaveformPreview
-                            },
-                            onValueChangeFinished = {}
+                            }
                         )
 
                         SettingSlider(
-                            name = "IR Tail Length (Advise Trim)",
+                            name = stringResource(id = R.string.dsp_convolver_tail_trim),
                             value = convolverTailTrim,
                             range = 15f..100f,
                             unit = "%",
                             accentColor = accentColor,
-                            onValueChange = {
-                                convolverTailTrim = it
+                            onValueChange = { convolverTailTrim = it },
+                            onValueChangeFinished = {
                                 JamesDspController.setConvolverConditioning(
                                     convolverWetMix, convolverPreDelay, convolverTailTrim, convolverInvPhase
                                 )
                                 irWaveform = JamesDspController.currentIrWaveformPreview
-                            },
-                            onValueChangeFinished = {}
+                            }
                         )
 
                         FilterChip(
@@ -1423,17 +1474,16 @@ fun EqualizerScreen(seedColor: Color) {
                                     convolverWetMix, convolverPreDelay, convolverTailTrim, convolverInvPhase
                                 )
                             },
-                            label = { Text("Invert IR Phase (180°)") },
+                            label = { Text(stringResource(id = R.string.dsp_convolver_invert_phase)) },
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        JamesDspController.builtInImpulsePresets.forEach { irPreset ->
-                            val isSelected = customIrName == null && convolverPresetId == irPreset.id
+                        allImpulsePresets.forEach { irPreset ->
+                            val isSelected = convolverPresetId == irPreset.id
                             Surface(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     convolverPresetId = irPreset.id
-                                    customIrName = null
                                     JamesDspController.setConvolverPreset(irPreset.id)
                                     irWaveform = JamesDspController.currentIrWaveformPreview
                                 },
@@ -1450,8 +1500,26 @@ fun EqualizerScreen(seedColor: Color) {
                                         Text(irPreset.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                         Text(irPreset.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = accentColor)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (irPreset.isUserFile) {
+                                            IconButton(
+                                                onClick = {
+                                                    JamesDspController.deleteUserFile(context, irPreset.filePath)
+                                                    userFilesVersion++
+                                                    if (convolverPresetId == irPreset.id) {
+                                                        convolverPresetId = 0
+                                                        JamesDspController.setConvolverPreset(0)
+                                                        irWaveform = JamesDspController.currentIrWaveformPreview
+                                                    }
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                        if (isSelected) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = accentColor)
+                                        }
                                     }
                                 }
                             }
@@ -1465,7 +1533,7 @@ fun EqualizerScreen(seedColor: Color) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = if (customIrName != null) "Loaded: $customIrName" else "Load Custom .wav / .irs Impulse",
+                                text = stringResource(id = R.string.dsp_import_ir_btn),
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -1723,14 +1791,22 @@ private fun DspSignalTelemetryDeck(
     var livePeakDb by remember { mutableFloatStateOf(-60f) }
     var isSoftClipping by remember { mutableStateOf(false) }
     var headroomDb by remember { mutableFloatStateOf(0f) }
+    var streamBitDepth by remember { mutableIntStateOf(globalAudioBitDepth) }
+    var streamIsFloat by remember { mutableStateOf(globalAudioIsFloat) }
+    var streamSampleRate by remember { mutableIntStateOf(globalAudioSampleRate) }
 
     LaunchedEffect(isEnabled) {
         while (isActive && isEnabled) {
-            liveLoudness = globalAudioLoudness.coerceIn(0f, 1f)
+            val loud = globalAudioLoudness.coerceIn(0f, 1f)
+            liveLoudness = loud
             livePeakDb = globalAudioPeakDb
             isSoftClipping = globalSoftClipActive
             headroomDb = JamesDspController.currentHeadroomDb
-            delay(80L)
+            streamBitDepth = globalAudioBitDepth
+            streamIsFloat = globalAudioIsFloat
+            streamSampleRate = globalAudioSampleRate
+            // Если звук на паузе/тишина, опрашиваем в 4 раза реже для нулевого расхода батареи
+            delay(if (loud > 0.002f) 100L else 400L)
         }
         if (!isEnabled) {
             liveLoudness = 0f
@@ -1741,9 +1817,15 @@ private fun DspSignalTelemetryDeck(
 
     val animatedMeter by animateFloatAsState(
         targetValue = liveLoudness,
-        animationSpec = tween(90),
+        animationSpec = tween(100),
         label = "vuMeter"
     )
+
+    val formatBitStr = if (streamIsFloat) {
+        stringResource(id = R.string.dsp_stream_format_float_fmt, streamBitDepth, streamSampleRate)
+    } else {
+        stringResource(id = R.string.dsp_stream_format_pcm_fmt, streamBitDepth, streamSampleRate)
+    }
 
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -1774,15 +1856,15 @@ private fun DspSignalTelemetryDeck(
                     )
                     Column {
                         Text(
-                            text = "JamesDSP 64-bit Engine • ${JamesDspController.currentSampleRate} Hz",
+                            text = formatBitStr,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
                             text = if (autoHeadroomEnabled) {
-                                String.format(Locale.US, "Auto Preamp: %.1f dB • Peak: %.1f dBFS", headroomDb, livePeakDb)
+                                stringResource(id = R.string.dsp_telemetry_auto_preamp_fmt, headroomDb, livePeakDb)
                             } else {
-                                String.format(Locale.US, "Preamp: 0.0 dB (Manual) • Peak: %.1f dBFS", livePeakDb)
+                                stringResource(id = R.string.dsp_telemetry_manual_preamp_fmt, livePeakDb)
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1802,7 +1884,7 @@ private fun DspSignalTelemetryDeck(
                     },
                     label = {
                         Text(
-                            text = "Anti-Clip",
+                            text = stringResource(id = R.string.dsp_anti_clip_label),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )

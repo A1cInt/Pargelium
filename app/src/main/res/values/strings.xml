@@ -222,15 +222,6 @@
     <string name="crossfeed_desc">Mixes channels for natural sound</string>
     <string name="select_headphone_model">Select headphone model</string>
 
-    <string-array name="reverb_modes">
-        <item>Custom</item>
-        <item>Studio</item>
-        <item>Room</item>
-        <item>Hall</item>
-        <item>Cathedral</item>
-        <item>Abyss</item>
-    </string-array>
-
     <string name="theme_pargelia">Pargelia</string>
     <string name="settings_integration">Integration</string>
     <string name="integration_auto_detect">Detect headphones</string>
@@ -327,11 +318,6 @@
     <!-- BS2B Crossfeed -->
     <string name="bs2b_title">BS2B Crossfeed</string>
     <string name="bs2b_desc">Binaural filter to reduce headphone fatigue</string>
-    <string-array name="bs2b_modes">
-        <item>Default (700 Hz, 4.5 dB)</item>
-        <item>Moy (650 Hz, 9.5 dB)</item>
-        <item>Chu (700 Hz, 6.0 dB)</item>
-    </string-array>
 
     <!-- Vacuum Tube -->
     <string name="tube_title">Vacuum Tube</string>
@@ -444,4 +430,88 @@
     <string name="artist_role_logo">Logo</string>
     <string name="artist_role_gallery">Gallery</string>
     <string name="stream_server_unavailable_msg">Streaming: Server unavailable</string>
+
+    <string name="dsp_status_active_fmt">JamesDSP • %1$d/11 ON</string>
+    <string name="dsp_status_bypass">BYPASS</string>
+    <string name="dsp_stream_format_pcm_fmt">Audio Stream: %1$d-bit PCM • %2$d Hz</string>
+    <string name="dsp_stream_format_float_fmt">Audio Stream: %1$d-bit Float • %2$d Hz</string>
+    <string name="dsp_telemetry_auto_preamp_fmt">Auto Preamp: %1$.1f dB • Peak: %2$.1f dBFS</string>
+    <string name="dsp_telemetry_manual_preamp_fmt">Preamp: 0.0 dB (Manual) • Peak: %1$.1f dBFS</string>
+    <string name="dsp_anti_clip_label">Anti-Clip</string>
+    <string name="dsp_save_profile_btn">Save DSP Profile</string>
+    <string name="dsp_save_profile_title">Save JamesDSP Profile</string>
+    <string name="dsp_save_profile_hint">Profile Name (e.g. AirPods Pro Bass)</string>
+    <string name="dsp_profile_default_prefix">Preset</string>
+    <string name="dsp_action_save">Save</string>
+    <string name="dsp_custom_graphiceq_active">Custom GraphicEQ Curve Active</string>
+    <string name="dsp_badge_arbitrary_fir">Arbitrary FIR</string>
+    <string name="dsp_graphiceq_btn">GraphicEQ</string>
+    <string name="dsp_graphiceq_hint">GraphicEQ: 20 0.0; 63 3.5; 1000 -1.2…</string>
+    <string name="dsp_multimodal_15band_title">15-Band Multimodal Equalizer</string>
+    <string name="dsp_badge_15_iso">15 ISO Bands</string>
+    <string name="dsp_badge_10_band">10 Bands</string>
+    <string name="dsp_spline_pchip">Spline: PCHIP</string>
+    <string name="dsp_spline_makima">Spline: Makima</string>
+    <string name="dsp_eq_filter_fir_min">FIR Min Phase</string>
+    <string name="dsp_eq_filter_fir_lin">FIR Linear Phase</string>
+    <string name="dsp_eq_filter_iir_4">IIR 4th Order</string>
+    <string name="dsp_eq_filter_iir_6">IIR 6th Order</string>
+    <string name="dsp_eq_filter_iir_8">IIR 8th Order</string>
+    <string name="dsp_eq_filter_iir_10">IIR 10th Order</string>
+    <string name="dsp_eq_filter_iir_12">IIR 12th Order</string>
+    <string name="dsp_compander_section_title">Dynamic Range Compander</string>
+    <string name="dsp_compander_card_title">Multiband Compander (7-Band)</string>
+    <string name="dsp_compander_card_desc">Time-frequency dynamic range compression &amp; micro-detail booster</string>
+    <string name="dsp_compander_time_constant">Time Constant (Release Speed)</string>
+    <string name="dsp_compander_granularity">Granularity</string>
+    <string name="dsp_compander_tf_uniform">Uniform</string>
+    <string name="dsp_compander_tf_low_lat">Low Latency</string>
+    <string name="dsp_compander_tf_high_res">High Res</string>
+    <string name="dsp_compander_tf_extreme">Extreme</string>
+    <string name="dsp_liveprog_section_title">EEL2 Liveprog Programmable DSP</string>
+    <string name="dsp_liveprog_card_title">Liveprog Script Engine (.eel)</string>
+    <string name="dsp_import_eel_btn">Import .eel</string>
+    <string name="dsp_eel_editor_btn">EEL2 Editor</string>
+    <string name="dsp_hide_code_btn">Hide Code</string>
+    <string name="dsp_eel_editor_hint">EEL2 Script (@init / @sample)</string>
+    <string name="dsp_ddc_convolver_section_title">Convolver &amp; ViPER-DDC</string>
+    <string name="dsp_ddc_card_title">ViPER-DDC (IIR Cascade)</string>
+    <string name="dsp_ddc_card_desc">Second-Order Sections headphone correction</string>
+    <string name="dsp_badge_sos_iir">SOS IIR</string>
+    <string name="dsp_import_vdc_btn">Import .vdc File from Storage</string>
+    <string name="dsp_convolver_card_title">Convolver (Partitioned FFT IR Engine)</string>
+    <string name="dsp_convolver_card_desc">Impulse response convolution</string>
+    <string name="dsp_convolver_wet_mix">IR Wet Mix</string>
+    <string name="dsp_convolver_predelay">IR Pre-Delay</string>
+    <string name="dsp_convolver_tail_trim">IR Tail Length (Trim)</string>
+    <string name="dsp_convolver_invert_phase">Invert IR Phase (180°)</string>
+    <string name="dsp_import_ir_btn">Import .wav / .irs Impulse</string>
+    <string name="dsp_toast_vdc_loaded">ViPER-DDC loaded: %1$s</string>
+    <string name="dsp_toast_eel_loaded">EEL2 script loaded: %1$s</string>
+    <string name="dsp_toast_ir_loaded">Impulse Response loaded: %1$s</string>
+    <string name="dsp_toast_ir_invalid">Unsupported IR format (use 16/24/32-bit WAV)</string>
+
+    <string-array name="reverb_modes">
+        <item>Small Hall</item>
+        <item>Medium Hall</item>
+        <item>Large Hall</item>
+        <item>Small Room</item>
+        <item>Medium Room</item>
+        <item>Large Room</item>
+        <item>Medium ER1</item>
+        <item>Medium ER2</item>
+        <item>Plate High</item>
+        <item>Plate Low</item>
+        <item>Long Reverb 1</item>
+        <item>Long Reverb 2</item>
+    </string-array>
+
+    <string-array name="bs2b_modes">
+        <item>BS2B Chu Moy (700Hz / 4.5dB)</item>
+        <item>BS2B Jan Meier (650Hz / 9.5dB)</item>
+        <item>BS2B Default (700Hz / 6.0dB)</item>
+        <item>HRTF Crossfeed Weak</item>
+        <item>HRTF Crossfeed Medium</item>
+        <item>HRTF Crossfeed Strong</item>
+    </string-array>
 </resources>

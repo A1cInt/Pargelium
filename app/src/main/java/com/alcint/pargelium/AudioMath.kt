@@ -13,7 +13,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tanh
 
-var currentAudioLoudness by mutableFloatStateOf(0f)
+@Volatile
+var currentAudioLoudness: Float = 0f
 
 @Immutable
 data class EqPreset(

@@ -16,13 +16,6 @@ static int isPowerOfTwo(int n) {
     return (n > 0) && ((n & (n - 1)) == 0);
 }
 
-/**
- * Точное преобразование Хартли H[k] = sum_{n=0}^{N-1} x[n] * (cos(2*pi*k*n/N) + sin(2*pi*k*n/N))
- * Так как стандартный прямой FFT считает sum x[n] * (cos(...) - i*sin(...)),
- * то Re(FFT) = sum x[n]*cos(...), а Im(FFT) = -sum x[n]*sin(...).
- * Поэтому cas(theta) = cos(theta) + sin(theta) = Re(FFT) - Im(FFT) при отрицательной экспоненте,
- * либо мы сразу используем положительный угол +2*pi/len и берем Re + Im!
- */
 void discreteHartleyTransform(float *x, int n) {
     if (!x || n <= 1) return;
 
@@ -77,11 +70,9 @@ void discreteHartleyTransform(float *x, int n) {
         double wLenIm = sin(angle);
 
         for (int i = 0; i < n; i += len) {
+            double wRe = 1.0;
+            double wIm = 0.0;
             for (int k = 0; k < halfLen; ++k) {
-                double theta = angle * (double)k;
-                double wRe = cos(theta);
-                double wIm = sin(theta);
-
                 int evenIdx = i + k;
                 int oddIdx = i + k + halfLen;
 
@@ -94,6 +85,10 @@ void discreteHartleyTransform(float *x, int n) {
                 im[evenIdx] = uIm + vIm;
                 re[oddIdx] = uRe - vRe;
                 im[oddIdx] = uIm - vIm;
+
+                double nextWRe = wRe * wLenRe - wIm * wLenIm;
+                wIm = wRe * wLenIm + wIm * wLenRe;
+                wRe = nextWRe;
             }
         }
     }
@@ -173,11 +168,11 @@ typedef struct {
 } PargeliumLiveProgState;
 
 static PargeliumLiveProgState gLiveProg = {
-    .enabled = 0,
-    .activeMode = 0,
-    .params = { 0.35f, 0.72f, 0.45f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f },
-    .sampleRate = 48000.0f,
-    .b0 = 1.0, .b1 = 0.0, .b2 = 0.0, .a1 = 0.0, .a2 = 0.0
+        .enabled = 0,
+        .activeMode = 0,
+        .params = { 0.35f, 0.72f, 0.45f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f },
+        .sampleRate = 48000.0f,
+        .b0 = 1.0, .b1 = 0.0, .b2 = 0.0, .a1 = 0.0, .a2 = 0.0
 };
 
 static const int kFdnLengths[8] = { 1087, 1283, 1511, 1789, 2081, 2411, 2797, 3203 };

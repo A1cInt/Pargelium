@@ -9,7 +9,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.math.log10
-import kotlin.math.tanh
 
 @Volatile
 var globalAudioLoudness = 0f
@@ -20,6 +19,15 @@ var globalAudioPeakDb = -60f
 @Volatile
 var globalSoftClipActive = false
 
+@Volatile
+var globalAudioBitDepth = 16
+
+@Volatile
+var globalAudioIsFloat = false
+
+@Volatile
+var globalAudioSampleRate = 48000
+
 @UnstableApi
 class CustomAudioProcessor : AudioProcessor {
 
@@ -29,6 +37,7 @@ class CustomAudioProcessor : AudioProcessor {
         private const val LOUDNESS_SMOOTH_FACTOR = 0.22f
         private const val SOFT_KNEE_THRESHOLD = 0.92f
         private const val SOFT_KNEE_HEADROOM = 1.0f - SOFT_KNEE_THRESHOLD
+        private const val INV_SOFT_KNEE_HEADROOM = 1.0f / SOFT_KNEE_HEADROOM
     }
 
     private var inputFormat = AudioFormat.NOT_SET
@@ -55,13 +64,20 @@ class CustomAudioProcessor : AudioProcessor {
         }
 
         inputFormat = inputAudioFormat
-        // Выдаем 16-бит или 32-бит Float в зависимости от входа для максимального динамического диапазона
         outputFormat = if (encoding == C.ENCODING_PCM_FLOAT) {
             inputAudioFormat
         } else {
             AudioFormat(inputAudioFormat.sampleRate, inputAudioFormat.channelCount, C.ENCODING_PCM_16BIT)
         }
         isProcessorActive = true
+
+        globalAudioSampleRate = inputAudioFormat.sampleRate
+        globalAudioIsFloat = encoding == C.ENCODING_PCM_FLOAT
+        globalAudioBitDepth = when (encoding) {
+            C.ENCODING_PCM_24BIT -> 24
+            C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
+            else -> 16
+        }
 
         JamesDspController.init(inputAudioFormat.sampleRate)
         return outputFormat
@@ -70,16 +86,22 @@ class CustomAudioProcessor : AudioProcessor {
     override fun isActive(): Boolean = isProcessorActive
 
     /**
-     * Мягкий прозрачный сатуратор верхнего колена (Soft-Knee Limiter):
-     * До 0.92f сигнал проходит 1:1 без изменений. Всё, что выше 0.92f, плавно сжимается через tanh() к 0.999f.
+     * Быстрая рациональная аппроксимация Паде для tanh(x) без вызова тяжелого Math.tanh().
      */
+    private fun fastTanh(x: Float): Float {
+        if (x > 3.0f) return 1.0f
+        if (x < -3.0f) return -1.0f
+        val x2 = x * x
+        return x * (27.0f + x2) / (27.0f + 9.0f * x2)
+    }
+
     private fun softKneeClip(sample: Float): Float {
         if (sample.isNaN() || sample.isInfinite()) return 0f
         val absVal = abs(sample)
         if (absVal <= SOFT_KNEE_THRESHOLD) return sample
 
-        val excess = (absVal - SOFT_KNEE_THRESHOLD) / SOFT_KNEE_HEADROOM
-        val compressed = SOFT_KNEE_THRESHOLD + SOFT_KNEE_HEADROOM * tanh(excess.toDouble()).toFloat()
+        val excess = (absVal - SOFT_KNEE_THRESHOLD) * INV_SOFT_KNEE_HEADROOM
+        val compressed = SOFT_KNEE_THRESHOLD + SOFT_KNEE_HEADROOM * fastTanh(excess)
         return if (sample >= 0f) compressed else -compressed
     }
 
@@ -90,6 +112,19 @@ class CustomAudioProcessor : AudioProcessor {
         if (sizeBytes <= 0) return
 
         val encoding = inputFormat.encoding
+
+        // Быстрый путь (Zero-DSP overhead), если эффекты отключены и формат совпадает:
+        if (!JamesDspController.hasActiveProcessing() && encoding == outputFormat.encoding) {
+            val resultBuffer = obtainOutputBuffer(sizeBytes)
+            resultBuffer.put(inputBuffer)
+            resultBuffer.flip()
+            outputBuffer = resultBuffer
+            globalAudioLoudness *= 0.85f
+            currentAudioLoudness = globalAudioLoudness
+            globalSoftClipActive = false
+            return
+        }
+
         val sampleCount = when (encoding) {
             C.ENCODING_PCM_16BIT -> sizeBytes shr 1
             C.ENCODING_PCM_24BIT -> sizeBytes / 3
@@ -134,8 +169,9 @@ class CustomAudioProcessor : AudioProcessor {
             }
         }
 
-        // Передаем ТОЧНОЕ количество сэмплов в нативный движок JamesDSP
-        JamesDspController.process(floatBuffer, sampleCount)
+        if (JamesDspController.hasActiveProcessing()) {
+            JamesDspController.process(floatBuffer, sampleCount)
+        }
 
         val outBytes = if (outputFormat.encoding == C.ENCODING_PCM_FLOAT) {
             sampleCount shl 2
@@ -152,9 +188,10 @@ class CustomAudioProcessor : AudioProcessor {
                 val raw = floatBuffer[i]
                 val absRaw = abs(raw)
                 if (absRaw > peakMagnitude) peakMagnitude = absRaw
-                if (absRaw > 0.96f) softClippedInBlock = true
-
-                val clean = softKneeClip(raw)
+                val clean = if (absRaw > SOFT_KNEE_THRESHOLD) {
+                    if (absRaw > 0.96f) softClippedInBlock = true
+                    softKneeClip(raw)
+                } else raw
                 resultBuffer.putFloat(clean)
             }
         } else {
@@ -162,9 +199,10 @@ class CustomAudioProcessor : AudioProcessor {
                 val raw = floatBuffer[i]
                 val absRaw = abs(raw)
                 if (absRaw > peakMagnitude) peakMagnitude = absRaw
-                if (absRaw > 0.96f) softClippedInBlock = true
-
-                val clean = softKneeClip(raw)
+                val clean = if (absRaw > SOFT_KNEE_THRESHOLD) {
+                    if (absRaw > 0.96f) softClippedInBlock = true
+                    softKneeClip(raw)
+                } else raw
                 val pcmShort = (clean * 32767.0f).toInt().coerceIn(-32768, 32767).toShort()
                 resultBuffer.putShort(pcmShort)
             }
@@ -209,6 +247,7 @@ class CustomAudioProcessor : AudioProcessor {
         outputBuffer = AudioProcessor.EMPTY_BUFFER
         inputEnded = false
         globalAudioLoudness = 0f
+        currentAudioLoudness = 0f
         globalAudioPeakDb = -60f
         globalSoftClipActive = false
     }

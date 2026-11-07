@@ -2,8 +2,10 @@ package com.alcint.pargelium.audio
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.runtime.Immutable
 import com.alcint.pargelium.PrefsManager
+import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -21,14 +23,18 @@ data class BuiltInVdcPreset(
     val id: String,
     val name: String,
     val subtitle: String,
-    val vdcContent: String
+    val vdcContent: String,
+    val isUserFile: Boolean = false,
+    val filePath: String? = null
 )
 
 @Immutable
 data class BuiltInImpulsePreset(
     val id: Int,
     val name: String,
-    val subtitle: String
+    val subtitle: String,
+    val isUserFile: Boolean = false,
+    val filePath: String? = null
 )
 
 @Immutable
@@ -48,7 +54,9 @@ data class BuiltInEelScript(
     val title: String,
     val description: String,
     val eelSource: String,
-    val parameters: List<EelParameterDef>
+    val parameters: List<EelParameterDef>,
+    val isUserFile: Boolean = false,
+    val filePath: String? = null
 )
 
 object JamesDspController {
@@ -104,39 +112,39 @@ object JamesDspController {
         BuiltInVdcPreset(
             id = "dt770_80",
             name = "Beyerdynamic DT770 Pro (80Ω)",
-            subtitle = "Official JamesDSP Cascade SOS (DT770-80-4.vdc)",
+            subtitle = "DT770-80-4.vdc",
             vdcContent = "SR_44100:0.99235648,-1.97626378,0.98412264,-1.97619318,0.97654972,1.01246894,-1.97214562,0.96128412,-1.97184930,0.97395736,0.96452180,-1.76419280,0.83124560,-1.76891240,0.80048320,0.89125094,-1.21458210,0.52148930,-1.24518920,0.44382190\n" +
                     "SR_48000:0.99296420,-1.97814210,0.98532410,-1.97808120,0.97834910,1.01148290,-1.97438120,0.96421890,-1.97412940,0.97591240,0.96721480,-1.78412940,0.84218490,-1.78841290,0.81349120,0.89641280,-1.26418920,0.55128490,-1.29184920,0.47891240"
         ),
         BuiltInVdcPreset(
             id = "front_rear_contrast",
             name = "Front-Rear Stage Contrast",
-            subtitle = "Official JamesDSP Spatial Depth (FrontRearContrast.vdc)",
+            subtitle = "FrontRearContrast.vdc",
             vdcContent = "SR_44100:1.03418920,-1.94128490,0.91248910,-1.94012840,0.94581290,0.95412890,-1.81248910,0.87124890,-1.81541290,0.82841290\n" +
                     "SR_48000:1.03148920,-1.94612840,0.91948120,-1.94512890,0.95012840,0.95781240,-1.82741290,0.88124890,-1.83012480,0.84192840"
         ),
         BuiltInVdcPreset(
             id = "butterworth_warm",
             name = "Butterworth Reference",
-            subtitle = "Official JamesDSP Butterworth.vdc",
+            subtitle = "Butterworth.vdc",
             vdcContent = "SR_44100:1.04512890,-1.98124890,0.93712480,-1.98091240,0.98214890,0.94128490,-1.54128940,0.64128940,-1.55128490,0.59128490\n" +
                     "SR_48000:1.04182940,-1.98284120,0.94182940,-1.98251290,0.98351290,0.94581290,-1.57812490,0.66812490,-1.58712490,0.61812490"
         ),
         BuiltInVdcPreset(
             id = "airpods_pro_studio",
             name = "AirPods Pro / Max Acoustic Match",
-            subtitle = "Sub-Bass Extension & 3.5kHz Ear-Canal Compensation",
+            subtitle = "Sub-Bass & 3.5kHz Ear-Canal Match",
             vdcContent = "SR_44100:1.05128490,-1.98412890,0.93384120,-1.98381240,0.98481290,1.03128490,-1.74128940,0.74128940,-1.73912840,0.77128490\n" +
                     "SR_48000:1.04781240,-1.98541290,0.93841290,-1.98512480,0.98591240,1.02891240,-1.76128490,0.75891240,-1.75941280,0.78641290"
         )
     )
 
     val builtInImpulsePresets = listOf(
-        BuiltInImpulsePreset(0, "JamesDSP Reference Studio (137777fs.wav)", "Tight control room early reflections (28 ms)"),
-        BuiltInImpulsePreset(1, "Analog Mastering Tape & Preamp", "Warm phase-coherent transformer impulse"),
-        BuiltInImpulsePreset(2, "Binaural Holographic Soundstage", "Wide out-of-head 3D spatial image"),
-        BuiltInImpulsePreset(3, "Symphony Concert Hall", "Natural acoustic hall decay (160 ms)"),
-        BuiltInImpulsePreset(4, "Club Sub-Bass & Punch IR", "Low-end punch & crisp transient response")
+        BuiltInImpulsePreset(0, "JamesDSP Reference Studio (137777fs.wav)", "28 ms Early Reflections"),
+        BuiltInImpulsePreset(1, "Analog Mastering Tape & Preamp", "14 ms Phase-Coherent IR"),
+        BuiltInImpulsePreset(2, "Binaural Holographic Soundstage", "38 ms 3D Spatial IR"),
+        BuiltInImpulsePreset(3, "Symphony Concert Hall", "160 ms Acoustic Decay"),
+        BuiltInImpulsePreset(4, "Club Sub-Bass & Punch IR", "24 ms Low-End Punch")
     )
 
     val builtInEelScripts = listOf(
@@ -144,7 +152,7 @@ object JamesDspController {
             id = 0,
             fileName = "hadamVerb.eel",
             title = "Hadamard FDN Reverb (hadamVerb.eel)",
-            description = "8x8 Hadamard Feedback Delay Network stereo reverberator from JamesDSP",
+            description = "8x8 Hadamard Feedback Delay Network stereo reverberator",
             eelSource = "desc: Hadamard 8x8 FDN Stereo Reverb\nslider1:0.35<0.0,1.0,0.01>Wet Mix\nslider2:0.74<0.1,0.95,0.01>Decay Time\nslider3:0.42<0.05,0.9,0.01>High Damping\nslider4:1.0<0.4,1.7,0.01>Room Size\n@sample\n// 8x8 Hadamard FDN matrix",
             parameters = listOf(
                 EelParameterDef(0, "Wet Mix", 0f, 1f, 0.35f, ""),
@@ -157,7 +165,7 @@ object JamesDspController {
             id = 1,
             fileName = "hpfloat.eel",
             title = "Precision High-Pass Biquad (hpfloat.eel)",
-            description = "Floating-point subsonic filter & Q resonance controller from JamesDSP",
+            description = "Floating-point subsonic filter & Q resonance controller",
             eelSource = "desc: Precision Highpass Biquad Filter\nslider1:55<15,400,1>Cutoff Frequency (Hz)\nslider2:0.707<0.3,4.0,0.01>Resonance Q\nslider3:0.0<-6.0,6.0,0.1>Output Gain (dB)\n@sample\n// Direct Form II Transposed Biquad",
             parameters = listOf(
                 EelParameterDef(0, "Cutoff Frequency", 15f, 400f, 55f, " Hz"),
@@ -233,52 +241,53 @@ object JamesDspController {
     @Volatile
     private var preAmpLinear: Float = 1.0f
 
-    // 1. Dynamic Bass
+    @Volatile
+    private var activeEffectsMask: Int = 0
+
+    // Пользовательские импортированные файлы (.vdc, .eel, .wav/.irs)
+    var userVdcPresets: List<BuiltInVdcPreset> = emptyList()
+        private set
+    var userEelScripts: List<BuiltInEelScript> = emptyList()
+        private set
+    var userImpulsePresets: List<BuiltInImpulsePreset> = emptyList()
+        private set
+
     private var isBassEnabled = false
     private var bassGainDb = 6.0f
 
-    // 2. Dynamic Range Compander (7 bands)
     private var isCompanderEnabled = false
     private var companderTimeConstant = 0.22f
     private var companderGranularity = 2
     private var companderTfResolution = 0
     private var companderGains = FloatArray(7) { 0f }
 
-    // 3. Multimodal Equalizer (15-band ISO or 10-band)
     private var isUserEqEnabled = false
-    private var eqFilterMode = 0
+    private var eqFilterMode = 2 // 2 = IIR 4th Order по умолчанию
     private var eqInterpolationMode = 0
     private var is15BandMode = true
     private var userEqGains10 = FloatArray(10) { 0f }
     private var userEqGains15 = FloatArray(15) { 0f }
 
-    // 4. Arbitrary Response Equalizer (AutoEQ & GraphicEQ string)
     private var isAutoEqEnabled = false
     private var autoEqGains: FloatArray? = null
     private var customGraphicEqString: String = ""
 
-    // 5. Vacuum Tube
     private var isTubeEnabled = false
     private var tubeDriveDb = 2.0f
 
-    // 6. Reverberation (Progenitor 2 - 12 presets)
     private var isReverbEnabled = false
     private var reverbPreset = 0
 
-    // 7. Stereo Widener
     private var isStereoWideEnabled = false
     private var stereoWidth = 50
 
-    // 8. BS2B / HRTF Crossfeed (6 modes)
     private var isBs2bEnabled = false
     private var bs2bMode = 0
 
-    // 9. ViPER-DDC
     private var isDdcEnabled = false
     private var selectedVdcPresetId: String = "dt770_80"
     private var customVdcContent: String? = null
 
-    // 10. Convolver 1D + IR Conditioning
     private var isConvolverEnabled = false
     private var convolverPresetId: Int = 0
     private var convolverWetMix: Float = 100f
@@ -293,13 +302,11 @@ object JamesDspController {
     var currentIrWaveformPreview: FloatArray = FloatArray(64) { 0f }
         private set
 
-    // 11. EEL2 Liveprog
     private var isLiveprogEnabled = false
     private var liveprogScriptId = 0
     private var liveprogParams = floatArrayOf(0.35f, 0.74f, 0.42f, 1.0f, 80.0f, 0.707f, 0.0f, 0.0f)
     private var customEelCode: String? = null
 
-    // 12. Master Limiter & PostGain
     private var limThresholdDb = -0.5f
     private var limReleaseMs = 60.0f
     private var postGainDb = 0.0f
@@ -310,6 +317,223 @@ object JamesDspController {
         1000.0, 1600.0, 2500.0, 4000.0, 6300.0, 10000.0, 16000.0
     )
     val companderFreqs7 = doubleArrayOf(95.0, 200.0, 400.0, 800.0, 1600.0, 3400.0, 7500.0)
+
+    private val sliderRegex = Regex(
+        """^slider(\d+)\s*:\s*([-+]?\d*\.?\d+)\s*<\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)(?:\s*,\s*[-+]?\d*\.?\d+)?\s*>\s*(.*)$""",
+        RegexOption.IGNORE_CASE
+    )
+
+    fun hasActiveProcessing(): Boolean {
+        return isMasterEnabled && (activeEffectsMask != 0 || abs(postGainDb) > 0.05f || limThresholdDb < -0.6f)
+    }
+
+    private fun updateActiveEffectsMask() {
+        var mask = 0
+        if (isUserEqEnabled) mask = mask or (1 shl 0)
+        if (isAutoEqEnabled) mask = mask or (1 shl 1)
+        if (isBassEnabled && bassGainDb > 0.05f) mask = mask or (1 shl 2)
+        if (isCompanderEnabled) mask = mask or (1 shl 3)
+        if (isReverbEnabled) mask = mask or (1 shl 4)
+        if (isStereoWideEnabled) mask = mask or (1 shl 5)
+        if (isBs2bEnabled) mask = mask or (1 shl 6)
+        if (isTubeEnabled && tubeDriveDb > 0.05f) mask = mask or (1 shl 7)
+        if (isDdcEnabled) mask = mask or (1 shl 8)
+        if (isConvolverEnabled) mask = mask or (1 shl 9)
+        if (isLiveprogEnabled) mask = mask or (1 shl 10)
+        activeEffectsMask = mask
+    }
+
+    /**
+     * Сканирует локальные папки приложения (dsp_vdc, dsp_eel, dsp_ir) и возвращает все
+     * добавленные пользователем .vdc, .eel и .wav/.irs файлы, чтобы они отображались в UI.
+     */
+    @Synchronized
+    fun refreshUserFiles(context: Context) {
+        val vdcDir = File(context.filesDir, "dsp_vdc").apply { if (!exists()) mkdirs() }
+        val eelDir = File(context.filesDir, "dsp_eel").apply { if (!exists()) mkdirs() }
+        val irDir = File(context.filesDir, "dsp_ir").apply { if (!exists()) mkdirs() }
+
+        userVdcPresets = vdcDir.listFiles()
+            ?.filter { it.isFile && it.length() > 10 }
+            ?.sortedBy { it.name.lowercase() }
+            ?.mapNotNull { file ->
+                val content = runCatching { file.readText() }.getOrNull() ?: return@mapNotNull null
+                BuiltInVdcPreset(
+                    id = "user_vdc_${file.name}",
+                    name = file.nameWithoutExtension,
+                    subtitle = file.name,
+                    vdcContent = content,
+                    isUserFile = true,
+                    filePath = file.absolutePath
+                )
+            } ?: emptyList()
+
+        userEelScripts = eelDir.listFiles()
+            ?.filter { it.isFile && it.length() > 5 }
+            ?.sortedBy { it.name.lowercase() }
+            ?.mapIndexedNotNull { idx, file ->
+                val code = runCatching { file.readText() }.getOrNull() ?: return@mapIndexedNotNull null
+                parseEelScriptFile(100 + idx, file.name, code, file.absolutePath)
+            } ?: emptyList()
+
+        userImpulsePresets = irDir.listFiles()
+            ?.filter { it.isFile && it.length() > 44 }
+            ?.sortedBy { it.name.lowercase() }
+            ?.mapIndexed { idx, file ->
+                val kb = (file.length() / 1024L).coerceAtLeast(1L)
+                BuiltInImpulsePreset(
+                    id = 100 + idx,
+                    name = file.nameWithoutExtension,
+                    subtitle = "${file.name} • $kb KB",
+                    isUserFile = true,
+                    filePath = file.absolutePath
+                )
+            } ?: emptyList()
+    }
+
+    private fun parseEelScriptFile(id: Int, fileName: String, code: String, filePath: String): BuiltInEelScript {
+        var descTitle = fileName.substringBeforeLast(".")
+        val params = mutableListOf<EelParameterDef>()
+
+        code.lineSequence().forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.startsWith("desc:", ignoreCase = true)) {
+                val d = line.substringAfter(":").trim()
+                if (d.isNotEmpty()) descTitle = d
+            } else if (line.startsWith("slider", ignoreCase = true)) {
+                val match = sliderRegex.find(line)
+                if (match != null) {
+                    val sIdx = (match.groupValues[1].toIntOrNull() ?: 1) - 1
+                    val defVal = match.groupValues[2].toFloatOrNull() ?: 0f
+                    val minVal = match.groupValues[3].toFloatOrNull() ?: 0f
+                    val maxVal = match.groupValues[4].toFloatOrNull() ?: 1f
+                    val label = match.groupValues[5].trim().ifEmpty { "Slider ${sIdx + 1}" }
+                    if (sIdx in 0..7 && maxVal > minVal) {
+                        params.add(EelParameterDef(sIdx, label, minVal, maxVal, defVal.coerceIn(minVal, maxVal)))
+                    }
+                }
+            }
+        }
+
+        if (params.isEmpty()) {
+            params.add(EelParameterDef(0, "Parameter 1", 0f, 1f, 0.5f))
+            params.add(EelParameterDef(1, "Parameter 2", 0f, 1f, 0.5f))
+        }
+
+        return BuiltInEelScript(
+            id = id,
+            fileName = fileName,
+            title = descTitle,
+            description = fileName,
+            eelSource = code,
+            parameters = params,
+            isUserFile = true,
+            filePath = filePath
+        )
+    }
+
+    fun getAllVdcPresets(): List<BuiltInVdcPreset> = builtInVdcPresets + userVdcPresets
+    fun getAllEelScripts(): List<BuiltInEelScript> = builtInEelScripts + userEelScripts
+    fun getAllImpulsePresets(): List<BuiltInImpulsePreset> = builtInImpulsePresets + userImpulsePresets
+
+    private fun resolveUriDisplayName(context: Context, uri: Uri, defaultExt: String): String {
+        var name: String? = null
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                if (c.moveToFirst()) {
+                    val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx != -1) name = c.getString(idx)
+                }
+            }
+        } catch (_: Exception) {}
+        val raw = name ?: uri.lastPathSegment?.substringAfterLast('/') ?: "custom_${System.currentTimeMillis()}.$defaultExt"
+        val safe = raw.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim()
+        return if (safe.contains('.')) safe else "$safe.$defaultExt"
+    }
+
+    fun importUserVdc(context: Context, uri: Uri): BuiltInVdcPreset? {
+        return try {
+            val fileName = resolveUriDisplayName(context, uri, "vdc")
+            val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: return null
+            if (content.isBlank()) return null
+
+            val vdcDir = File(context.filesDir, "dsp_vdc").apply { if (!exists()) mkdirs() }
+            val targetFile = File(vdcDir, fileName)
+            targetFile.writeText(content)
+
+            refreshUserFiles(context)
+            val added = userVdcPresets.find { it.filePath == targetFile.absolutePath }
+            if (added != null) {
+                setDdcPreset(added.id)
+                setDdcEnabled(true)
+            }
+            added
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun importUserEel(context: Context, uri: Uri): BuiltInEelScript? {
+        return try {
+            val fileName = resolveUriDisplayName(context, uri, "eel")
+            val code = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: return null
+            if (code.isBlank()) return null
+
+            val eelDir = File(context.filesDir, "dsp_eel").apply { if (!exists()) mkdirs() }
+            val targetFile = File(eelDir, fileName)
+            targetFile.writeText(code)
+
+            refreshUserFiles(context)
+            val added = userEelScripts.find { it.filePath == targetFile.absolutePath }
+            if (added != null) {
+                setLiveprogScript(added.id)
+                setLiveprogEnabled(true)
+            }
+            added
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun importUserImpulse(context: Context, uri: Uri): BuiltInImpulsePreset? {
+        return try {
+            val fileName = resolveUriDisplayName(context, uri, "wav")
+            val bytes = context.contentResolver.openInputStream(uri)?.use(InputStream::readBytes) ?: return null
+            val parsed = parseWavBytes(bytes) ?: return null
+
+            val irDir = File(context.filesDir, "dsp_ir").apply { if (!exists()) mkdirs() }
+            val targetFile = File(irDir, fileName)
+            targetFile.writeBytes(bytes)
+
+            refreshUserFiles(context)
+            val added = userImpulsePresets.find { it.filePath == targetFile.absolutePath }
+            synchronized(this) {
+                customImpulseSamples = parsed.first
+                customImpulseChannels = parsed.second
+                customImpulseFrames = parsed.third
+                customImpulseName = targetFile.name
+                if (added != null) {
+                    convolverPresetId = added.id
+                    PrefsManager.saveConvolverPresetId(added.id)
+                }
+                isConvolverEnabled = true
+                PrefsManager.saveConvolverEnabled(true)
+                updateActiveEffectsMask()
+                recalculateHeadroomAndSyncEq()
+                syncConvolverInternal(engineHandle)
+            }
+            added
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    @Synchronized
+    fun deleteUserFile(context: Context, filePath: String?) {
+        if (filePath.isNullOrBlank()) return
+        runCatching { File(filePath).delete() }
+        refreshUserFiles(context)
+    }
 
     @Synchronized
     fun syncFromPrefs() {
@@ -366,6 +590,7 @@ object JamesDspController {
             limThresholdDb = PrefsManager.getLimThreshold()
             limReleaseMs = PrefsManager.getLimRelease()
             postGainDb = PrefsManager.getPostGain()
+            updateActiveEffectsMask()
             hasRestoredFromPrefs = true
         } catch (_: Exception) {}
     }
@@ -444,6 +669,7 @@ object JamesDspController {
     }
 
     private fun recalculateHeadroomAndSyncEq() {
+        updateActiveEffectsMask()
         val activeUser15 = getActiveUserEq15Bands()
         var maxPositiveEqDb = 0f
         if (isUserEqEnabled) {
@@ -515,8 +741,9 @@ object JamesDspController {
             nativeSetDdc(handle, false, null)
             return
         }
-        val vdcStr = customVdcContent?.takeIf { it.isNotBlank() }
-            ?: builtInVdcPresets.find { it.id == selectedVdcPresetId }?.vdcContent
+        val allPresets = getAllVdcPresets()
+        val vdcStr = allPresets.find { it.id == selectedVdcPresetId }?.vdcContent
+            ?: customVdcContent?.takeIf { it.isNotBlank() }
             ?: builtInVdcPresets.first().vdcContent
         nativeSetDdc(handle, true, vdcStr)
     }
@@ -524,11 +751,11 @@ object JamesDspController {
     private fun generateSyntheticImpulse(presetId: Int, sampleRate: Int): Pair<FloatArray, Int> {
         val sr = sampleRate.coerceAtLeast(44100)
         val durationMs = when (presetId) {
-            0 -> 28 // JamesDSP Reference Studio
-            1 -> 14 // Analog Mastering Tape
-            2 -> 38 // Binaural Stage
-            3 -> 160 // Symphony Concert Hall
-            else -> 24 // Club Sub-Bass Exciter
+            0 -> 28
+            1 -> 14
+            2 -> 38
+            3 -> 160
+            else -> 24
         }
         val frames = (sr * durationMs) / 1000
         val samples = FloatArray(frames * 2)
@@ -584,10 +811,6 @@ object JamesDspController {
         return samples to frames
     }
 
-    /**
-     * Применяет к импульсу Convolver параметры Pre-Delay (мс), Tail Trim (%),
-     * Wet/Dry Mix (%) и инверсию фазы, а также строит массив превью формы волны для UI.
-     */
     private fun conditionImpulseResponse(
         rawSamples: FloatArray,
         channels: Int,
@@ -605,7 +828,6 @@ object JamesDspController {
 
         val out = FloatArray(totalFrames * channels)
 
-        // Сухой сигнал (Dirac delta в нулевом отсчете) для бесшовного Wet/Dry микса внутри свертки
         for (ch in 0 until channels.coerceAtMost(2)) {
             out[ch] += dry
         }
@@ -624,7 +846,6 @@ object JamesDspController {
             }
         }
 
-        // Обновляем 64-точечное превью импульса для UI графика
         val preview = FloatArray(64)
         val step = (totalFrames / 64).coerceAtLeast(1)
         var maxPeak = 0.001f
@@ -653,6 +874,19 @@ object JamesDspController {
             nativeSetConvolver(handle, false, null, 2, 0)
             return
         }
+
+        val userIrPreset = userImpulsePresets.find { it.id == convolverPresetId }
+        if (userIrPreset?.filePath != null && customImpulseSamples == null) {
+            val bytes = runCatching { File(userIrPreset.filePath).readBytes() }.getOrNull()
+            val parsed = bytes?.let { parseWavBytes(it) }
+            if (parsed != null) {
+                customImpulseSamples = parsed.first
+                customImpulseChannels = parsed.second
+                customImpulseFrames = parsed.third
+                customImpulseName = userIrPreset.name
+            }
+        }
+
         val customSamples = customImpulseSamples
         val (baseSamples, ch, baseFrames) = if (customSamples != null && customImpulseFrames > 0) {
             Triple(customSamples, customImpulseChannels, customImpulseFrames)
@@ -667,7 +901,10 @@ object JamesDspController {
 
     private fun syncLiveprogInternal(handle: Long) {
         if (handle == 0L) return
-        nativeSetLiveprog(handle, isLiveprogEnabled, liveprogScriptId, liveprogParams, customEelCode)
+        val scriptObj = getAllEelScripts().find { it.id == liveprogScriptId }
+        val effectiveCode = scriptObj?.eelSource ?: customEelCode
+        val nativeMode = if (liveprogScriptId in 0..5) liveprogScriptId else 0
+        nativeSetLiveprog(handle, isLiveprogEnabled, nativeMode, liveprogParams, effectiveCode)
     }
 
     private fun applyAllCurrentSettings() {
@@ -696,6 +933,7 @@ object JamesDspController {
     @Synchronized
     fun setMasterEnabled(enabled: Boolean) {
         isMasterEnabled = enabled
+        updateActiveEffectsMask()
     }
 
     @Synchronized
@@ -849,6 +1087,7 @@ object JamesDspController {
     @Synchronized
     fun setStereoWideEnabled(enabled: Boolean) {
         isStereoWideEnabled = enabled
+        updateActiveEffectsMask()
         if (engineHandle != 0L) nativeSetStereoWide(engineHandle, enabled, stereoWidth)
     }
 
@@ -861,6 +1100,7 @@ object JamesDspController {
     @Synchronized
     fun setBs2bEnabled(enabled: Boolean) {
         isBs2bEnabled = enabled
+        updateActiveEffectsMask()
         if (engineHandle != 0L) nativeSetCrossfeed(engineHandle, enabled, bs2bMode)
     }
 
@@ -888,6 +1128,7 @@ object JamesDspController {
     fun setDdcEnabled(enabled: Boolean) {
         isDdcEnabled = enabled
         PrefsManager.saveDdcEnabled(enabled)
+        updateActiveEffectsMask()
         syncDdcInternal(engineHandle)
     }
 
@@ -918,8 +1159,20 @@ object JamesDspController {
     @Synchronized
     fun setConvolverPreset(presetId: Int) {
         convolverPresetId = presetId
-        customImpulseSamples = null
-        customImpulseName = null
+        val userIr = userImpulsePresets.find { it.id == presetId }
+        if (userIr?.filePath != null) {
+            val bytes = runCatching { File(userIr.filePath).readBytes() }.getOrNull()
+            val parsed = bytes?.let { parseWavBytes(it) }
+            if (parsed != null) {
+                customImpulseSamples = parsed.first
+                customImpulseChannels = parsed.second
+                customImpulseFrames = parsed.third
+                customImpulseName = userIr.name
+            }
+        } else {
+            customImpulseSamples = null
+            customImpulseName = null
+        }
         PrefsManager.saveConvolverPresetId(presetId)
         syncConvolverInternal(engineHandle)
     }
@@ -949,8 +1202,9 @@ object JamesDspController {
 
     @Synchronized
     fun setLiveprogScript(scriptId: Int) {
-        liveprogScriptId = scriptId.coerceIn(0, builtInEelScripts.lastIndex)
-        val scriptDef = builtInEelScripts[liveprogScriptId]
+        val allScripts = getAllEelScripts()
+        val scriptDef = allScripts.find { it.id == scriptId } ?: builtInEelScripts.first()
+        liveprogScriptId = scriptDef.id
         val newParams = FloatArray(8) { idx ->
             scriptDef.parameters.getOrNull(idx)?.defaultVal ?: 0f
         }
@@ -972,23 +1226,7 @@ object JamesDspController {
     }
 
     fun loadImpulseFromUri(context: Context, uri: Uri, displayName: String?): Boolean {
-        return try {
-            val bytes = context.contentResolver.openInputStream(uri)?.use(InputStream::readBytes) ?: return false
-            val parsed = parseWavBytes(bytes) ?: return false
-            synchronized(this) {
-                customImpulseSamples = parsed.first
-                customImpulseChannels = parsed.second
-                customImpulseFrames = parsed.third
-                customImpulseName = displayName ?: uri.lastPathSegment ?: "Custom IR.wav"
-                isConvolverEnabled = true
-                PrefsManager.saveConvolverEnabled(true)
-                recalculateHeadroomAndSyncEq()
-                syncConvolverInternal(engineHandle)
-            }
-            true
-        } catch (_: Exception) {
-            false
-        }
+        return importUserImpulse(context, uri) != null
     }
 
     private fun parseWavBytes(bytes: ByteArray): Triple<FloatArray, Int, Int>? {
@@ -1055,6 +1293,7 @@ object JamesDspController {
         limThresholdDb = threshold.coerceIn(-24f, -0.05f)
         limReleaseMs = release.coerceIn(5f, 500f)
         postGainDb = postgain.coerceIn(-15f, 15f)
+        updateActiveEffectsMask()
         if (engineHandle != 0L) {
             nativeSetLimiter(engineHandle, limThresholdDb, limReleaseMs, postGainDb)
         }

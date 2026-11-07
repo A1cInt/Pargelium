@@ -214,15 +214,6 @@
     <string name="crossfeed_desc">Смешивает каналы для естественного звучания</string>
     <string name="select_headphone_model">Выберите модель наушников</string>
 
-    <string-array name="reverb_modes">
-        <item>Своя</item>
-        <item>Студия</item>
-        <item>Комната</item>
-        <item>Зал</item>
-        <item>Собор</item>
-        <item>Бездна</item>
-    </string-array>
-
     <string name="theme_pargelia">Паргелия</string>
     <string name="settings_integration">Интеграция</string>
     <string name="integration_auto_detect">Распознавать наушники</string>
@@ -323,13 +314,6 @@
     <string name="bs2b_title">BS2B Crossfeed</string>
     <string name="bs2b_desc">Бинауральный кроссфид для снятия усталости от наушников</string>
 
-    <!-- Массивы пресетов BS2B -->
-    <string-array name="bs2b_modes">
-        <item>Default (700 Hz, 4.5 dB)</item>
-        <item>Moy (650 Hz, 9.5 dB)</item>
-        <item>Chu (700 Hz, 6.0 dB)</item>
-    </string-array>
-
     <string name="settings_design">Дизайн</string>
 
     <string name="settings_nav_style">Стиль панели навигации</string>
@@ -429,4 +413,88 @@
     <string name="artist_role_logo">Логотип</string>
     <string name="artist_role_gallery">Галерея</string>
     <string name="stream_server_unavailable_msg">Стриминг: Сервер недоступен</string>
+
+    <string name="dsp_status_active_fmt">JamesDSP • %1$d/11 ВКЛ</string>
+    <string name="dsp_status_bypass">ОБХОД</string>
+    <string name="dsp_stream_format_pcm_fmt">Поток: %1$d-бит PCM • %2$d Гц</string>
+    <string name="dsp_stream_format_float_fmt">Поток: %1$d-бит Float • %2$d Гц</string>
+    <string name="dsp_telemetry_auto_preamp_fmt">Авто-преамп: %1$.1f дБ • Пик: %2$.1f dBFS</string>
+    <string name="dsp_telemetry_manual_preamp_fmt">Преамп: 0.0 дБ (Ручной) • Пик: %1$.1f dBFS</string>
+    <string name="dsp_anti_clip_label">Анти-клип</string>
+    <string name="dsp_save_profile_btn">Сохранить профиль DSP</string>
+    <string name="dsp_save_profile_title">Сохранить профиль JamesDSP</string>
+    <string name="dsp_save_profile_hint">Название профиля (напр., AirPods Pro Bass)</string>
+    <string name="dsp_profile_default_prefix">Пресет</string>
+    <string name="dsp_action_save">Сохранить</string>
+    <string name="dsp_custom_graphiceq_active">Активна своя кривая GraphicEQ</string>
+    <string name="dsp_badge_arbitrary_fir">Arbitrary FIR</string>
+    <string name="dsp_graphiceq_btn">GraphicEQ</string>
+    <string name="dsp_graphiceq_hint">GraphicEQ: 20 0.0; 63 3.5; 1000 -1.2…</string>
+    <string name="dsp_multimodal_15band_title">15-полосный эквалайзер JamesDSP</string>
+    <string name="dsp_badge_15_iso">15 полос ISO</string>
+    <string name="dsp_badge_10_band">10 полос</string>
+    <string name="dsp_spline_pchip">Сплайн: PCHIP</string>
+    <string name="dsp_spline_makima">Сплайн: Makima</string>
+    <string name="dsp_eq_filter_fir_min">FIR Мин. фаза</string>
+    <string name="dsp_eq_filter_fir_lin">FIR Лин. фаза</string>
+    <string name="dsp_eq_filter_iir_4">IIR 4-й порядок</string>
+    <string name="dsp_eq_filter_iir_6">IIR 6-й порядок</string>
+    <string name="dsp_eq_filter_iir_8">IIR 8-й порядок</string>
+    <string name="dsp_eq_filter_iir_10">IIR 10-й порядок</string>
+    <string name="dsp_eq_filter_iir_12">IIR 12-й порядок</string>
+    <string name="dsp_compander_section_title">Динамический компандер</string>
+    <string name="dsp_compander_card_title">Многополосный компандер (7 полос)</string>
+    <string name="dsp_compander_card_desc">Частотно-временная компрессия и вытягивание микродеталей</string>
+    <string name="dsp_compander_time_constant">Постоянная времени (релиз)</string>
+    <string name="dsp_compander_granularity">Детализация (Granularity)</string>
+    <string name="dsp_compander_tf_uniform">Равномерное</string>
+    <string name="dsp_compander_tf_low_lat">Мин. задержка</string>
+    <string name="dsp_compander_tf_high_res">Высокое разр.</string>
+    <string name="dsp_compander_tf_extreme">Максимум</string>
+    <string name="dsp_liveprog_section_title">Программируемый DSP (EEL2 Liveprog)</string>
+    <string name="dsp_liveprog_card_title">Движок скриптов Liveprog (.eel)</string>
+    <string name="dsp_import_eel_btn">Импорт .eel</string>
+    <string name="dsp_eel_editor_btn">Редактор EEL2</string>
+    <string name="dsp_hide_code_btn">Скрыть код</string>
+    <string name="dsp_eel_editor_hint">Скрипт EEL2 (@init / @sample)</string>
+    <string name="dsp_ddc_convolver_section_title">Конвольвер и ViPER-DDC</string>
+    <string name="dsp_ddc_card_title">ViPER-DDC (IIR каскад)</string>
+    <string name="dsp_ddc_card_desc">Точная коррекция АЧХ наушников</string>
+    <string name="dsp_badge_sos_iir">SOS IIR</string>
+    <string name="dsp_import_vdc_btn">Импортировать файл .vdc</string>
+    <string name="dsp_convolver_card_title">Конвольвер (FFT-свертка импульсов)</string>
+    <string name="dsp_convolver_card_desc">Свертка импульсного отклика</string>
+    <string name="dsp_convolver_wet_mix">Уровень эффекта (Wet Mix)</string>
+    <string name="dsp_convolver_predelay">Предзадержка (Pre-Delay)</string>
+    <string name="dsp_convolver_tail_trim">Длина хвоста импульса (Trim)</string>
+    <string name="dsp_convolver_invert_phase">Инверсия фазы импульса (180°)</string>
+    <string name="dsp_import_ir_btn">Импортировать импульс .wav / .irs</string>
+    <string name="dsp_toast_vdc_loaded">ViPER-DDC загружен: %1$s</string>
+    <string name="dsp_toast_eel_loaded">EEL2 скрипт загружен: %1$s</string>
+    <string name="dsp_toast_ir_loaded">Импульс загружен: %1$s</string>
+    <string name="dsp_toast_ir_invalid">Неподдерживаемый формат (нужен 16/24/32-бит WAV)</string>
+
+    <string-array name="reverb_modes">
+        <item>Малый зал</item>
+        <item>Средний зал</item>
+        <item>Большой зал</item>
+        <item>Малая комната</item>
+        <item>Средняя комната</item>
+        <item>Большая комната</item>
+        <item>Ранние отражения 1</item>
+        <item>Ранние отражения 2</item>
+        <item>Пластина ВЧ</item>
+        <item>Пластина НЧ</item>
+        <item>Длинный реверб 1</item>
+        <item>Длинный реверб 2</item>
+    </string-array>
+
+    <string-array name="bs2b_modes">
+        <item>BS2B Chu Moy (700Гц / 4.5дБ)</item>
+        <item>BS2B Jan Meier (650Гц / 9.5дБ)</item>
+        <item>BS2B Стандарт (700Гц / 6.0дБ)</item>
+        <item>HRTF Кроссфид Слабый</item>
+        <item>HRTF Кроссфид Средний</item>
+        <item>HRTF Кроссфид Сильный</item>
+    </string-array>
 </resources>
