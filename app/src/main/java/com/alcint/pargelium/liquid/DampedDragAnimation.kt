@@ -3,6 +3,9 @@ package com.alcint.pargelium.liquid
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MutatorMutex
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -15,7 +18,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import com.alcint.pargelium.liquid.inspectDragGestures
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -35,8 +37,6 @@ class DampedDragAnimation(
 
     private val valueAnimationSpec =
         spring(1f, 1000f, visibilityThreshold)
-    private val velocityAnimationSpec =
-        spring(0.5f, 300f, visibilityThreshold * 10f)
     private val pressProgressAnimationSpec =
         spring(1f, 1000f, 0.001f)
     private val scaleXAnimationSpec =
@@ -46,8 +46,6 @@ class DampedDragAnimation(
 
     private val valueAnimation =
         Animatable(initialValue, visibilityThreshold)
-    private val velocityAnimation =
-        Animatable(0f, 5f)
     private val pressProgressAnimation =
         Animatable(0f, 0.001f)
     private val scaleXAnimation =
@@ -59,6 +57,7 @@ class DampedDragAnimation(
 
     private var pressJob: Job? = null
     private var releaseJob: Job? = null
+    private var valueJob: Job? = null
 
     private val velocityTracker = VelocityTracker()
     private val startMark = TimeSource.Monotonic.markNow()
@@ -68,7 +67,10 @@ class DampedDragAnimation(
     val pressProgress: Float get() = pressProgressAnimation.value
     val scaleX: Float get() = scaleXAnimation.value
     val scaleY: Float get() = scaleYAnimation.value
-    val velocity: Float get() = velocityAnimation.value
+
+    // Легковесное состояние скорости без запуска корутин на каждом кадре
+    var velocity: Float by mutableFloatStateOf(0f)
+        private set
 
     val modifier: Modifier = Modifier.pointerInput(Unit) {
         inspectDragGestures(
@@ -116,6 +118,7 @@ class DampedDragAnimation(
                 val threshold = (valueRange.endInclusive - valueRange.start) * 0.025f
                 snapshotFlow { valueAnimation.value }.first { abs(it - valueAnimation.targetValue) < threshold }
             }
+            velocity = 0f
             launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
             launch { scaleXAnimation.animateTo(initialScale, scaleXAnimationSpec) }
             launch { scaleYAnimation.animateTo(initialScale, scaleYAnimationSpec) }
@@ -123,9 +126,11 @@ class DampedDragAnimation(
     }
 
     fun updateValue(value: Float) {
-        val targetValue = value.coerceIn(valueRange)
-        animationScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            valueAnimation.animateTo(targetValue, valueAnimationSpec) { updateVelocity() }
+        val clamped = value.coerceIn(valueRange)
+        valueJob?.cancel()
+        valueJob = animationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            valueAnimation.animateTo(clamped, valueAnimationSpec) { updateVelocity() }
+            velocity = 0f
         }
     }
 
@@ -133,11 +138,14 @@ class DampedDragAnimation(
         animationScope.launch {
             mutatorMutex.mutate {
                 press()
-                val targetValue = value.coerceIn(valueRange)
-                launch { valueAnimation.animateTo(targetValue, valueAnimationSpec) }
-                if (velocity != 0f) {
-                    launch { velocityAnimation.animateTo(0f, velocityAnimationSpec) }
+                val clamped = value.coerceIn(valueRange)
+                valueJob?.cancel()
+                val job = launch {
+                    valueAnimation.animateTo(clamped, valueAnimationSpec) { updateVelocity() }
                 }
+                valueJob = job
+                job.join()
+                velocity = 0f
                 release()
             }
         }
@@ -149,9 +157,6 @@ class DampedDragAnimation(
             Offset(value, 0f),
         )
         val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1e-6f)
-        val targetVelocity = velocityTracker.calculateVelocity().x / span
-        animationScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            velocityAnimation.snapTo(targetVelocity)
-        }
+        velocity = velocityTracker.calculateVelocity().x / span
     }
 }

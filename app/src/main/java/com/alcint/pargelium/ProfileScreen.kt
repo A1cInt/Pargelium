@@ -1,14 +1,21 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
 package com.alcint.pargelium
 
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,14 +32,19 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.rounded.AutoGraph
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -40,12 +52,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +76,16 @@ private data class TopArtistUiModel(
     val coverModel: Any?
 )
 
+@Immutable
+private data class ProfileStatsSnapshot(
+    val filteredPlaysCount: Int = 0,
+    val listenedMinutes: Long = 0L,
+    val topArtistName: String = "",
+    val topArtists: List<TopArtistUiModel> = emptyList(),
+    val topTracks: List<Pair<AudioTrack, Int>> = emptyList(),
+    val timeBuckets: List<Int> = listOf(0, 0, 0, 0)
+)
+
 @Composable
 fun ProfileScreen(
     allTracks: List<AudioTrack>,
@@ -71,6 +94,9 @@ fun ProfileScreen(
     onArtistClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val motionScheme = MaterialTheme.motionScheme
+
     val accentColor = if (seedColor != Color.Unspecified && seedColor != Color.Transparent) {
         seedColor
     } else {
@@ -84,6 +110,7 @@ fun ProfileScreen(
     var isEditingName by remember { mutableStateOf(false) }
     var nameInput by remember { mutableStateOf(userName) }
     var showRanksSheet by remember { mutableStateOf(false) }
+    var selectedPeriodDays by rememberSaveable { mutableIntStateOf(-1) } // -1: All time, 30: 30d, 7: 7d
 
     val listState = rememberLazyListState()
 
@@ -108,38 +135,44 @@ fun ProfileScreen(
     }
 
     val allEvents = remember { PrefsManager.getPlayEvents() }
-    val totalPlays = allEvents.size
+    val allTimeTotalPlays = allEvents.size
     val unknownArtistStr = stringResource(id = R.string.unknown_artist)
 
-    var topTracksDetails by remember { mutableStateOf<List<Pair<AudioTrack, Int>>>(emptyList()) }
-    var topArtistsUi by remember { mutableStateOf<List<TopArtistUiModel>>(emptyList()) }
-    var topArtistName by remember { mutableStateOf(unknownArtistStr) }
-    var totalListenedMinutes by remember { mutableLongStateOf(0L) }
-    var timeOfDayBuckets by remember { mutableStateOf(intArrayOf(0, 0, 0, 0)) } // Утро, День, Вечер, Ночь
+    var statsSnapshot by remember {
+        mutableStateOf(ProfileStatsSnapshot(topArtistName = unknownArtistStr))
+    }
 
-    // Быстрый O(1) расчет статистики в фоновом потоке без блокировки UI
-    LaunchedEffect(allEvents, allTracks) {
-        withContext(Dispatchers.Default) {
-            val tracksById = allTracks.associateBy { it.id }
+    LaunchedEffect(allEvents, allTracks, selectedPeriodDays, unknownArtistStr) {
+        val computed = withContext(Dispatchers.Default) {
+            val cutoffMs = if (selectedPeriodDays <= 0) {
+                0L
+            } else {
+                System.currentTimeMillis() - (selectedPeriodDays * 86_400_000L)
+            }
+
+            val tracksById = HashMap<Long, AudioTrack>(allTracks.size)
+            for (t in allTracks) tracksById[t.id] = t
 
             val trackPlays = HashMap<Long, Int>()
             val artistPlays = HashMap<String, Int>()
             val artistFallbackAlbumId = HashMap<String, Long>()
             var listenedMs = 0L
+            var periodCount = 0
             val buckets = IntArray(4)
             val calendar = Calendar.getInstance()
 
             for (event in allEvents) {
+                if (event.timestamp < cutoffMs) continue
+                periodCount++
                 trackPlays[event.trackId] = (trackPlays[event.trackId] ?: 0) + 1
 
                 if (event.timestamp > 0L) {
                     calendar.timeInMillis = event.timestamp
-                    val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                    when (hour) {
-                        in 6..11 -> buckets[0]++   // Утро
-                        in 12..17 -> buckets[1]++  // День
-                        in 18..23 -> buckets[2]++  // Вечер
-                        else -> buckets[3]++       // Ночь
+                    when (calendar.get(Calendar.HOUR_OF_DAY)) {
+                        in 6..11 -> buckets[0]++
+                        in 12..17 -> buckets[1]++
+                        in 18..23 -> buckets[2]++
+                        else -> buckets[3]++
                     }
                 }
 
@@ -178,12 +211,16 @@ fun ProfileScreen(
                     )
                 }
 
-            topTracksDetails = resolvedTopTracks
-            topArtistsUi = resolvedTopArtists
-            topArtistName = resolvedTopArtists.firstOrNull()?.name ?: unknownArtistStr
-            totalListenedMinutes = (listenedMs / 60000L).coerceAtLeast(totalPlays * 3L)
-            timeOfDayBuckets = buckets
+            ProfileStatsSnapshot(
+                filteredPlaysCount = periodCount,
+                listenedMinutes = (listenedMs / 60000L).coerceAtLeast(periodCount * 3L),
+                topArtistName = resolvedTopArtists.firstOrNull()?.name ?: unknownArtistStr,
+                topArtists = resolvedTopArtists,
+                topTracks = resolvedTopTracks,
+                timeBuckets = buckets.toList()
+            )
         }
+        statsSnapshot = computed
     }
 
     val ranksList = listOf(
@@ -193,8 +230,28 @@ fun ProfileScreen(
         200 to stringResource(id = R.string.rank_audiophile),
         1000 to stringResource(id = R.string.rank_music_maniac)
     )
-    val userRank = ranksList.lastOrNull { totalPlays >= it.first }?.second ?: ""
-    val nextRank = ranksList.firstOrNull { totalPlays < it.first }
+    val userRank = ranksList.lastOrNull { allTimeTotalPlays >= it.first }?.second ?: ""
+    val nextRank = ranksList.firstOrNull { allTimeTotalPlays < it.first }
+
+    val bannerImageRequest = remember(context, bannerUri) {
+        bannerUri?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(1080)
+                .crossfade(true)
+                .build()
+        }
+    }
+
+    val avatarImageRequest = remember(context, avatarUri) {
+        avatarUri?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(360)
+                .crossfade(true)
+                .build()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -206,26 +263,20 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 240.dp)
         ) {
-            item(key = "profile_banner") {
+            item(key = "profile_banner", contentType = "banner") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(270.dp)
+                        .height(264.dp)
                         .graphicsLayer {
                             if (listState.firstVisibleItemIndex == 0) {
-                                translationY = listState.firstVisibleItemScrollOffset * 0.38f
+                                translationY = listState.firstVisibleItemScrollOffset * 0.36f
                             }
                         }
                 ) {
-                    if (bannerUri != null) {
+                    if (bannerImageRequest != null) {
                         AsyncImage(
-                            model = remember(bannerUri) {
-                                ImageRequest.Builder(context)
-                                    .data(bannerUri)
-                                    .size(1080)
-                                    .crossfade(true)
-                                    .build()
-                            },
+                            model = bannerImageRequest,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -241,7 +292,8 @@ fun ProfileScreen(
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
-                                            accentColor.copy(alpha = 0.45f),
+                                            accentColor.copy(alpha = 0.52f),
+                                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
                                             MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     )
@@ -265,7 +317,7 @@ fun ProfileScreen(
                             .fillMaxSize()
                             .background(
                                 Brush.verticalGradient(
-                                    0.0f to Color.Black.copy(alpha = 0.32f),
+                                    0.0f to Color.Black.copy(alpha = 0.30f),
                                     0.5f to Color.Transparent,
                                     1.0f to MaterialTheme.colorScheme.background
                                 )
@@ -274,35 +326,47 @@ fun ProfileScreen(
                 }
             }
 
-            item(key = "profile_identity") {
+            item(key = "profile_identity", contentType = "identity") {
+                val avatarInteraction = remember { MutableInteractionSource() }
+                val isAvatarPressed by avatarInteraction.collectIsPressedAsState()
+                val avatarCornerPercent by animateDpAsState(
+                    targetValue = if (isAvatarPressed) 32.dp else 58.dp,
+                    animationSpec = motionScheme.fastSpatialSpec(),
+                    label = "avatarMorph"
+                )
+                val avatarScale by animateFloatAsState(
+                    targetValue = if (isAvatarPressed) 0.93f else 1f,
+                    animationSpec = motionScheme.fastSpatialSpec(),
+                    label = "avatarScale"
+                )
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = (-48).dp)
+                        .offset(y = (-52).dp)
                         .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(112.dp)
-                            .shadow(16.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(3.dp, MaterialTheme.colorScheme.background, CircleShape)
-                            .clickable {
+                            .size(116.dp)
+                            .scale(avatarScale)
+                            .shadow(18.dp, RoundedCornerShape(avatarCornerPercent), spotColor = accentColor)
+                            .clip(RoundedCornerShape(avatarCornerPercent))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .border(3.dp, MaterialTheme.colorScheme.background, RoundedCornerShape(avatarCornerPercent))
+                            .clickable(
+                                interactionSource = avatarInteraction,
+                                indication = null
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (avatarUri != null) {
+                        if (avatarImageRequest != null) {
                             AsyncImage(
-                                model = remember(avatarUri) {
-                                    ImageRequest.Builder(context)
-                                        .data(avatarUri)
-                                        .size(360)
-                                        .crossfade(true)
-                                        .build()
-                                },
+                                model = avatarImageRequest,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
@@ -312,7 +376,7 @@ fun ProfileScreen(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
                                 modifier = Modifier.size(56.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = accentColor
                             )
                         }
                     }
@@ -324,13 +388,14 @@ fun ProfileScreen(
                             value = nameInput,
                             onValueChange = { nameInput = it },
                             singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth(0.8f),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.fillMaxWidth(0.82f),
                             trailingIcon = {
                                 IconButton(
                                     onClick = {
-                                        PrefsManager.saveUserName(nameInput)
-                                        userName = nameInput
+                                        val clean = nameInput.trim().ifEmpty { userName }
+                                        PrefsManager.saveUserName(clean)
+                                        userName = clean
                                         isEditingName = false
                                     }
                                 ) {
@@ -343,9 +408,9 @@ fun ProfileScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(16.dp))
                                 .clickable { isEditingName = true }
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = userName,
@@ -365,41 +430,78 @@ fun ProfileScreen(
                         }
                     }
 
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
+
+                    // Экспрессивная капсула ранга с индикатором прогресса до следующего звания
+                    val rankInteraction = remember { MutableInteractionSource() }
+                    val isRankPressed by rankInteraction.collectIsPressedAsState()
+                    val rankCorner by animateDpAsState(
+                        targetValue = if (isRankPressed) 14.dp else 26.dp,
+                        animationSpec = motionScheme.fastSpatialSpec(),
+                        label = "rankCorner"
+                    )
 
                     Surface(
-                        onClick = { showRanksSheet = true },
-                        shape = RoundedCornerShape(50),
-                        color = accentColor.copy(alpha = 0.16f)
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showRanksSheet = true
+                        },
+                        interactionSource = rankInteraction,
+                        shape = RoundedCornerShape(rankCorner),
+                        color = accentColor.copy(alpha = 0.16f),
+                        modifier = Modifier.border(
+                            width = 1.dp,
+                            color = accentColor.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(rankCorner)
+                        )
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.WorkspacePremium,
                                 contentDescription = null,
                                 tint = accentColor,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(Modifier.width(6.dp))
                             Text(
                                 text = userRank,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = accentColor,
                                 fontWeight = FontWeight.ExtraBold
                             )
+                            if (nextRank != null) {
+                                Text(
+                                    text = "• $allTimeTotalPlays / ${nextRank.first}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Морфинг-селектор периода статистики (All Time / 30 Days / 7 Days)
+                    ProfilePeriodSelector(
+                        selectedPeriodDays = selectedPeriodDays,
+                        accentColor = accentColor,
+                        onSelectPeriod = { days ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedPeriodDays = days
+                        }
+                    )
                 }
             }
 
-            // Bento-сетка статистики профиля
-            item(key = "profile_bento_stats") {
+            item(key = "profile_bento_stats", contentType = "bento_stats") {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = (-24).dp)
+                        .offset(y = (-28).dp)
                         .padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -408,15 +510,28 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(22.dp),
+                            shape = RoundedCornerShape(26.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.height(8.dp))
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(accentColor.copy(alpha = 0.16f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.GraphicEq,
+                                        contentDescription = null,
+                                        tint = accentColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(Modifier.height(10.dp))
                                 Text(
-                                    text = totalPlays.toString(),
+                                    text = statsSnapshot.filteredPlaysCount.toString(),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.ExtraBold
                                 )
@@ -429,24 +544,41 @@ fun ProfileScreen(
                         }
 
                         Surface(
-                            shape = RoundedCornerShape(22.dp),
+                            shape = RoundedCornerShape(26.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
                             modifier = Modifier.weight(1f)
                         ) {
-                            val hours = totalListenedMinutes / 60L
-                            val mins = totalListenedMinutes % 60L
-                            val timeText = if (hours > 0L) "${hours}h ${mins}m" else "${mins}m"
+                            val hours = (statsSnapshot.listenedMinutes / 60L).toInt()
+                            val mins = (statsSnapshot.listenedMinutes % 60L).toInt()
+                            val timeText = if (hours > 0) {
+                                stringResource(id = R.string.duration_hours_mins_fmt, hours, mins)
+                            } else {
+                                stringResource(id = R.string.duration_mins_fmt, mins)
+                            }
 
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Icon(Icons.Rounded.Schedule, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.height(8.dp))
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(accentColor.copy(alpha = 0.16f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Schedule,
+                                        contentDescription = null,
+                                        tint = accentColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(Modifier.height(10.dp))
                                 Text(
                                     text = timeText,
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = "Время в музыке",
+                                    text = stringResource(id = R.string.profile_listening_time_label),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -454,14 +586,23 @@ fun ProfileScreen(
                         }
                     }
 
+                    val favArtistInteraction = remember { MutableInteractionSource() }
+                    val isFavPressed by favArtistInteraction.collectIsPressedAsState()
+                    val favCorner by animateDpAsState(
+                        targetValue = if (isFavPressed) 18.dp else 26.dp,
+                        animationSpec = motionScheme.fastSpatialSpec(),
+                        label = "favArtistCorner"
+                    )
+
                     Surface(
-                        onClick = { onArtistClick(topArtistName) },
-                        shape = RoundedCornerShape(22.dp),
+                        onClick = { onArtistClick(statsSnapshot.topArtistName) },
+                        interactionSource = favArtistInteraction,
+                        shape = RoundedCornerShape(favCorner),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(18.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -470,32 +611,36 @@ fun ProfileScreen(
                                     text = stringResource(id = R.string.favorite_artist_label),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = accentColor,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.ExtraBold
                                 )
-                                Spacer(Modifier.height(2.dp))
+                                Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = topArtistName,
+                                    text = statsSnapshot.topArtistName,
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Icon(
+                                imageVector = Icons.Rounded.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
-                    // Хронотип активности слушателя по времени суток
-                    if (timeOfDayBuckets.sum() > 0) {
+                    if (statsSnapshot.timeBuckets.sum() > 0) {
                         ListeningChronotypeCard(
-                            buckets = timeOfDayBuckets,
+                            buckets = statsSnapshot.timeBuckets,
                             accentColor = accentColor
                         )
                     }
                 }
             }
 
-            if (topArtistsUi.isNotEmpty()) {
-                item(key = "top_artists_section") {
+            if (statsSnapshot.topArtists.isNotEmpty()) {
+                item(key = "top_artists_section", contentType = "top_artists") {
                     Text(
                         text = stringResource(id = R.string.top_10_artists),
                         style = MaterialTheme.typography.titleLarge,
@@ -508,25 +653,41 @@ fun ProfileScreen(
                         contentPadding = PaddingValues(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        items(
-                            items = topArtistsUi,
-                            key = { it.name },
-                            contentType = { "top_artist_chip" }
-                        ) { artistItem ->
+                        itemsIndexed(
+                            items = statsSnapshot.topArtists,
+                            key = { _, item -> item.name },
+                            contentType = { _, _ -> "top_artist_chip" }
+                        ) { index, artistItem ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isPressed by interactionSource.collectIsPressedAsState()
+                            val shapeRadius by animateDpAsState(
+                                targetValue = if (isPressed || index == 0) 28.dp else 46.dp,
+                                animationSpec = motionScheme.fastSpatialSpec(),
+                                label = "artistAvatarShape"
+                            )
+
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .width(104.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .clickable { onArtistClick(artistItem.name) }
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) { onArtistClick(artistItem.name) }
                                     .padding(4.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(92.dp)
-                                        .shadow(6.dp, CircleShape)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        .shadow(6.dp, RoundedCornerShape(shapeRadius))
+                                        .clip(RoundedCornerShape(shapeRadius))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(
+                                            width = if (index == 0) 2.dp else 0.dp,
+                                            color = if (index == 0) accentColor else Color.Transparent,
+                                            shape = RoundedCornerShape(shapeRadius)
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     if (artistItem.coverModel != null) {
@@ -534,7 +695,7 @@ fun ProfileScreen(
                                             model = remember(artistItem.coverModel) {
                                                 ImageRequest.Builder(context)
                                                     .data(artistItem.coverModel)
-                                                    .size(256)
+                                                    .size(240)
                                                     .crossfade(true)
                                                     .build()
                                             },
@@ -576,8 +737,8 @@ fun ProfileScreen(
                 }
             }
 
-            if (topTracksDetails.isNotEmpty()) {
-                item(key = "music_dna_header") {
+            if (statsSnapshot.topTracks.isNotEmpty()) {
+                item(key = "music_dna_header", contentType = "dna_header") {
                     Text(
                         text = stringResource(id = R.string.your_music_dna),
                         style = MaterialTheme.typography.titleLarge,
@@ -587,20 +748,20 @@ fun ProfileScreen(
                     )
                 }
 
-                val maxPlays = topTracksDetails.firstOrNull()?.second?.coerceAtLeast(1) ?: 1
+                val maxPlays = statsSnapshot.topTracks.firstOrNull()?.second?.coerceAtLeast(1) ?: 1
 
                 itemsIndexed(
-                    items = topTracksDetails,
+                    items = statsSnapshot.topTracks,
                     key = { _, pair -> pair.first.id },
                     contentType = { _, _ -> "dna_track_item" }
                 ) { index, (track, plays) ->
                     val artUri = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) }
-                    val ratio = (plays.toFloat() / maxPlays).coerceIn(0.1f, 1f)
+                    val ratio = (plays.toFloat() / maxPlays).coerceIn(0.08f, 1f)
 
                     Surface(
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = if (index < 3) {
-                            accentColor.copy(alpha = 0.08f)
+                            accentColor.copy(alpha = 0.09f)
                         } else {
                             Color.Transparent
                         },
@@ -625,7 +786,7 @@ fun ProfileScreen(
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(14.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 AsyncImage(
@@ -633,7 +794,7 @@ fun ProfileScreen(
                                         ImageRequest.Builder(context)
                                             .data(artUri)
                                             .size(144)
-                                            .crossfade(true)
+                                            .crossfade(false)
                                             .build()
                                     },
                                     contentDescription = null,
@@ -661,13 +822,23 @@ fun ProfileScreen(
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.clickable { onArtistClick(track.artist) }
                                 )
-                                Spacer(Modifier.height(4.dp))
-                                Box(
+                                Spacer(Modifier.height(5.dp))
+                                Spacer(
                                     modifier = Modifier
-                                        .fillMaxWidth(ratio * 0.85f)
+                                        .fillMaxWidth()
                                         .height(3.dp)
-                                        .clip(CircleShape)
-                                        .background(accentColor.copy(alpha = 0.55f))
+                                        .drawWithCache {
+                                            val barColor = accentColor.copy(alpha = 0.65f)
+                                            val corner = CornerRadius(size.height / 2f, size.height / 2f)
+                                            val barWidth = (size.width * ratio * 0.88f).coerceAtLeast(size.height)
+                                            onDrawBehind {
+                                                drawRoundRect(
+                                                    color = barColor,
+                                                    size = Size(barWidth, size.height),
+                                                    cornerRadius = corner
+                                                )
+                                            }
+                                        }
                                 )
                             }
 
@@ -693,15 +864,19 @@ fun ProfileScreen(
 
         FilledTonalIconButton(
             onClick = onBack,
+            shapes = IconButtonDefaults.shapes(),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
             ),
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(start = 12.dp, top = 8.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(id = R.string.action_back)
+            )
         }
     }
 
@@ -719,7 +894,7 @@ fun ProfileScreen(
                 )
 
                 if (nextRank != null) {
-                    val progress = (totalPlays.toFloat() / nextRank.first.toFloat()).coerceIn(0f, 1f)
+                    val progress = (allTimeTotalPlays.toFloat() / nextRank.first.toFloat()).coerceIn(0f, 1f)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -729,7 +904,7 @@ fun ProfileScreen(
                             text = stringResource(
                                 id = R.string.tracks_left_for_rank_fmt,
                                 nextRank.second,
-                                nextRank.first - totalPlays
+                                nextRank.first - allTimeTotalPlays
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -759,7 +934,7 @@ fun ProfileScreen(
 
                 LazyColumn {
                     items(ranksList, key = { it.first }) { rank ->
-                        val isAchieved = totalPlays >= rank.first
+                        val isAchieved = allTimeTotalPlays >= rank.first
                         ListItem(
                             headlineContent = {
                                 Text(
@@ -795,30 +970,99 @@ fun ProfileScreen(
     }
 }
 
-/**
- * Уникальная карточка хронотипа слушателя (Утро / День / Вечер / Ночь)
- */
 @Composable
-private fun ListeningChronotypeCard(
-    buckets: IntArray,
-    accentColor: Color
+private fun ProfilePeriodSelector(
+    selectedPeriodDays: Int,
+    accentColor: Color,
+    onSelectPeriod: (Int) -> Unit
 ) {
-    val labels = listOf("Утро", "День", "Вечер", "Ночь")
-    val maxIdx = buckets.indices.maxByOrNull { buckets[it] } ?: 2
-    val chronotypeTitle = when (maxIdx) {
-        0 -> "Утренний Энерджайзер"
-        1 -> "Дневной Ритм"
-        2 -> "Вечерний Меломан"
-        else -> "Ночной Аудиофил"
-    }
-    val maxVal = (buckets.maxOrNull() ?: 1).coerceAtLeast(1)
+    val motionScheme = MaterialTheme.motionScheme
+    val periods = listOf(
+        -1 to stringResource(id = R.string.profile_period_all_time),
+        30 to stringResource(id = R.string.profile_period_30_days),
+        7 to stringResource(id = R.string.profile_period_7_days)
+    )
 
     Surface(
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            periods.forEach { (days, label) ->
+                val isSelected = selectedPeriodDays == days
+                val weight by animateFloatAsState(
+                    targetValue = if (isSelected) 1.25f else 0.9f,
+                    animationSpec = motionScheme.defaultSpatialSpec(),
+                    label = "periodWeight"
+                )
+                val corner by animateDpAsState(
+                    targetValue = if (isSelected) 18.dp else 12.dp,
+                    animationSpec = motionScheme.fastSpatialSpec(),
+                    label = "periodCorner"
+                )
+                val bgColor by animateColorAsState(
+                    targetValue = if (isSelected) accentColor.copy(alpha = 0.20f) else Color.Transparent,
+                    animationSpec = motionScheme.fastEffectsSpec(),
+                    label = "periodBg"
+                )
+
+                Surface(
+                    onClick = { onSelectPeriod(days) },
+                    shape = RoundedCornerShape(corner),
+                    color = bgColor,
+                    modifier = Modifier.weight(weight)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                            color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ListeningChronotypeCard(
+    buckets: List<Int>,
+    accentColor: Color
+) {
+    val labels = listOf(
+        stringResource(id = R.string.chronotype_morning),
+        stringResource(id = R.string.chronotype_afternoon),
+        stringResource(id = R.string.chronotype_evening),
+        stringResource(id = R.string.chronotype_night)
+    )
+    val maxIdx = buckets.indices.maxByOrNull { buckets[it] } ?: 2
+    val chronotypeTitle = when (maxIdx) {
+        0 -> stringResource(id = R.string.chronotype_title_morning)
+        1 -> stringResource(id = R.string.chronotype_title_afternoon)
+        2 -> stringResource(id = R.string.chronotype_title_evening)
+        else -> stringResource(id = R.string.chronotype_title_night)
+    }
+    val maxVal = (buckets.maxOrNull() ?: 1).coerceAtLeast(1)
+
+    Surface(
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -826,7 +1070,7 @@ private fun ListeningChronotypeCard(
             ) {
                 Column {
                     Text(
-                        text = "Биоритм прослушиваний",
+                        text = stringResource(id = R.string.profile_chronotype_subtitle),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -837,9 +1081,14 @@ private fun ListeningChronotypeCard(
                         color = accentColor
                     )
                 }
+                Icon(
+                    imageVector = Icons.Rounded.AutoGraph,
+                    contentDescription = null,
+                    tint = accentColor
+                )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -847,31 +1096,39 @@ private fun ListeningChronotypeCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 for (i in 0..3) {
-                    val fraction = (buckets[i].toFloat() / maxVal).coerceIn(0.12f, 1f)
+                    val count = buckets.getOrElse(i) { 0 }
+                    val fraction = (count.toFloat() / maxVal).coerceIn(0.14f, 1f)
                     val isPeak = i == maxIdx
+                    val barColor = if (isPeak) accentColor else accentColor.copy(alpha = 0.26f)
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Canvas(
+                        Spacer(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(42.dp)
-                        ) {
-                            val barH = size.height * fraction
-                            drawRoundRect(
-                                color = if (isPeak) accentColor else accentColor.copy(alpha = 0.28f),
-                                topLeft = Offset(0f, size.height - barH),
-                                size = Size(size.width, barH),
-                                cornerRadius = CornerRadius(6.dp.toPx())
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
+                                .height(46.dp)
+                                .drawWithCache {
+                                    val barH = size.height * fraction
+                                    val radius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
+                                    onDrawBehind {
+                                        drawRoundRect(
+                                            color = barColor,
+                                            topLeft = Offset(0f, size.height - barH),
+                                            size = Size(size.width, barH),
+                                            cornerRadius = radius
+                                        )
+                                    }
+                                }
+                        )
+                        Spacer(Modifier.height(6.dp))
                         Text(
                             text = labels[i],
                             fontSize = 11.sp,
                             fontWeight = if (isPeak) FontWeight.ExtraBold else FontWeight.Medium,
-                            color = if (isPeak) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isPeak) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
                 }

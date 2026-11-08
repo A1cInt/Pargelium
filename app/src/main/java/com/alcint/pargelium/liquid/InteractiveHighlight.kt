@@ -19,7 +19,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.util.fastCoerceIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import com.alcint.pargelium.liquid.inspectDragGestures
 import org.intellij.lang.annotations.Language
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 
@@ -43,7 +42,7 @@ class InteractiveHighlight(
     val offset: Offset get() = positionAnimation.value - startPosition
 
     @Language("AGSL")
-    private val shader =
+    private val shader: RuntimeShader? =
         if (!isRuntimeShaderSupported()) null else RuntimeShader(
             """
     uniform float2 size;
@@ -58,32 +57,32 @@ class InteractiveHighlight(
     }"""
         )
 
+    // Кэшируем ShaderBrush один раз вместо аллокации на каждом кадре
+    private val cachedShaderBrush: ShaderBrush? = shader?.let { ShaderBrush(it) }
+
     val modifier: Modifier =
         Modifier.drawWithContent {
             val progress = pressProgressAnimation.value
-            if (progress > 0f) {
+            if (progress > 0.002f) {
                 drawRect(
                     Color.White.copy(0.06f * progress),
                     blendMode = BlendMode.Plus
                 )
-                val position = position(size, positionAnimation.value)
-                val spotX = position.x.fastCoerceIn(0f, size.width)
-                val spotY = position.y.fastCoerceIn(0f, size.height)
+                val currentPos = position(size, positionAnimation.value)
+                val spotX = currentPos.x.fastCoerceIn(0f, size.width)
+                val spotY = currentPos.y.fastCoerceIn(0f, size.height)
                 val spotColor = Color.White.copy(0.12f * progress)
                 val radius = (size.minDimension * 1.2f).coerceAtLeast(1f)
-                if (shader != null) {
-                    shader.apply {
-                        setFloatUniform("size", size.width, size.height)
-                        setColorUniform("color", spotColor.toArgb())
-                        setFloatUniform("radius", size.minDimension * 1.2f)
-                        setFloatUniform("position", spotX, spotY)
-                    }
+                if (shader != null && cachedShaderBrush != null) {
+                    shader.setFloatUniform("size", size.width, size.height)
+                    shader.setColorUniform("color", spotColor.toArgb())
+                    shader.setFloatUniform("radius", radius)
+                    shader.setFloatUniform("position", spotX, spotY)
                     drawRect(
-                        ShaderBrush(shader),
+                        brush = cachedShaderBrush,
                         blendMode = BlendMode.Plus
                     )
                 } else {
-                    // Pre-Android 13: no AGSL, use a radial gradient instead.
                     drawRect(
                         Brush.radialGradient(
                             0f to spotColor,
@@ -122,8 +121,10 @@ class InteractiveHighlight(
                         launch { positionAnimation.animateTo(startPosition, positionAnimationSpec) }
                     }
                 }
-            ) { change, _ ->
-                animationScope.launch { positionAnimation.snapTo(change.position) }
+            ) { change, dragAmount ->
+                if (dragAmount != Offset.Zero) {
+                    animationScope.launch { positionAnimation.snapTo(change.position) }
+                }
             }
         }
 }

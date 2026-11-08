@@ -14,14 +14,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -29,8 +25,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,13 +41,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -79,7 +71,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Casino
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Edit
@@ -118,7 +109,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -169,7 +159,6 @@ import com.alcint.pargelium.PrefsManager
 import com.alcint.pargelium.R as AppR
 import com.alcint.pargelium.TrackRow
 import com.alcint.pargelium.rememberDominantColor
-import com.alcint.pargelium.tiltOnTouch
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -179,6 +168,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.net.URLEncoder
+import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -218,6 +208,7 @@ data class ArtistProfileBundle(
 object ArtistRepository {
     private const val PREFS_ARTIST_EXTRAS = "pargelium_artist_extras"
     private val bundleCache = ConcurrentHashMap<String, ArtistProfileBundle>()
+    private val wikiNotFoundCache: MutableSet<String> = Collections.synchronizedSet(HashSet())
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -240,6 +231,13 @@ object ArtistRepository {
     )
     private val yearRegex = Regex("(?:19[5-9]\\d|20[0-3]\\d)")
     private val singleEpRegex = Regex("(?i)(\\bep\\b|\\bsingle\\b|\\bmaxi\\b|\\bpromo\\b|\\bost\\b|\\bremix(?:es)?\\b)")
+
+    private val htmlTagRegex = Regex("<[^>]*>")
+    private val wikiCitationRegex = Regex("\\[\\s*(?:\\d+|[a-zA-Z]|citation needed|править|источник[^]]*)\\s*]")
+    private val urlRegex = Regex("https?://\\S+")
+    private val emptyParenRegex = Regex("\\(\\s*[;,]?\\s*\\)")
+    private val horizontalSpacesRegex = Regex("[ \\t]+")
+    private val multipleNewlinesRegex = Regex("\\n{3,}")
 
     fun invalidateArtistCache(artistName: String) {
         bundleCache.remove(artistName.lowercase())
@@ -519,18 +517,23 @@ object ArtistRepository {
 
     fun cleanBiographyText(rawText: String): String {
         return rawText
-            .replace(Regex("<[^>]*>"), " ")
-            .replace(Regex("\\[\\s*(?:\\d+|[a-zA-Z]|citation needed|править|источник[^]]*)\\s*]"), "")
-            .replace(Regex("https?://\\S+"), "")
-            .replace(Regex("\\(\\s*[;,]?\\s*\\)"), "")
-            .replace(Regex("[ \\t]+"), " ")
-            .replace(Regex("\\n{3,}"), "\n\n")
+            .replace(htmlTagRegex, " ")
+            .replace(wikiCitationRegex, "")
+            .replace(urlRegex, "")
+            .replace(emptyParenRegex, "")
+            .replace(horizontalSpacesRegex, " ")
+            .replace(multipleNewlinesRegex, "\n\n")
             .trim()
     }
 
-    suspend fun fetchWikipediaBiography(artistName: String): String? = withContext(Dispatchers.IO) {
+    suspend fun fetchWikipediaBiography(artistName: String, forceRetry: Boolean = false): String? = withContext(Dispatchers.IO) {
         val cleanName = artistName.trim()
         if (cleanName.isEmpty() || cleanName.equals("<unknown>", ignoreCase = true)) return@withContext null
+
+        val cacheKey = cleanName.lowercase()
+        if (!forceRetry && wikiNotFoundCache.contains(cacheKey)) {
+            return@withContext null
+        }
 
         val isRussianLocale = Locale.getDefault().language.equals("ru", ignoreCase = true)
         val langPriority = if (isRussianLocale) listOf("ru", "en") else listOf("en", "ru")
@@ -593,6 +596,7 @@ object ArtistRepository {
                                             if (!extract.isNullOrBlank()) {
                                                 val cleaned = cleanBiographyText(extract)
                                                 if (cleaned.length >= 60) {
+                                                    wikiNotFoundCache.remove(cacheKey)
                                                     return@withContext cleaned
                                                 }
                                             }
@@ -605,6 +609,8 @@ object ArtistRepository {
                 } catch (_: Exception) {}
             }
         }
+
+        wikiNotFoundCache.add(cacheKey)
         null
     }
 
@@ -735,7 +741,19 @@ object ArtistRepository {
         return match?.value?.toIntOrNull()
     }
 
-    fun findLatestRelease(context: Context, albums: List<AlbumModel>): AlbumModel? {
+    fun findLatestReleaseFast(albums: List<AlbumModel>): AlbumModel? {
+        if (albums.isEmpty()) return null
+        if (albums.size == 1) return albums.first()
+        val withExplicitYear = albums.mapNotNull { alb ->
+            extractReleaseYear(alb)?.let { yr -> alb to yr }
+        }
+        if (withExplicitYear.isNotEmpty()) {
+            return withExplicitYear.maxByOrNull { it.second }?.first
+        }
+        return albums.maxByOrNull { it.id }
+    }
+
+    fun findLatestReleaseIo(context: Context, albums: List<AlbumModel>): AlbumModel? {
         if (albums.isEmpty()) return null
         if (albums.size == 1) return albums.first()
 
@@ -787,16 +805,8 @@ fun ArtistCard(
                 modifier = Modifier
                     .fillMaxWidth(0.82f)
                     .aspectRatio(1f)
-                    .shadow(10.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.secondaryContainer
-                            )
-                        )
-                    )
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
                     .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -805,8 +815,8 @@ fun ArtistCard(
                         model = remember(coverData) {
                             ImageRequest.Builder(context)
                                 .data(coverData)
-                                .size(320)
-                                .crossfade(true)
+                                .size(280)
+                                .crossfade(false)
                                 .build()
                         },
                         contentDescription = artist.name,
@@ -818,7 +828,7 @@ fun ArtistCard(
                         text = initial,
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
@@ -831,7 +841,7 @@ fun ArtistCard(
                         ImageRequest.Builder(context)
                             .data(artist.customLogoUri)
                             .size(240)
-                            .crossfade(true)
+                            .crossfade(false)
                             .build()
                     },
                     contentDescription = artist.name,
@@ -936,16 +946,30 @@ fun SharedTransitionScope.ArtistProfileView(
     val extractedColor = rememberDominantColor(dominantUri)
     val accentColor = if (extractedColor != Color.Unspecified) extractedColor else MaterialTheme.colorScheme.primary
 
-    val isArtistPlaying = remember(currentTrack, artist.tracks, isPlaying) {
+    val isArtistPlaying = remember(currentTrack?.id, artist.tracks, isPlaying) {
         isPlaying && currentTrack != null && artist.tracks.any { it.id == currentTrack.id }
     }
 
-    LaunchedEffect(artist.name) {
+    val fullAlbums = remember(artist.albums) {
+        artist.albums.filterNot { ArtistRepository.isSingleOrEpRelease(it) }
+    }
+    val singlesAndEps = remember(artist.albums) {
+        artist.albums.filter { ArtistRepository.isSingleOrEpRelease(it) }
+    }
+    var latestRelease by remember(artist.albums) {
+        mutableStateOf(ArtistRepository.findLatestReleaseFast(artist.albums))
+    }
+
+    LaunchedEffect(artist.name, artist.albums) {
         isScanningBundle = true
-        val loaded = withContext(Dispatchers.IO) {
-            ArtistRepository.loadArtistProfileBundle(context, artist)
+        val (loaded, resolvedLatest) = withContext(Dispatchers.IO) {
+            val b = ArtistRepository.loadArtistProfileBundle(context, artist)
+            val l = ArtistRepository.findLatestReleaseIo(context, artist.albums)
+            b to l
         }
         profileBundle = loaded
+        latestRelease = resolvedLatest
+
         if (meta.description.isBlank() && !loaded.localBioText.isNullOrBlank()) {
             val updated = meta.copy(description = loaded.localBioText)
             PrefsManager.saveArtistMetadata(artist.name, updated)
@@ -956,7 +980,7 @@ fun SharedTransitionScope.ArtistProfileView(
 
         if (meta.description.isBlank() && loaded.localBioText.isNullOrBlank()) {
             isFetchingWiki = true
-            val wikiBio = ArtistRepository.fetchWikipediaBiography(artist.name)
+            val wikiBio = ArtistRepository.fetchWikipediaBiography(artist.name, forceRetry = false)
             if (!wikiBio.isNullOrBlank()) {
                 val updated = meta.copy(description = wikiBio)
                 PrefsManager.saveArtistMetadata(artist.name, updated)
@@ -995,16 +1019,6 @@ fun SharedTransitionScope.ArtistProfileView(
                 }
             }
         }
-    }
-
-    val fullAlbums = remember(artist.albums) {
-        artist.albums.filterNot { ArtistRepository.isSingleOrEpRelease(it) }
-    }
-    val singlesAndEps = remember(artist.albums) {
-        artist.albums.filter { ArtistRepository.isSingleOrEpRelease(it) }
-    }
-    val latestRelease = remember(artist.albums) {
-        ArtistRepository.findLatestRelease(context, artist.albums)
     }
 
     val featuredTracks = remember(artist.tracks, artist.name) {
@@ -1099,13 +1113,6 @@ fun SharedTransitionScope.ArtistProfileView(
                             val shuffled = artist.tracks.shuffled()
                             onTrackSelect(shuffled.first(), shuffled)
                         }
-                    },
-                    onDeepCutsRadioClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (artist.tracks.isNotEmpty()) {
-                            val deepMix = artist.tracks.sortedByDescending { it.duration }.shuffled()
-                            onTrackSelect(deepMix.first(), deepMix)
-                        }
                     }
                 )
             }
@@ -1138,7 +1145,7 @@ fun SharedTransitionScope.ArtistProfileView(
                             if (!isFetchingWiki) {
                                 scope.launch {
                                     isFetchingWiki = true
-                                    val fetched = ArtistRepository.fetchWikipediaBiography(artist.name)
+                                    val fetched = ArtistRepository.fetchWikipediaBiography(artist.name, forceRetry = true)
                                     if (!fetched.isNullOrBlank()) {
                                         val newMeta = meta.copy(description = fetched)
                                         PrefsManager.saveArtistMetadata(artist.name, newMeta)
@@ -1153,15 +1160,16 @@ fun SharedTransitionScope.ArtistProfileView(
                 }
 
                 if (latestRelease != null && artist.albums.size > 1) {
+                    val release = latestRelease!!
                     item(key = "artist_latest_release", contentType = "latest_release") {
                         ArtistLatestReleaseSpotlight(
-                            album = latestRelease,
+                            album = release,
                             accentColor = accentColor,
-                            onAlbumClick = { onAlbumSelect(latestRelease) },
+                            onAlbumClick = { onAlbumSelect(release) },
                             onPlayAlbum = {
-                                if (latestRelease.tracks.isNotEmpty()) {
+                                if (release.tracks.isNotEmpty()) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onTrackSelect(latestRelease.tracks.first(), latestRelease.tracks)
+                                    onTrackSelect(release.tracks.first(), release.tracks)
                                 }
                             }
                         )
@@ -1204,10 +1212,11 @@ fun SharedTransitionScope.ArtistProfileView(
                     key = { it.id },
                     contentType = { "artist_track_row" }
                 ) { track ->
+                    val isCurrent = currentTrack?.id == track.id
                     TrackRow(
                         track = track,
-                        isPlaying = isPlaying,
-                        isCurrentTrack = currentTrack?.id == track.id,
+                        isPlaying = isCurrent && isPlaying,
+                        isCurrentTrack = isCurrent,
                         albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) },
                         onClick = { onTrackSelect(track, artist.tracks) },
                         onPlayNext = { onPlayNext(track) },
@@ -1259,10 +1268,11 @@ fun SharedTransitionScope.ArtistProfileView(
                         key = { "collab_${it.id}" },
                         contentType = { "artist_track_row" }
                     ) { collabTrack ->
+                        val isCurrent = currentTrack?.id == collabTrack.id
                         TrackRow(
                             track = collabTrack,
-                            isPlaying = isPlaying,
-                            isCurrentTrack = currentTrack?.id == collabTrack.id,
+                            isPlaying = isCurrent && isPlaying,
+                            isCurrentTrack = isCurrent,
                             albumArt = remember(collabTrack.albumId) { AudioRepository.getAlbumArtUri(collabTrack.albumId) },
                             onClick = { onTrackSelect(collabTrack, featuredTracks) },
                             onPlayNext = { onPlayNext(collabTrack) },
@@ -1701,8 +1711,7 @@ private fun ArtistExpressiveHero(
     onBannerClick: () -> Unit,
     onLogoClick: () -> Unit,
     onPlayAllClick: () -> Unit,
-    onShuffleClick: () -> Unit,
-    onDeepCutsRadioClick: () -> Unit
+    onShuffleClick: () -> Unit
 ) {
     val context = LocalContext.current
     val onAccentColor = if (accentColor.luminance() > 0.55f) Color(0xFF121214) else Color.White
@@ -1779,7 +1788,6 @@ private fun ArtistExpressiveHero(
                 Box(
                     modifier = Modifier
                         .size(124.dp)
-                        .tiltOnTouch()
                         .shadow(20.dp, RoundedCornerShape(34.dp))
                         .clip(RoundedCornerShape(34.dp))
                         .background(MaterialTheme.colorScheme.surface)
@@ -1871,6 +1879,7 @@ private fun ArtistExpressiveHero(
 
             Spacer(modifier = Modifier.height(18.dp))
 
+            // Две кнопки: Слушать и одна кнопка Перемешать (дублирующая кнопка Casino убрана)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1880,8 +1889,8 @@ private fun ArtistExpressiveHero(
                     onClick = onPlayAllClick,
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(20.dp),
+                        .height(54.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = accentColor,
                         contentColor = onAccentColor
@@ -1897,31 +1906,21 @@ private fun ArtistExpressiveHero(
                             id = if (isArtistPlaying) AppR.string.album_action_pause else AppR.string.album_action_play
                         ),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
 
                 FilledTonalButton(
                     onClick = onShuffleClick,
-                    modifier = Modifier.height(52.dp),
-                    shape = RoundedCornerShape(20.dp)
+                    modifier = Modifier.height(54.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    contentPadding = PaddingValues(horizontal = 22.dp)
                 ) {
                     Icon(Icons.Rounded.Shuffle, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = stringResource(id = AppR.string.album_action_shuffle),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                FilledTonalIconButton(
-                    onClick = onDeepCutsRadioClick,
-                    modifier = Modifier.size(52.dp),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Casino,
-                        contentDescription = stringResource(id = AppR.string.artist_action_radio_mix)
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
             }

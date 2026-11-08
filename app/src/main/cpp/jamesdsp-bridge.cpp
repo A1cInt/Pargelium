@@ -22,20 +22,33 @@ extern void JDSP_LiveProgProcessInterleaved(float *buffer, int numFrames, float 
 #define TAG "JamesDSP-JNI"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 #define MAX_BLOCK_SIZE 2048
+#define IO_SCRATCH_FRAMES 4096
 
 struct NativeJdspEngine {
     JamesDSPLib jdsp;
     pthread_mutex_t lock;
     float sampleRate;
+    float ioScratch[IO_SCRATCH_FRAMES * 2];
     int lastCompGranularity;
     int lastCompTfRes;
     int eqInitialized;
     int arbEqInitialized;
     int compInitialized;
+    int liveprogEnabled;
+    unsigned int lastEelCodeHash;
 };
 
 static pthread_mutex_t gGlobalAllocLock = PTHREAD_MUTEX_INITIALIZER;
 static int gInitCount = 0;
+
+static unsigned int computeStringHash(const char *str) {
+    unsigned int hash = 2166136261u;
+    while (*str) {
+        hash ^= (unsigned char)(*str++);
+        hash *= 16777619u;
+    }
+    return hash;
+}
 
 static const double kUiFreqs10[10] = {
         31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
@@ -94,6 +107,7 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeInit(JNIEnv *env, jobje
     engine->sampleRate = targetRate;
     engine->lastCompGranularity = -1;
     engine->lastCompTfRes = -1;
+    engine->lastEelCodeHash = 0;
 
     JamesDSPInit(&engine->jdsp, MAX_BLOCK_SIZE, targetRate);
     JLimiterSetCoefficients(&engine->jdsp, -0.5, 60.0);
@@ -146,73 +160,83 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeProcess(
         return;
     }
 
-    jfloat *buf = (jfloat *)env->GetPrimitiveArrayCritical(buffer, nullptr);
-    if (!buf) {
-        pthread_mutex_unlock(&engine->lock);
-        return;
-    }
-
-    JDSP_LiveProgProcessInterleaved(buf, numFrames, engine->sampleRate);
-
     JamesDSPLib *jdsp = &engine->jdsp;
-    int offsetFrame = 0;
-    while (offsetFrame < numFrames) {
-        int chunkFrames = numFrames - offsetFrame;
-        if (chunkFrames > MAX_BLOCK_SIZE) {
-            chunkFrames = MAX_BLOCK_SIZE;
+    float *scratch = engine->ioScratch;
+    int processedFrames = 0;
+
+    while (processedFrames < numFrames) {
+        int batchFrames = numFrames - processedFrames;
+        if (batchFrames > IO_SCRATCH_FRAMES) {
+            batchFrames = IO_SCRATCH_FRAMES;
+        }
+        int batchSamples = batchFrames * 2;
+
+        // Копируем блок без блокировки сборщика мусора JVM
+        env->GetFloatArrayRegion(buffer, processedFrames * 2, batchSamples, scratch);
+
+        if (engine->liveprogEnabled) {
+            JDSP_LiveProgProcessInterleaved(scratch, batchFrames, engine->sampleRate);
         }
 
-        float inEnergy = 0.0f;
-        for (int i = 0; i < chunkFrames; ++i) {
-            int idx = (offsetFrame + i) * 2;
-            float l = buf[idx] * safePreAmp;
-            float r = buf[idx + 1] * safePreAmp;
-
-            if (!isfinite(l) || fabsf(l) < 1e-20f) l = 0.0f;
-            if (!isfinite(r) || fabsf(r) < 1e-20f) r = 0.0f;
-
-            inEnergy += fabsf(l) + fabsf(r);
-            jdsp->tmpBuffer[0][i] = l;
-            jdsp->tmpBuffer[1][i] = r;
-        }
-
-        JamesDSPProcess(jdsp, (size_t)chunkFrames);
-
-        float outEnergy = 0.0f;
-        for (int i = 0; i < chunkFrames; ++i) {
-            float outL = jdsp->tmpBuffer[0][i];
-            float outR = jdsp->tmpBuffer[1][i];
-            if (isfinite(outL) && isfinite(outR)) {
-                outEnergy += fabsf(outL) + fabsf(outR);
+        int offsetFrame = 0;
+        while (offsetFrame < batchFrames) {
+            int chunkFrames = batchFrames - offsetFrame;
+            if (chunkFrames > MAX_BLOCK_SIZE) {
+                chunkFrames = MAX_BLOCK_SIZE;
             }
-        }
 
-        // Если на входе есть звук, а после JamesDSPProcess получился NaN или полный 0 из-за переходного процесса FIR,
-        // сохраняем мягкий сухой сигнал, чтобы звук НИКОГДА не пропадал!
-        if (inEnergy > 0.001f && outEnergy < 1e-9f) {
+            float inEnergy = 0.0f;
             for (int i = 0; i < chunkFrames; ++i) {
                 int idx = (offsetFrame + i) * 2;
-                buf[idx] *= safePreAmp;
-                buf[idx + 1] *= safePreAmp;
+                float l = scratch[idx] * safePreAmp;
+                float r = scratch[idx + 1] * safePreAmp;
+
+                if (!isfinite(l) || fabsf(l) < 1e-20f) l = 0.0f;
+                if (!isfinite(r) || fabsf(r) < 1e-20f) r = 0.0f;
+
+                inEnergy += fabsf(l) + fabsf(r);
+                jdsp->tmpBuffer[0][i] = l;
+                jdsp->tmpBuffer[1][i] = r;
             }
-        } else {
+
+            JamesDSPProcess(jdsp, (size_t)chunkFrames);
+
+            float outEnergy = 0.0f;
             for (int i = 0; i < chunkFrames; ++i) {
-                int idx = (offsetFrame + i) * 2;
                 float outL = jdsp->tmpBuffer[0][i];
                 float outR = jdsp->tmpBuffer[1][i];
-
-                if (!isfinite(outL)) outL = 0.0f;
-                if (!isfinite(outR)) outR = 0.0f;
-
-                buf[idx] = outL;
-                buf[idx + 1] = outR;
+                if (isfinite(outL) && isfinite(outR)) {
+                    outEnergy += fabsf(outL) + fabsf(outR);
+                }
             }
+
+            if (inEnergy > 0.001f && outEnergy < 1e-9f) {
+                for (int i = 0; i < chunkFrames; ++i) {
+                    int idx = (offsetFrame + i) * 2;
+                    scratch[idx] *= safePreAmp;
+                    scratch[idx + 1] *= safePreAmp;
+                }
+            } else {
+                for (int i = 0; i < chunkFrames; ++i) {
+                    int idx = (offsetFrame + i) * 2;
+                    float outL = jdsp->tmpBuffer[0][i];
+                    float outR = jdsp->tmpBuffer[1][i];
+
+                    if (!isfinite(outL)) outL = 0.0f;
+                    if (!isfinite(outR)) outR = 0.0f;
+
+                    scratch[idx] = outL;
+                    scratch[idx + 1] = outR;
+                }
+            }
+
+            offsetFrame += chunkFrames;
         }
 
-        offsetFrame += chunkFrames;
+        env->SetFloatArrayRegion(buffer, processedFrames * 2, batchSamples, scratch);
+        processedFrames += batchFrames;
     }
 
-    env->ReleasePrimitiveArrayCritical(buffer, buf, 0);
     pthread_mutex_unlock(&engine->lock);
 }
 
@@ -254,37 +278,37 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetCompander(
 
     if (enabled && gains7 != nullptr) {
         jsize len = env->GetArrayLength(gains7);
-        jfloat *g = env->GetFloatArrayElements(gains7, nullptr);
-        if (g) {
-            double freqs[7];
-            double dGains[7];
-            memcpy(freqs, kCompanderFreqs7, sizeof(kCompanderFreqs7));
-            for (int i = 0; i < 7; ++i) {
-                double val = (i < len) ? (double)g[i] : 0.0;
-                if (val > 12.0) val = 12.0;
-                if (val < -12.0) val = -12.0;
-                dGains[i] = val;
-            }
-            env->ReleaseFloatArrayElements(gains7, g, JNI_ABORT);
+        jfloat g[7] = { 0 };
+        jsize copyLen = len < 7 ? len : 7;
+        env->GetFloatArrayRegion(gains7, 0, copyLen, g);
 
-            float safeTc = timeConstant < 0.02f ? 0.02f : (timeConstant > 2.0f ? 2.0f : timeConstant);
-            int safeGran = granularity < 1 ? 1 : (granularity > 4 ? 4 : granularity);
-            int safeTf = tfResolution < 0 ? 0 : (tfResolution > 3 ? 3 : tfResolution);
-
-            char needRefresh = (!engine->compInitialized ||
-                                engine->lastCompGranularity != safeGran ||
-                                engine->lastCompTfRes != safeTf) ? 1 : 0;
-
-            if (!engine->compInitialized) {
-                CompressorEnable(&engine->jdsp, 1);
-                engine->compInitialized = 1;
-            }
-            CompressorSetParam(&engine->jdsp, safeTc, safeGran, safeTf, needRefresh);
-            CompressorSetGain(&engine->jdsp, freqs, dGains, 1);
-
-            engine->lastCompGranularity = safeGran;
-            engine->lastCompTfRes = safeTf;
+        double freqs[7];
+        double dGains[7];
+        memcpy(freqs, kCompanderFreqs7, sizeof(kCompanderFreqs7));
+        for (int i = 0; i < 7; ++i) {
+            double val = (double)g[i];
+            if (val > 12.0) val = 12.0;
+            if (val < -12.0) val = -12.0;
+            dGains[i] = val;
         }
+
+        float safeTc = timeConstant < 0.02f ? 0.02f : (timeConstant > 2.0f ? 2.0f : timeConstant);
+        int safeGran = granularity < 1 ? 1 : (granularity > 4 ? 4 : granularity);
+        int safeTf = tfResolution < 0 ? 0 : (tfResolution > 3 ? 3 : tfResolution);
+
+        char needRefresh = (!engine->compInitialized ||
+                            engine->lastCompGranularity != safeGran ||
+                            engine->lastCompTfRes != safeTf) ? 1 : 0;
+
+        if (!engine->compInitialized) {
+            CompressorEnable(&engine->jdsp, 1);
+            engine->compInitialized = 1;
+        }
+        CompressorSetParam(&engine->jdsp, safeTc, safeGran, safeTf, needRefresh);
+        CompressorSetGain(&engine->jdsp, freqs, dGains, 1);
+
+        engine->lastCompGranularity = safeGran;
+        engine->lastCompTfRes = safeTf;
     } else {
         CompressorDisable(&engine->jdsp);
         engine->compInitialized = 0;
@@ -309,37 +333,35 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetEqualizer(
 
     if (enabled && gains != nullptr) {
         jsize len = env->GetArrayLength(gains);
-        jfloat *g = env->GetFloatArrayElements(gains, nullptr);
-        if (g) {
-            double stdFreqs[15];
-            double dGains[15];
-            memcpy(stdFreqs, kIsoFreqs15, sizeof(kIsoFreqs15));
+        jfloat g[15] = { 0 };
+        jsize copyLen = len < 15 ? len : 15;
+        env->GetFloatArrayRegion(gains, 0, copyLen, g);
 
-            if (len == 10) {
-                interpolate10To15Bands(g, dGains);
-            } else {
-                for (int i = 0; i < 15; ++i) {
-                    dGains[i] = (i < len) ? (double)g[i] : 0.0;
-                }
-            }
-            env->ReleaseFloatArrayElements(gains, g, JNI_ABORT);
+        double stdFreqs[15];
+        double dGains[15];
+        memcpy(stdFreqs, kIsoFreqs15, sizeof(kIsoFreqs15));
 
+        if (len == 10) {
+            interpolate10To15Bands(g, dGains);
+        } else {
             for (int i = 0; i < 15; ++i) {
-                if (dGains[i] > 15.0) dGains[i] = 15.0;
-                if (dGains[i] < -15.0) dGains[i] = -15.0;
+                dGains[i] = (i < len) ? (double)g[i] : 0.0;
             }
-
-            int safeInterp = (interpolationMode == 1) ? 1 : 0;
-            // По умолчанию в MultimodalEqualizer: 0 = MinPhase FIR, 1 = Exact LinPhase, 2..6 = IIR
-            int safeOpMode = filterMode < 0 ? 0 : (filterMode > 6 ? 6 : filterMode);
-
-            // ВАЖНО: Сначала включаем MultimodalEqualizerEnable, затем рассчитываем фильтр!
-            if (!engine->eqInitialized) {
-                MultimodalEqualizerEnable(&engine->jdsp, 1);
-                engine->eqInitialized = 1;
-            }
-            MultimodalEqualizerAxisInterpolation(&engine->jdsp, safeInterp, safeOpMode, stdFreqs, dGains);
         }
+
+        for (int i = 0; i < 15; ++i) {
+            if (dGains[i] > 15.0) dGains[i] = 15.0;
+            if (dGains[i] < -15.0) dGains[i] = -15.0;
+        }
+
+        int safeInterp = (interpolationMode == 1) ? 1 : 0;
+        int safeOpMode = filterMode < 0 ? 0 : (filterMode > 6 ? 6 : filterMode);
+
+        if (!engine->eqInitialized) {
+            MultimodalEqualizerEnable(&engine->jdsp, 1);
+            engine->eqInitialized = 1;
+        }
+        MultimodalEqualizerAxisInterpolation(&engine->jdsp, safeInterp, safeOpMode, stdFreqs, dGains);
     } else {
         MultimodalEqualizerDisable(&engine->jdsp);
         engine->eqInitialized = 0;
@@ -569,10 +591,20 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetLiveprog(
     NativeJdspEngine *engine = reinterpret_cast<NativeJdspEngine *>(handle);
     pthread_mutex_lock(&engine->lock);
 
-    if (eelCode != nullptr) {
+    engine->liveprogEnabled = enabled ? 1 : 0;
+
+    if (enabled && eelCode != nullptr) {
         const char *rawCode = env->GetStringUTFChars(eelCode, nullptr);
         if (rawCode) {
-            LiveProgStringParser(&engine->jdsp, const_cast<char *>(rawCode));
+            unsigned int codeHash = computeStringHash(rawCode);
+            if (codeHash != engine->lastEelCodeHash) {
+                char *mutableCode = strdup(rawCode);
+                if (mutableCode) {
+                    LiveProgStringParser(&engine->jdsp, mutableCode);
+                    free(mutableCode);
+                    engine->lastEelCodeHash = codeHash;
+                }
+            }
             env->ReleaseStringUTFChars(eelCode, rawCode);
         }
     }
@@ -582,19 +614,11 @@ Java_com_alcint_pargelium_audio_JamesDspController_nativeSetLiveprog(
     if (params != nullptr) {
         pLen = env->GetArrayLength(params);
         if (pLen > 8) pLen = 8;
-        jfloat *elements = env->GetFloatArrayElements(params, nullptr);
-        if (elements) {
-            for (int i = 0; i < pLen; ++i) pArr[i] = elements[i];
-            env->ReleaseFloatArrayElements(params, elements, JNI_ABORT);
-        }
+        env->GetFloatArrayRegion(params, 0, pLen, pArr);
     }
 
     JDSP_LiveProgSetConfig(enabled ? 1 : 0, mode, pArr, pLen, engine->sampleRate);
-    if (enabled) {
-        LiveProgEnable(&engine->jdsp);
-    } else {
-        LiveProgDisable(&engine->jdsp);
-    }
+    LiveProgDisable(&engine->jdsp);
 
     pthread_mutex_unlock(&engine->lock);
 }

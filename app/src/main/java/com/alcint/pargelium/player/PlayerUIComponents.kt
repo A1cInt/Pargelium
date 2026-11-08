@@ -47,6 +47,7 @@ import com.alcint.pargelium.R
 import com.alcint.pargelium.SaavnApi
 import com.alcint.pargelium.liquid.LiquidGlassIconButton
 import com.alcint.pargelium.liquid.LiquidGlassPlayPauseButton
+import ir.mahozad.multiplatform.wavyslider.WaveDirection
 import ir.mahozad.multiplatform.wavyslider.material3.WavySlider
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 
@@ -259,7 +260,7 @@ fun TrackTitleArtist(
             fontWeight = FontWeight.ExtraBold,
             color = Color.White,
             maxLines = 1,
-            modifier = Modifier.basicMarquee()
+            modifier = Modifier.basicMarquee(iterations = 2)
         )
         Spacer(modifier = Modifier.height(4.dp))
         Row(
@@ -272,11 +273,11 @@ fun TrackTitleArtist(
                 color = Color.White.copy(alpha = 0.88f),
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { onArtistClick(track.artist) }
                     .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .basicMarquee()
             )
             if (track.album.isNotBlank() && !track.album.equals("<unknown>", ignoreCase = true)) {
                 Text(
@@ -306,8 +307,11 @@ fun PlayerProgressSlider(
 
     if (isRadio) {
         val saavnTrack = SaavnApi.trackCache[track.id]
-        LinearWavyProgressIndicator(
-            modifier = Modifier.fillMaxWidth(),
+        LinearProgressIndicator(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(CircleShape),
             color = if (saavnTrack != null) iconTint else Color.Red,
             trackColor = Color.White.copy(alpha = 0.2f)
         )
@@ -342,7 +346,7 @@ fun PlayerProgressSlider(
         }
 
         val animatedWaveHeight by animateDpAsState(
-            targetValue = if (isPlaying && !isDragging) 15.dp else 0.dp,
+            targetValue = if (isPlaying && !isDragging) 12.dp else 0.dp,
             animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
             label = "waveHeight"
         )
@@ -393,9 +397,10 @@ fun PlayerProgressSlider(
                     lastHapticBucket = -1
                 },
                 waveHeight = animatedWaveHeight,
-                waveLength = 45.dp,
-                waveThickness = 11.dp,
-                trackThickness = 11.dp,
+                waveLength = 48.dp,
+                waveVelocity = (if (isPlaying && !isDragging) 10.dp else 0.dp) to WaveDirection.TAIL,
+                waveThickness = 9.dp,
+                trackThickness = 9.dp,
                 colors = SliderDefaults.colors(
                     thumbColor = Color.White,
                     activeTrackColor = iconTint,

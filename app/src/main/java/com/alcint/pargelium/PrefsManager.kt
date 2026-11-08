@@ -533,4 +533,21 @@ object PrefsManager {
 
     fun saveOnboardingCompleted(completed: Boolean) =
         prefs.edit().putBoolean("onboarding_completed_v1", completed).apply()
+
+    private const val KEY_MONET_SOURCE = "monet_color_source"
+    private const val KEY_MONET_CUSTOM_COLOR = "monet_custom_color_argb"
+    private const val KEY_MONET_PALETTE_STYLE = "monet_palette_style"
+    private const val KEY_MONET_CONTRAST = "monet_contrast_level"
+
+    fun saveMonetColorSource(source: Int) = prefs.edit().putInt(KEY_MONET_SOURCE, source).apply()
+    fun getMonetColorSource(): Int = prefs.getInt(KEY_MONET_SOURCE, 0)
+
+    fun saveMonetCustomColor(argb: Int) = prefs.edit().putInt(KEY_MONET_CUSTOM_COLOR, argb).apply()
+    fun getMonetCustomColor(): Int = prefs.getInt(KEY_MONET_CUSTOM_COLOR, 0xFFD0BCFF.toInt())
+
+    fun saveMonetPaletteStyle(style: Int) = prefs.edit().putInt(KEY_MONET_PALETTE_STYLE, style).apply()
+    fun getMonetPaletteStyle(): Int = prefs.getInt(KEY_MONET_PALETTE_STYLE, 0)
+
+    fun saveMonetContrastLevel(contrast: Float) = prefs.edit().putFloat(KEY_MONET_CONTRAST, contrast).apply()
+    fun getMonetContrastLevel(): Float = prefs.getFloat(KEY_MONET_CONTRAST, 0f)
 }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -62,6 +64,7 @@ fun FastScrollThumb(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val thumbHeightPx = remember(density) { with(density) { 44.dp.toPx() } }
+    val latestGetLetter by rememberUpdatedState(getLetter)
 
     var isDragging by remember { mutableStateOf(false) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -84,15 +87,16 @@ fun FastScrollThumb(
         label = "thumbWidth"
     )
 
+    // Читаем букву только когда пользователь реально тянет ползунок (0 рекомпозиций при обычном скролле сетки!)
     val currentLetter by remember(itemCount) {
         derivedStateOf {
-            val idx = if (isDragging && trackHeightPx > 1f) {
-                val fraction = (dragOffsetY / trackHeightPx).coerceIn(0f, 1f)
-                (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
+            if (!isDragging || trackHeightPx <= 1f) {
+                ""
             } else {
-                state.firstVisibleItemIndex.coerceIn(0, itemCount - 1)
+                val fraction = (dragOffsetY / trackHeightPx).coerceIn(0f, 1f)
+                val idx = (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
+                latestGetLetter(idx)
             }
-            getLetter(idx)
         }
     }
 
@@ -113,12 +117,14 @@ fun FastScrollThumb(
                         val targetIndex = (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
                         if (targetIndex != lastScrolledIndex) {
                             lastScrolledIndex = targetIndex
-                            val letter = getLetter(targetIndex)
+                            val letter = latestGetLetter(targetIndex)
                             if (letter != lastHapticLetter && letter.isNotEmpty()) {
                                 lastHapticLetter = letter
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             }
-                            scope.launch { state.scrollToItem(targetIndex) }
+                            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                                state.scrollToItem(targetIndex)
+                            }
                         }
                     }
 
@@ -173,19 +179,19 @@ fun FastScrollThumb(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = 4.dp)
-                    .offset {
+                    .width(thumbWidth)
+                    .height(44.dp)
+                    // Перемещение бегунка происходит на фазе Draw в RenderNode (0 проходов Layout во время скролла!)
+                    .graphicsLayer {
+                        alpha = thumbAlpha
                         val maxThumbY = (trackHeightPx - thumbHeightPx).coerceAtLeast(1f)
-                        val targetY = if (isDragging) {
+                        translationY = if (isDragging) {
                             dragOffsetY.coerceIn(0f, maxThumbY)
                         } else {
                             val currentFraction = state.firstVisibleItemIndex.toFloat() / (itemCount - 1).coerceAtLeast(1)
                             (currentFraction * maxThumbY).coerceIn(0f, maxThumbY)
                         }
-                        IntOffset(0, targetY.roundToInt())
                     }
-                    .width(thumbWidth)
-                    .height(44.dp)
-                    .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
                     .background(
                         if (isDragging) MaterialTheme.colorScheme.primary

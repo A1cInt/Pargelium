@@ -6,7 +6,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
-import androidx.media3.session.MediaSession // <-- Добавлен пропущенный импорт
+import androidx.media3.session.MediaSession
 import com.alcint.pargelium.service.PargeliumSessionCallback
 import com.alcint.pargelium.service.PlaybackStateSyncManager
 import com.alcint.pargelium.service.PlayerFactory
@@ -28,6 +28,7 @@ class PlaybackService : MediaLibraryService() {
 
     private var stateSyncManager: PlaybackStateSyncManager? = null
     private var continuousMixManager: ContinuousMixManager? = null
+    private var playerListener: Player.Listener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -36,27 +37,26 @@ class PlaybackService : MediaLibraryService() {
         val customProcessor = CustomAudioProcessor()
         activeAudioProcessor = customProcessor
 
-        // Выделенная инициализация ExoPlayer
         val components = PlayerFactory.create(applicationContext, customProcessor)
         val player = components.player
 
         continuousMixManager = ContinuousMixManager(applicationContext, player, components.mediaSourceFactory)
         continuousMixManager?.start()
 
-        // Делегируем работу с виджетами и часами менеджеру
         val playerHandler = Handler(player.applicationLooper)
         stateSyncManager = PlaybackStateSyncManager(applicationContext, serviceScope, playerHandler, player)
 
-        player.addListener(object : Player.Listener {
+        val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) { stateSyncManager?.updateWearState() }
             override fun onPlaybackStateChanged(playbackState: Int) { stateSyncManager?.updateWearState() }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { stateSyncManager?.updateWearState(force = true) }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
                 stateSyncManager?.updateWearState(force = true)
             }
-        })
+        }
+        playerListener = listener
+        player.addListener(listener)
 
-        // Делегируем обработку сессии в отдельный коллбэк
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, PargeliumSessionCallback()).build()
     }
 
@@ -66,18 +66,24 @@ class PlaybackService : MediaLibraryService() {
         continuousMixManager?.stop()
         continuousMixManager = null
 
+        mediaLibrarySession?.player?.let { player ->
+            playerListener?.let { player.removeListener(it) }
+        }
+        playerListener = null
+
         stateSyncManager?.release()
         stateSyncManager = null
         serviceScope.cancel()
-
-        activeAudioProcessor?.release()
-        activeAudioProcessor = null
 
         mediaLibrarySession?.run {
             player.release()
             release()
         }
         mediaLibrarySession = null
+
+        activeAudioProcessor?.release()
+        activeAudioProcessor = null
+
         super.onDestroy()
     }
 

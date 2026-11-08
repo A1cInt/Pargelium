@@ -56,9 +56,10 @@ private class InnerShadowElement(
     override fun create(): InnerShadowNode = InnerShadowNode(shape, shadow)
 
     override fun update(node: InnerShadowNode) {
-        if (node.shape != shape || node.shadow !== shadow) {
-            node.shape = shape
-            node.shadow = shadow
+        val shapeChanged = node.shape != shape
+        node.shape = shape
+        node.shadow = shadow
+        if (shapeChanged) {
             node.markDirty()
             node.invalidateDraw()
         }
@@ -115,8 +116,10 @@ private class InnerShadowNode(
         if (currentShadow.alpha <= 0.005f || currentShadow.color.alpha <= 0.005f) return
         if (size.width <= 0f || size.height <= 0f) return
 
-        val layer = shadowLayer ?: return
         val radius = currentShadow.radius.toPx()
+        if (radius <= 0.5f) return
+
+        val layer = shadowLayer ?: return
         val offsetX = currentShadow.offset.x.toPx()
         val offsetY = currentShadow.offset.y.toPx()
 
@@ -145,7 +148,7 @@ private class InnerShadowNode(
             layer.alpha = currentShadow.alpha
             layer.blendMode = currentShadow.blendMode
             if (prevRadius != radius) {
-                layer.renderEffect = if (radius > 0f) BlurEffect(radius, radius, TileMode.Decal) else null
+                layer.renderEffect = BlurEffect(radius, radius, TileMode.Decal)
                 prevRadius = radius
             }
 

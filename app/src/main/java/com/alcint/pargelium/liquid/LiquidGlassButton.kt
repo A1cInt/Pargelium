@@ -130,6 +130,8 @@ fun LiquidGlassIconButton(
         }
     }
 
+    val shadowProvider = remember(cachedInnerShadow) { { cachedInnerShadow } }
+
     val rimBrush = remember(isActive, activeColor, isPressed) {
         val topTint = if (isActive && activeColor != Color.Transparent) activeColor else Color.White
         Brush.verticalGradient(
@@ -157,18 +159,18 @@ fun LiquidGlassIconButton(
                 backdrop = backdrop,
                 shape = { shape },
                 effects = {
-                    blur(7.dp.toPx(), 7.dp.toPx())
+                    blur(6.dp.toPx(), 6.dp.toPx())
                     lens(
-                        refractionHeight = 15.dp.toPx(),
-                        refractionAmount = 13.dp.toPx(),
-                        depthEffect = true,
-                        chromaticAberration = 0.025f
+                        refractionHeight = 14.dp.toPx(),
+                        refractionAmount = 12.dp.toPx(),
+                        depthEffect = isPressed || isActive,
+                        chromaticAberration = if (isPressed) 0.025f else 0f
                     )
                 },
                 highlight = { ButtonSpecularHighlight },
                 onDrawSurface = { drawRect(surfaceColor) }
             )
-            .innerShadow(shape) { cachedInnerShadow }
+            .innerShadow(shape, shadowProvider)
             .border(width = 0.8.dp, brush = rimBrush, shape = shape)
             .then(highlight.modifier)
             .then(highlight.gestureModifier)
@@ -211,7 +213,6 @@ fun LiquidGlassPlayPauseButton(
         label = "playScale"
     )
 
-    // Плавный морфинг линзы: круг на паузе -> сквиркл при воспроизведении -> компактный сквиркл при нажатии
     val cornerRadius by animateDpAsState(
         targetValue = when {
             isPressed -> 20.dp
@@ -222,7 +223,8 @@ fun LiquidGlassPlayPauseButton(
         label = "playCornerMorph"
     )
 
-    val shape = RoundedCornerShape(cornerRadius)
+    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
+    val playShadowProvider = remember { { PlayButtonInnerShadow } }
 
     val playSurfaceBrush = remember(accentColor, isInDark, isPlaying) {
         val baseWhite = if (isInDark) Color(0x42FFFFFF) else Color(0x64FFFFFF)
@@ -250,7 +252,7 @@ fun LiquidGlassPlayPauseButton(
                 scaleY = scale
             }
             .shadow(
-                elevation = if (isPlaying) 22.dp else 16.dp,
+                elevation = if (isPlaying) 20.dp else 14.dp,
                 shape = shape,
                 spotColor = accentColor.copy(alpha = 0.65f),
                 ambientColor = Color.Black.copy(alpha = 0.45f)
@@ -265,13 +267,13 @@ fun LiquidGlassPlayPauseButton(
                         refractionHeight = 22.dp.toPx(),
                         refractionAmount = 18.dp.toPx(),
                         depthEffect = true,
-                        chromaticAberration = 0.04f
+                        chromaticAberration = 0.035f
                     )
                 },
                 highlight = { PlayButtonSpecularHighlight },
                 onDrawSurface = { drawRect(brush = playSurfaceBrush) }
             )
-            .innerShadow(shape) { PlayButtonInnerShadow }
+            .innerShadow(shape, playShadowProvider)
             .border(width = 1.2.dp, brush = outerRimBrush, shape = shape)
             .then(highlight.modifier)
             .then(highlight.gestureModifier)

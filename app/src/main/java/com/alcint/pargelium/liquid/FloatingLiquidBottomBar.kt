@@ -1,6 +1,3 @@
-// Adapted from compose-miuix-ui example (IosLiquidGlassNavigationBar) — Apache 2.0.
-// Mirrored from SukiSU-Ultra.
-
 package com.alcint.pargelium.liquid
 
 import androidx.compose.animation.core.Animatable
@@ -42,6 +39,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -75,15 +73,12 @@ import top.yukonga.miuix.kmp.blur.highlight.LightPosition
 import top.yukonga.miuix.kmp.blur.highlight.LightSource
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.sensor.rememberDeviceTilt
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
-import androidx.compose.ui.draw.clip
 
 val LocalFloatingBottomBarTabScale = staticCompositionLocalOf { { 1f } }
 
@@ -109,36 +104,23 @@ private val iosIndicatorSpecular: Highlight = Highlight(
 
 private const val LIGHT_REF_X = 0.5f
 private const val LIGHT_REF_Y = 0.7f
-private const val GRAVITY_DIR_THRESHOLD_SQ = 0.01f
-private const val GRAVITY_ANGLE_STEP_RAD = (3.0 * PI / 180.0).toFloat()
 
+/**
+ * Вместо постоянного опроса аппаратного акселерометра (rememberDeviceTilt), который будил CPU/GPU
+ * от каждого микродвижения руки, блик плавно поворачивается от движения самой стеклянной линзы.
+ */
 @Composable
-private fun rememberQuantizedGravityAngle(): State<Float> {
-    val tiltState = rememberDeviceTilt()
-    return remember(tiltState) {
-        derivedStateOf {
-            val tilt = tiltState.value
-            val magnitudeSquared = tilt.gravityX * tilt.gravityX + tilt.gravityY * tilt.gravityY
-            if (magnitudeSquared > GRAVITY_DIR_THRESHOLD_SQ) {
-                (atan2(tilt.gravityY, tilt.gravityX) / GRAVITY_ANGLE_STEP_RAD).roundToInt() * GRAVITY_ANGLE_STEP_RAD
-            } else {
-                (-PI / 2).toFloat()
-            }
-        }
-    }
-}
-
-@Composable
-private fun rememberGravityRotatedHighlight(
+private fun rememberMotionRotatedHighlight(
     base: Highlight,
+    dragValueProvider: () -> Float,
     extraDegrees: Float = 0f,
 ): State<Highlight> {
     val baseStyle = base.style as BloomStroke
-    val angle = rememberQuantizedGravityAngle()
-    return remember(angle, base, extraDegrees) {
+    return remember(base, extraDegrees) {
         derivedStateOf {
             val basePrimary = baseStyle.primaryLight
-            val rad = angle.value + (extraDegrees * PI / 180.0).toFloat()
+            val quantizedStep = (dragValueProvider() * 4f).roundToInt() * 0.08f
+            val rad = (-PI / 2.0).toFloat() + quantizedStep + (extraDegrees * PI / 180.0).toFloat()
             base.copy(
                 style = baseStyle.copy(
                     primaryLight = basePrimary.copy(
@@ -318,10 +300,23 @@ fun FloatingBottomBar(
         )
     }
 
-    val baseHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
-    val pillHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = 90f)
+    val baseHighlight = rememberMotionRotatedHighlight(
+        base = iosIndicatorSpecular,
+        dragValueProvider = { dampedDragAnimation.value },
+        extraDegrees = -45f
+    )
+    val pillHighlight = rememberMotionRotatedHighlight(
+        base = iosIndicatorSpecular,
+        dragValueProvider = { dampedDragAnimation.value },
+        extraDegrees = 90f
+    )
 
     val combinedBackdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop)
+
+    // Второй и третий шейдерные слои (увеличительная линза активного таба) включаются ТОЛЬКО при касании/перетаскивании!
+    val isLensMagnifierActive by remember(dampedDragAnimation) {
+        derivedStateOf { dampedDragAnimation.pressProgress > 0.005f }
+    }
 
     Box(
         modifier = modifier.width(IntrinsicSize.Min),
@@ -386,7 +381,7 @@ fun FloatingBottomBar(
             }
         }
 
-        if (isBlurEnabled) {
+        if (isBlurEnabled && isLensMagnifierActive) {
             CompositionLocalProvider(
                 LocalFloatingBottomBarTabScale provides {
                     lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
@@ -423,7 +418,7 @@ fun FloatingBottomBar(
 
         if (tabWidthPx > 0f) {
             val tabWidthDp = with(density) { tabWidthPx.toDp() }
-            if (isBlurEnabled) {
+            if (isBlurEnabled && isLensMagnifierActive) {
                 Box(
                     Modifier
                         .padding(horizontal = 4.dp)
@@ -471,15 +466,24 @@ fun FloatingBottomBar(
                         .width(tabWidthDp)
                 )
             } else {
+                // В покое (когда палец не зажимает бар) рисуем легкую капсулу с акцентной маской без 2 лишних проходов шейдера
+                val restingPillColor = if (isBlurEnabled) {
+                    if (!isInDark) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.1f)
+                } else {
+                    accentColor.copy(alpha = 0.15f)
+                }
+
                 Box(
                     Modifier
                         .padding(horizontal = 4.dp)
                         .graphicsLayer {
                             val progressOffset = dampedDragAnimation.value * tabWidthPx
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
+                            scaleX = dampedDragAnimation.scaleX
+                            scaleY = dampedDragAnimation.scaleY
                         }
                         .clip(pillShape)
-                        .background(accentColor.copy(alpha = 0.15f), pillShape)
+                        .background(restingPillColor, pillShape)
                         .height(56.dp)
                         .width(tabWidthDp),
                     contentAlignment = Alignment.CenterStart,

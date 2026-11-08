@@ -1,10 +1,9 @@
-// Mirrored from compose-miuix-ui example.
 package com.alcint.pargelium.liquid
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
@@ -12,6 +11,7 @@ import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.invalidateDraw
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -101,7 +101,7 @@ private class BgEffectNode(
     private var startOffset: Float = 0f
 
     override fun onAttach() {
-        if (playing) startAnimation()
+        if (playing && effectBackground) startAnimation()
     }
 
     override fun onDetach() {
@@ -121,40 +121,53 @@ private class BgEffectNode(
         colorStage: () -> Float,
         alpha: () -> Float,
     ) {
+        val visualPropsChanged = this.preset !== preset ||
+                this.isDarkTheme != isDarkTheme ||
+                this.surface != surface ||
+                this.isFullSize != isFullSize ||
+                this.effectBackground != effectBackground
+
         this.painter = painter
         this.preset = preset
         this.deviceType = deviceType
         this.isDarkTheme = isDarkTheme
         this.surface = surface
-        this.effectBackground = effectBackground
         this.isFullSize = isFullSize
         this.colorStage = colorStage
         this.alpha = alpha
 
-        if (this.playing != playing) {
-            this.playing = playing
-            if (playing) {
+        val shouldAnimate = playing && effectBackground
+        val wasAnimating = this.playing && this.effectBackground
+        this.playing = playing
+        this.effectBackground = effectBackground
+
+        if (shouldAnimate != wasAnimating) {
+            if (shouldAnimate) {
                 startAnimation()
             } else {
                 animationJob?.cancel()
                 animationJob = null
             }
         }
-        invalidateDraw()
+        if (visualPropsChanged) {
+            invalidateDraw()
+        }
     }
 
     private fun startAnimation() {
         animationJob?.cancel()
         startOffset = animTime
         animationJob = coroutineScope.launch {
-            val minDeltaNanos = 1_000_000_000L / 60L
-            val origin = withFrameNanos { it }
-            var lastEmit = origin
+            val originMs = SystemClock.elapsedRealtime()
             while (isActive) {
-                val now = withFrameNanos { it }
-                if (now - lastEmit < minDeltaNanos) continue
-                lastEmit = now
-                animTime = startOffset + (now - origin) / 1_000_000_000f
+                if (alpha() <= 0.005f) {
+                    delay(250L)
+                    continue
+                }
+                // Настоящий сон корутины на 50 мс (20 FPS) вместо 120 Гц цикла withFrameNanos
+                delay(50L)
+                val elapsedSec = (SystemClock.elapsedRealtime() - originMs) / 1000f
+                animTime = startOffset + elapsedSec
                 invalidateDraw()
             }
         }
@@ -165,13 +178,15 @@ private class BgEffectNode(
         drawRect(surface)
         if (effectBackground) {
             val alphaValue = alpha()
-            if (alphaValue > 0f) {
+            if (alphaValue > 0.005f) {
                 val drawHeight = if (isFullSize) size.height * 0.8f else size.height * 0.5f
+                val period = preset.colorInterpPeriod.coerceAtLeast(1f)
+                val computedColorStage = colorStage() + (animTime / period)
 
                 painter.updateResolution(size.width, size.height)
                 painter.updateBoundIfNeeded(drawHeight, size.height, size.width)
                 painter.updatePresetIfNeeded(deviceType, isDarkTheme)
-                painter.updateColors(preset, colorStage())
+                painter.updateColors(preset, computedColorStage)
                 painter.updateAnimTime(animTime)
                 painter.updatePointsAnim(animTime, preset)
 

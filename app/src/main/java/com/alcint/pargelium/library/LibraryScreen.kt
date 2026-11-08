@@ -53,7 +53,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
@@ -82,7 +81,7 @@ import com.alcint.pargelium.ShareTrackSheet
 import com.alcint.pargelium.SortOption
 import com.alcint.pargelium.StreamingManager
 import com.alcint.pargelium.player.FullPlayerScreen
-import com.alcint.pargelium.rememberDominantColor
+import com.alcint.pargelium.rememberEffectiveSeedColor
 import com.alcint.pargelium.rememberPargeliumScheme
 import com.alcint.pargelium.settings.SettingsScreen
 import com.google.common.util.concurrent.MoreExecutors
@@ -93,6 +92,8 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import kotlin.coroutines.resume
+
+private var cachedEnrichedArtistsByName: Map<String, Triple<String?, String?, String?>>? = null
 
 @Composable
 fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
@@ -149,6 +150,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     var currentQueueIndex by remember { mutableIntStateOf(-1) }
 
     var lastPreviousClickTime by remember { mutableLongStateOf(0L) }
+    var lastSavedQueueHash by remember { mutableIntStateOf(0) }
     val unknownArtistStr = stringResource(id = R.string.unknown_artist)
 
     val currentTracksById by rememberUpdatedState(tracksById)
@@ -158,7 +160,6 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     val allTracksState by rememberUpdatedState(allTracks)
     val updatedAllArtists by rememberUpdatedState(allArtists)
 
-    // Синхронное вычисление обложки без промежуточного обнуления (убирает прыжки цветов Monet)
     val currentAlbumArt: Uri? = remember(currentTrack?.id, currentTrack?.albumId, currentTrack?.coverUrl) {
         val track = currentTrack ?: return@remember null
         when {
@@ -178,7 +179,12 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
     LaunchedEffect(currentPlaylist) {
         if (currentPlaylist.isNotEmpty()) {
             withContext(Dispatchers.IO) {
-                PrefsManager.saveLastQueue(currentPlaylist.map { it.id })
+                val ids = currentPlaylist.map { it.id }
+                val hash = ids.hashCode()
+                if (hash != lastSavedQueueHash) {
+                    lastSavedQueueHash = hash
+                    PrefsManager.saveLastQueue(ids)
+                }
             }
         }
     }
@@ -311,7 +317,13 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
 
     fun loadTracks(forceScan: Boolean = false) {
         scope.launch {
-            if (forceScan) isRefreshing = true else isLoading = true
+            if (forceScan) {
+                isRefreshing = true
+                cachedEnrichedArtistsByName = null
+            } else {
+                isLoading = true
+            }
+
             if (forceScan) {
                 suspendCancellableCoroutine { cont ->
                     AudioRepository.forceScan(context) {
@@ -321,16 +333,17 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             }
             val loadedTracks = withContext(Dispatchers.IO) { AudioRepository.getAudioTracks(context, forceScan) }
 
-            // Фаза 1: Мгновенное построение альбомов и артистов без блокирующего обхода папок
             val (loadedAlbums, quickArtists, idMap) = withContext(Dispatchers.Default) {
                 val albums = AudioRepository.processAlbums(loadedTracks)
                 val albumsByArtist = albums.groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
+                val cachedAssets = cachedEnrichedArtistsByName
 
                 val artists = loadedTracks
                     .groupBy { getPrimaryArtist(it.artist, unknownArtistStr) }
                     .map { (name, artistTracks) ->
                         val artistAlbums = albumsByArtist[name]?.sortedBy { it.title } ?: emptyList()
                         val savedMeta = PrefsManager.getArtistMetadata(name)
+                        val cachedFolder = cachedAssets?.get(name)
                         val firstAlbumId = artistAlbums.firstOrNull()?.id ?: artistTracks.firstOrNull()?.albumId
                         val fallbackCover = if (firstAlbumId != null && firstAlbumId > 0L) {
                             AudioRepository.getAlbumArtUri(firstAlbumId)
@@ -340,9 +353,9 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             name = name,
                             tracks = artistTracks.sortedBy { it.title },
                             albums = artistAlbums,
-                            customAvatarUri = savedMeta.avatarUri,
-                            customBannerUri = savedMeta.bannerUri,
-                            customLogoUri = null,
+                            customAvatarUri = cachedFolder?.first ?: savedMeta.avatarUri,
+                            customBannerUri = cachedFolder?.second ?: savedMeta.bannerUri,
+                            customLogoUri = cachedFolder?.third,
                             fallbackCoverUri = fallbackCover
                         )
                     }
@@ -358,31 +371,35 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
             isLoading = false
             isRefreshing = false
 
-            // Фаза 2: Тихая фоновая подгрузка локальных аватарок и логотипов из папок артистов в IO-потоке
-            val enrichedArtists = withContext(Dispatchers.IO) {
-                var anyChanged = false
-                val updated = quickArtists.map { artist ->
-                    val (folderAvatar, folderBanner, folderLogo) = ArtistRepository.resolveQuickFolderAssets(
-                        context = context,
-                        artistName = artist.name,
-                        tracks = artist.tracks
-                    )
-                    if (folderAvatar != artist.customAvatarUri || folderBanner != artist.customBannerUri || folderLogo != artist.customLogoUri) {
-                        anyChanged = true
-                        artist.copy(
-                            customAvatarUri = folderAvatar ?: artist.customAvatarUri,
-                            customBannerUri = folderBanner ?: artist.customBannerUri,
-                            customLogoUri = folderLogo ?: artist.customLogoUri
+            if (cachedEnrichedArtistsByName == null) {
+                val enrichedArtists = withContext(Dispatchers.IO) {
+                    var anyChanged = false
+                    val newAssetCache = HashMap<String, Triple<String?, String?, String?>>(quickArtists.size)
+                    val updated = quickArtists.map { artist ->
+                        val (folderAvatar, folderBanner, folderLogo) = ArtistRepository.resolveQuickFolderAssets(
+                            context = context,
+                            artistName = artist.name,
+                            tracks = artist.tracks
                         )
-                    } else {
-                        artist
+                        newAssetCache[artist.name] = Triple(folderAvatar, folderBanner, folderLogo)
+                        if (folderAvatar != artist.customAvatarUri || folderBanner != artist.customBannerUri || folderLogo != artist.customLogoUri) {
+                            anyChanged = true
+                            artist.copy(
+                                customAvatarUri = folderAvatar ?: artist.customAvatarUri,
+                                customBannerUri = folderBanner ?: artist.customBannerUri,
+                                customLogoUri = folderLogo ?: artist.customLogoUri
+                            )
+                        } else {
+                            artist
+                        }
                     }
+                    cachedEnrichedArtistsByName = newAssetCache
+                    if (anyChanged) updated else null
                 }
-                if (anyChanged) updated else null
-            }
 
-            if (enrichedArtists != null) {
-                allArtists = enrichedArtists
+                if (enrichedArtists != null) {
+                    allArtists = enrichedArtists
+                }
             }
         }
     }
@@ -581,8 +598,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
         }
     }
 
-    val seedColor = rememberDominantColor(currentAlbumArt)
-    val targetColor = if (seedColor != Color.Unspecified) seedColor else Color(0xFFD0BCFF)
+    val targetColor = rememberEffectiveSeedColor(currentAlbumArt)
     val targetScheme = rememberPargeliumScheme(targetColor, themeMode, systemDark)
 
     val navItems = remember(hasPlaylists) {
@@ -630,6 +646,12 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         }
                     }
 
+                    val isFullPlayerFullyOpaque by remember {
+                        derivedStateOf {
+                            isPlayerExpanded && playerOffsetY.value <= 2f
+                        }
+                    }
+
                     LaunchedEffect(hiddenOffsetPx) {
                         if (!isPlayerExpanded) playerOffsetY.snapTo(hiddenOffsetPx)
                     }
@@ -673,12 +695,17 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                         }
                     }
 
+                    // Отключаем дорогой полноэкранный захват layerBackdrop, когда полный плеер перекрывает экран
+                    val shouldCaptureLibraryBackdrop = !isFullPlayerFullyOpaque && (navBarStyle == 0 || currentTrack != null)
+
                     Box(modifier = Modifier.fillMaxSize()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(MaterialTheme.colorScheme.background)
-                                .layerBackdrop(backdrop)
+                                .let { mod ->
+                                    if (shouldCaptureLibraryBackdrop) mod.layerBackdrop(backdrop) else mod
+                                }
                         ) {
                             if (isProfileOpen) {
                                 ProfileScreen(
@@ -726,7 +753,8 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                                 album = album,
                                                                 animatedVisibilityScope = this@AnimatedContent,
                                                                 currentTrack = currentTrack,
-                                                                isPlaying = isPlaying,
+                                                                // Ставим анимации альбома на паузу, когда поверх открыт полный плеер
+                                                                isPlaying = isPlaying && !isFullPlayerFullyOpaque,
                                                                 artistAvatarUri = matchedArtistAvatar,
                                                                 onBack = remember { { selectedAlbum = null } },
                                                                 onTrackSelect = onAlbumTrackSelect,
@@ -745,7 +773,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                                 artist = artist,
                                                                 animatedVisibilityScope = this@AnimatedContent,
                                                                 currentTrack = currentTrack,
-                                                                isPlaying = isPlaying,
+                                                                isPlaying = isPlaying && !isFullPlayerFullyOpaque,
                                                                 onBack = remember { { selectedArtist = null } },
                                                                 onTrackSelect = onPlayTrackCallback,
                                                                 onAlbumSelect = remember { { selectedAlbum = it } },
@@ -783,7 +811,7 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                                             onAlbumClick = remember { { selectedAlbum = it } },
                                                             onArtistClick = remember { { selectedArtist = it } },
                                                             currentTrack = currentTrack,
-                                                            isPlaying = isPlaying,
+                                                            isPlaying = isPlaying && !isFullPlayerFullyOpaque,
                                                             onTrackClick = onPlayTrackCallback,
                                                             onPlayNext = onPlayNextCallback,
                                                             onAddToQueue = onAddToQueueCallback,
@@ -832,54 +860,61 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                             }
                         }
 
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(bottom = 12.dp)
-                                .zIndex(1f),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (pagerState.currentPage == 0 && !isSearchActive && selectedAlbum == null && selectedArtist == null && !isProfileOpen) {
-                                FloatingActionRow(onRefresh = onRefreshCallback, onShuffleAll = onShuffleAllCallback)
-                            }
+                        // Скрываем MiniPlayer и нижнюю панель, когда полный плеер полностью раскрыт (0 лишних проходов blur-шейдера!)
+                        if (!isFullPlayerFullyOpaque) {
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .padding(bottom = 12.dp)
+                                    .zIndex(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (pagerState.currentPage == 0 && !isSearchActive && selectedAlbum == null && selectedArtist == null && !isProfileOpen) {
+                                    FloatingActionRow(onRefresh = onRefreshCallback, onShuffleAll = onShuffleAllCallback)
+                                }
 
-                            currentTrack?.let { activeTrack ->
-                                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                    PlayerPositionProvider(playerController, isPlaying && !isFullPlayerVisible) { currentPosProvider ->
-                                        val currentPos = currentPosProvider()
-                                        val calculatedProgress = if (trackDuration > 0L) currentPos.toFloat() / trackDuration else 0f
+                                currentTrack?.let { activeTrack ->
+                                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                        PlayerPositionProvider(
+                                            playerController = playerController,
+                                            isPlaying = isPlaying && !isFullPlayerVisible,
+                                            pollIntervalMs = 1000L
+                                        ) { currentPosProvider ->
+                                            val currentPos = currentPosProvider()
+                                            val calculatedProgress = if (trackDuration > 0L) currentPos.toFloat() / trackDuration else 0f
 
-                                        MiniPlayer(
-                                            track = activeTrack,
-                                            isPlaying = isPlaying,
-                                            progress = calculatedProgress,
-                                            albumArt = currentAlbumArt,
-                                            backdrop = backdrop,
-                                            onPlayPause = onPlayPauseCallback,
-                                            onSkipNext = onSkipNextCallback,
-                                            onClick = remember { { snapPlayer(true) } }
-                                        )
+                                            MiniPlayer(
+                                                track = activeTrack,
+                                                isPlaying = isPlaying,
+                                                progress = calculatedProgress,
+                                                albumArt = currentAlbumArt,
+                                                backdrop = backdrop,
+                                                onPlayPause = onPlayPauseCallback,
+                                                onSkipNext = onSkipNextCallback,
+                                                onClick = remember { { snapPlayer(true) } }
+                                            )
+                                        }
                                     }
                                 }
-                            }
 
-                            LibraryBottomNav(
-                                pagerState = pagerState,
-                                navItems = navItems,
-                                backdrop = backdrop,
-                                navBarStyle = navBarStyle,
-                                onTabSelected = remember {
-                                    { index ->
-                                        selectedAlbum = null
-                                        selectedArtist = null
-                                        isProfileOpen = false
-                                        scope.launch { pagerState.animateScrollToPage(index) }
+                                LibraryBottomNav(
+                                    pagerState = pagerState,
+                                    navItems = navItems,
+                                    backdrop = backdrop,
+                                    navBarStyle = navBarStyle,
+                                    onTabSelected = remember {
+                                        { index ->
+                                            selectedAlbum = null
+                                            selectedArtist = null
+                                            isProfileOpen = false
+                                            scope.launch { pagerState.animateScrollToPage(index) }
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
 
                         currentTrack?.let { activeTrack ->
@@ -889,7 +924,11 @@ fun LibraryScreen(onSecureRequest: (Boolean) -> Unit) {
                                 hiddenOffsetPx = hiddenOffsetPx,
                                 snapPlayer = { snapPlayer(it) }
                             ) {
-                                PlayerPositionProvider(playerController, isPlaying) { currentPosProvider ->
+                                PlayerPositionProvider(
+                                    playerController = playerController,
+                                    isPlaying = isPlaying,
+                                    pollIntervalMs = 500L
+                                ) { currentPosProvider ->
                                     FullPlayerScreen(
                                         track = activeTrack,
                                         isPlaying = isPlaying,

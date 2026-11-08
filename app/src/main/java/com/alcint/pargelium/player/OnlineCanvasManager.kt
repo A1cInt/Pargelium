@@ -9,8 +9,6 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,17 +28,19 @@ object OnlineCanvasManager {
     private const val PREFS_NAME = "pargelium_canvas_prefs"
     private const val KEY_ENABLED = "online_canvas_enabled"
     private const val KEY_SOURCE_MODE = "online_canvas_source_mode"
+    private const val NO_CANVAS_SENTINEL = "NONE"
+    private const val NEGATIVE_CACHE_TTL_MS = 24 * 3600 * 1000L
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(9, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
                 .header(
                     "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
                 )
                 .header("Accept", "application/json, text/html, */*")
                 .build()
@@ -49,20 +49,15 @@ object OnlineCanvasManager {
         .build()
 
     private val gson = Gson()
-    private val memoryCache = LruCache<String, String>(128)
+    private val memoryCache = LruCache<String, String>(256)
 
-    private val parenCleanupRegex = Regex("(?i)\\s*\\(?(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio|bonus|deluxe|explicit|clean).*?\\)?")
-    private val bracketCleanupRegex = Regex("(?i)\\s*\\[(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio|bonus|deluxe|explicit|clean).*?]")
-    private val dashCleanupRegex = Regex("(?i)\\s*-.*?(Remaster|Edit|Mix|Version|Live|Mono|Stereo).*")
+    private val parenCleanupRegex = Regex("(?i)\\s*\\(?(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio|bonus|deluxe|explicit|clean|vinyl).*?\\)?")
+    private val bracketCleanupRegex = Regex("(?i)\\s*\\[(feat\\.|ft\\.|remaster|official|lyric|video|audio|radio|bonus|deluxe|explicit|clean|vinyl).*?]")
+    private val dashCleanupRegex = Regex("(?i)\\s*-.*?(Remaster|Edit|Mix|Version|Live|Mono|Stereo|Vinyl).*")
 
     private val m3u8StreamRegex = Regex("""(https?://[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*)""")
     private val mp4DirectRegex = Regex("""(https?://[^\s"'<>\\]+(?:canvaz\.scdn\.co|\.mp4)[^\s"'<>\\]*)""", RegexOption.IGNORE_CASE)
-    private val spotifyTrackIdRegex = Regex("""(?:open\.spotify\.com/track/|spotify:track:|"id"\s*:\s*")([a-zA-Z0-9]{22})""")
-
-    @Volatile
-    private var cachedSpotifyAnonToken: String? = null
-    @Volatile
-    private var tokenExpirationMs: Long = 0L
+    private val spotifyTrackIdRegex = Regex("""(?:open\.spotify\.com/track/|spotify:track:|SPOTIFY_SONG::|"id"\s*:\s*")([a-zA-Z0-9]{22})""")
 
     fun isOnlineCanvasEnabled(context: Context): Boolean {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -117,50 +112,50 @@ object OnlineCanvasManager {
         val baseKey = "${cleanArtist.lowercase()}_${cleanTitle.lowercase()}"
         val cacheKey = "${mode.ordinal}_$baseKey"
 
+        // 1. Проверяем оперативный кэш (включая негативный результат "NONE")
+        memoryCache.get(cacheKey)?.let { cached ->
+            return@withContext if (cached == NO_CANVAS_SENTINEL) null else Uri.parse(cached)
+        }
+
         val videoDir = File(context.filesDir, "spotify_canvas_videos").apply { if (!exists()) mkdirs() }
         val localMp4File = File(videoDir, "canvas_${baseKey.hashCode()}.mp4")
 
-        // 1. Если MP4 канвас уже скачан локально — отдаем его мгновенно!
         if (mode != CanvasSourceMode.APPLE_ONLY && localMp4File.exists() && localMp4File.length() > 10_240L) {
             val fileUri = Uri.fromFile(localMp4File)
             memoryCache.put(cacheKey, fileUri.toString())
             return@withContext fileUri
         }
 
-        // 2. Проверяем оперативный кэш и кэш HLS-ссылок Apple Music
-        memoryCache.get(cacheKey)?.let { cached ->
-            return@withContext Uri.parse(cached)
-        }
-
         val urlCacheDir = context.getDir("online_canvas_cache", Context.MODE_PRIVATE)
         val diskUrlFile = File(urlCacheDir, "canvas_${cacheKey.hashCode()}.txt")
         if (diskUrlFile.exists()) {
             val cachedUrl = runCatching { diskUrlFile.readText().trim() }.getOrNull()
-            if (!cachedUrl.isNullOrEmpty() && cachedUrl.startsWith("http")) {
+            if (cachedUrl == NO_CANVAS_SENTINEL) {
+                if (System.currentTimeMillis() - diskUrlFile.lastModified() < NEGATIVE_CACHE_TTL_MS) {
+                    memoryCache.put(cacheKey, NO_CANVAS_SENTINEL)
+                    return@withContext null
+                }
+            } else if (!cachedUrl.isNullOrEmpty() && cachedUrl.startsWith("http")) {
                 memoryCache.put(cacheKey, cachedUrl)
                 return@withContext Uri.parse(cachedUrl)
             }
         }
 
-        // 3. Ищем онлайн в зависимости от выбранного режима
-        val resolvedUri: Uri? = coroutineScope {
-            when (mode) {
-                CanvasSourceMode.SPOTIFY_ONLY -> {
-                    fetchAndSaveSpotifyCanvas(cleanArtist, cleanTitle, localMp4File)
-                }
-                CanvasSourceMode.APPLE_ONLY -> {
-                    fetchAppleMusicVideo(cleanArtist, cleanTitle)?.let { Uri.parse(it) }
-                }
-                CanvasSourceMode.BOTH_SPOTIFY_PRIORITY -> {
-                    val spotifyDeferred = async { fetchAndSaveSpotifyCanvas(cleanArtist, cleanTitle, localMp4File) }
-                    val appleDeferred = async { fetchAppleMusicVideo(cleanArtist, cleanTitle) }
-                    spotifyDeferred.await() ?: appleDeferred.await()?.let { Uri.parse(it) }
-                }
-                CanvasSourceMode.BOTH_APPLE_PRIORITY -> {
-                    val appleDeferred = async { fetchAppleMusicVideo(cleanArtist, cleanTitle) }
-                    val spotifyDeferred = async { fetchAndSaveSpotifyCanvas(cleanArtist, cleanTitle, localMp4File) }
-                    appleDeferred.await()?.let { Uri.parse(it) } ?: spotifyDeferred.await()
-                }
+        // 2. Последовательный приоритетный поиск (не жжёт батарею двойным параллельным скачиванием)
+        val resolvedUri: Uri? = when (mode) {
+            CanvasSourceMode.SPOTIFY_ONLY -> {
+                fetchAndSaveSpotifyCanvas(cleanArtist, cleanTitle, localMp4File)
+            }
+            CanvasSourceMode.APPLE_ONLY -> {
+                fetchAppleMusicVideo(cleanArtist, cleanTitle)?.let { Uri.parse(it) }
+            }
+            CanvasSourceMode.BOTH_SPOTIFY_PRIORITY -> {
+                fetchAndSaveSpotifyCanvas(cleanArtist, cleanTitle, localMp4File)
+                    ?: fetchAppleMusicVideo(cleanArtist, cleanTitle)?.let { Uri.parse(it) }
+            }
+            CanvasSourceMode.BOTH_APPLE_PRIORITY -> {
+                fetchAppleMusicVideo(cleanArtist, cleanTitle)?.let { Uri.parse(it) }
+                    ?: fetchAndSaveSpotifyCanvas(cleanArtist, cleanTitle, localMp4File)
             }
         }
 
@@ -170,6 +165,10 @@ object OnlineCanvasManager {
             if (uriStr.startsWith("http")) {
                 runCatching { diskUrlFile.writeText(uriStr) }
             }
+        } else {
+            // Кэшируем отсутствие канваса, чтобы не спамить сеть при каждом открытии трека
+            memoryCache.put(cacheKey, NO_CANVAS_SENTINEL)
+            runCatching { diskUrlFile.writeText(NO_CANVAS_SENTINEL) }
         }
 
         return@withContext resolvedUri
@@ -177,9 +176,11 @@ object OnlineCanvasManager {
 
     private fun fetchAndSaveSpotifyCanvas(artist: String, title: String, targetMp4File: File): Uri? {
         val remoteMp4Url = fetchSpotifyCanvasUrl(artist, title) ?: return null
-        val cleanUrl = remoteMp4Url.replace("\\/", "/").replace("&amp;", "&")
+        val cleanUrl = remoteMp4Url
+            .replace("\\u002F", "/")
+            .replace("\\/", "/")
+            .replace("&amp;", "&")
 
-        // Скачиваем .mp4 локально, чтобы ExoPlayer воспроизводил его без сетевых задержек и ошибок
         try {
             val req = Request.Builder().url(cleanUrl).build()
             client.newCall(req).execute().use { resp ->
@@ -203,39 +204,37 @@ object OnlineCanvasManager {
         val encTitle = URLEncoder.encode(title, "UTF-8")
         val encQuery = URLEncoder.encode("$artist $title", "UTF-8")
 
-        // Шаг 1: Резолвим 22-символьный Spotify Track ID для точного попадания в Canvas API
         val trackId = resolveSpotifyTrackId(artist, title)
 
         val endpoints = buildList {
             if (!trackId.isNullOrBlank()) {
+                add("https://www.canvasdownloader.com/canvas?link=https://open.spotify.com/track/$trackId")
                 add("https://api.paxsenix.biz.id/spotify/canvas?id=$trackId")
                 add("https://canvas-api.boidu.dev/canvas?trackId=$trackId")
-                add("https://spotify-canvas-api.vercel.app/api/canvas?trackId=$trackId")
-                add("https://www.canvasdownloader.com/canvas?link=https://open.spotify.com/track/$trackId")
             }
             add("https://api.paxsenix.biz.id/spotify/canvas?q=$encQuery")
             add("https://canvas-api.boidu.dev/canvas?song=$encTitle&artist=$encArtist")
-            add("https://api.siputzx.my.id/api/s/spotify?query=$encQuery")
-            add("https://spotify-canvas-api.vercel.app/api/canvas?artist=$encArtist&track=$encTitle")
         }
 
         for (url in endpoints) {
             try {
-                val request = Request.Builder().url(url).build()
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Referer", "https://www.canvasdownloader.com/")
+                    .build()
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@use
-                    val body = response.body?.string() ?: return@use
+                    val rawBody = response.body?.string() ?: return@use
+                    val body = rawBody.replace("\\u002F", "/").replace("\\/", "/")
 
-                    // 1. Ищем прямую ссылку на canvaz.scdn.co / .mp4 в теле ответа (JSON или HTML)
                     val directMatch = mp4DirectRegex.findAll(body)
-                        .map { it.value.replace("\\/", "/").trimEnd('"', '\'', '\\') }
-                        .firstOrNull { it.contains("canvaz", true) || it.endsWith(".mp4", true) }
+                        .map { it.value.trimEnd('"', '\'', '\\', '>') }
+                        .firstOrNull { it.contains("canvaz", true) || it.contains(".mp4", true) }
 
                     if (!directMatch.isNullOrBlank()) {
                         return directMatch
                     }
 
-                    // 2. Рекурсивный обход JSON-дерева
                     val extracted = extractVideoUrlFromJson(body)
                     if (!extracted.isNullOrBlank()) {
                         return extracted
@@ -251,83 +250,56 @@ object OnlineCanvasManager {
     private fun resolveSpotifyTrackId(artist: String, title: String): String? {
         val query = URLEncoder.encode("$artist $title", "UTF-8")
 
-        // Способ A: Через анонимный токен веб-плеера Spotify
         try {
-            val token = getSpotifyAnonymousToken()
-            if (!token.isNullOrBlank()) {
-                val searchUrl = "https://api.spotify.com/v1/search?q=$query&type=track&limit=3"
-                val req = Request.Builder()
-                    .url(searchUrl)
-                    .header("Authorization", "Bearer $token")
-                    .build()
-                client.newCall(req).execute().use { resp ->
+            val deezerUrl = "https://api.deezer.com/search?q=$query&limit=1"
+            var deezerTrackLink: String? = null
+            client.newCall(Request.Builder().url(deezerUrl).build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string().orEmpty()
+                    val data = gson.fromJson(body, JsonObject::class.java)?.getAsJsonArray("data")
+                    if (data != null && data.size() > 0) {
+                        deezerTrackLink = data.get(0).asJsonObject.get("link")?.asString
+                    }
+                }
+            }
+
+            if (!deezerTrackLink.isNullOrBlank()) {
+                val odesliUrl = "https://api.song.link/v1-alpha.1/links?url=${URLEncoder.encode(deezerTrackLink!!, "UTF-8")}"
+                client.newCall(Request.Builder().url(odesliUrl).build()).execute().use { resp ->
                     if (resp.isSuccessful) {
-                        val body = resp.body?.string() ?: ""
-                        val json = gson.fromJson(body, JsonObject::class.java)
-                        val items = json.getAsJsonObject("tracks")?.getAsJsonArray("items")
-                        if (items != null && items.size() > 0) {
-                            val id = items.get(0).asJsonObject.get("id")?.asString
-                            if (!id.isNullOrBlank() && id.length == 22) return id
+                        val body = resp.body?.string().orEmpty()
+                        val match = spotifyTrackIdRegex.find(body)?.groupValues?.getOrNull(1)
+                        if (!match.isNullOrBlank() && match.length == 22) {
+                            return match
                         }
                     }
                 }
             }
         } catch (_: Exception) {}
 
-        // Способ B: Через публичные поисковые эндпоинты и веб-страницу поиска Spotify
-        val searchUrls = listOf(
-            "https://api.paxsenix.biz.id/spotify/search?q=$query",
-            "https://api.siputzx.my.id/api/s/spotify?query=$query",
-            "https://open.spotify.com/search/$query"
-        )
-
-        for (url in searchUrls) {
-            try {
-                client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
-                    if (resp.isSuccessful) {
-                        val body = resp.body?.string() ?: ""
-                        val foundId = spotifyTrackIdRegex.find(body)?.groupValues?.getOrNull(1)
-                        if (!foundId.isNullOrBlank() && foundId.length == 22) {
-                            return foundId
-                        }
+        val searchUrl = "https://html.duckduckgo.com/html/?q=${URLEncoder.encode("site:open.spotify.com/track $artist $title", "UTF-8")}"
+        try {
+            client.newCall(Request.Builder().url(searchUrl).build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string().orEmpty()
+                        .replace("%2F", "/")
+                        .replace("\\/", "/")
+                    val foundId = spotifyTrackIdRegex.find(body)?.groupValues?.getOrNull(1)
+                    if (!foundId.isNullOrBlank() && foundId.length == 22) {
+                        return foundId
                     }
                 }
-            } catch (_: Exception) {}
-        }
-        return null
-    }
-
-    private fun getSpotifyAnonymousToken(): String? {
-        val now = System.currentTimeMillis()
-        if (cachedSpotifyAnonToken != null && now < tokenExpirationMs) {
-            return cachedSpotifyAnonToken
-        }
-        return try {
-            val req = Request.Builder()
-                .url("https://open.spotify.com/get_access_token?reason=transport&productType=web_player")
-                .build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val json = gson.fromJson(body, JsonObject::class.java)
-                val token = json.get("accessToken")?.asString
-                val exp = json.get("accessTokenExpirationTimestampMs")?.asLong ?: (now + 1800_000L)
-                if (!token.isNullOrBlank()) {
-                    cachedSpotifyAnonToken = token
-                    tokenExpirationMs = exp - 30_000L
-                }
-                token
             }
-        } catch (_: Exception) {
-            null
-        }
+        } catch (_: Exception) {}
+
+        return null
     }
 
     private fun fetchAppleMusicVideo(artist: String, title: String): String? {
         try {
             val term = URLEncoder.encode("$artist $title", "UTF-8")
             val searchUrl = "https://itunes.apple.com/search?term=$term&entity=song&limit=4"
-            var trackViewUrl: String? = null
+            var albumViewUrl: String? = null
 
             client.newCall(Request.Builder().url(searchUrl).build()).execute().use { response ->
                 if (!response.isSuccessful) return null
@@ -337,33 +309,43 @@ object OnlineCanvasManager {
                 if (results != null && results.size() > 0) {
                     for (i in 0 until results.size()) {
                         val item = results.get(i).asJsonObject
-                        val foundArtist = item.get("artistName")?.asString ?: ""
+                        val foundArtist = item.get("artistName")?.asString.orEmpty()
                         if (foundArtist.contains(artist, ignoreCase = true) || artist.contains(foundArtist, ignoreCase = true)) {
-                            trackViewUrl = item.get("collectionViewUrl")?.asString ?: item.get("trackViewUrl")?.asString
-                            if (trackViewUrl != null) break
+                            albumViewUrl = item.get("collectionViewUrl")?.asString ?: item.get("trackViewUrl")?.asString
+                            if (albumViewUrl != null) break
                         }
                     }
-                    if (trackViewUrl == null) {
+                    if (albumViewUrl == null) {
                         val first = results.get(0).asJsonObject
-                        trackViewUrl = first.get("collectionViewUrl")?.asString ?: first.get("trackViewUrl")?.asString
+                        albumViewUrl = first.get("collectionViewUrl")?.asString ?: first.get("trackViewUrl")?.asString
                     }
                 }
             }
 
-            val pageUrl = trackViewUrl ?: return null
-            client.newCall(Request.Builder().url(pageUrl).build()).execute().use { response ->
+            val cleanAlbumPageUrl = albumViewUrl?.substringBefore("?") ?: return null
+
+            client.newCall(Request.Builder().url(cleanAlbumPageUrl).build()).execute().use { response ->
                 if (!response.isSuccessful) return null
-                val html = response.body?.string() ?: return null
-                val matches = m3u8StreamRegex.findAll(html).map { it.value }.toList()
+                val rawHtml = response.body?.string() ?: return null
+                val unescapedHtml = rawHtml
+                    .replace("\\u002F", "/")
+                    .replace("\\/", "/")
+                    .replace("&amp;", "&")
+
+                val matches = m3u8StreamRegex.findAll(unescapedHtml)
+                    .map { it.value.trimEnd('"', '\'', '\\') }
+                    .toList()
+
                 val editorialStream = matches.firstOrNull {
-                    it.contains("editorial", ignoreCase = true) ||
+                    it.contains("mvod.itunes.apple.com", ignoreCase = true) ||
+                            it.contains("editorial", ignoreCase = true) ||
                             it.contains("tall", ignoreCase = true) ||
                             it.contains("motion", ignoreCase = true) ||
                             it.contains("video", ignoreCase = true)
                 } ?: matches.firstOrNull()
 
                 if (!editorialStream.isNullOrBlank()) {
-                    return editorialStream.replace("\\/", "/")
+                    return editorialStream
                 }
             }
         } catch (e: CancellationException) {

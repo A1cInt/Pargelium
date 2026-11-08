@@ -222,6 +222,7 @@ object JamesDspController {
         )
     )
 
+    @Volatile
     private var engineHandle: Long = 0L
     var currentSampleRate: Int = 48000
         private set
@@ -244,7 +245,6 @@ object JamesDspController {
     @Volatile
     private var activeEffectsMask: Int = 0
 
-    // Пользовательские импортированные файлы (.vdc, .eel, .wav/.irs)
     var userVdcPresets: List<BuiltInVdcPreset> = emptyList()
         private set
     var userEelScripts: List<BuiltInEelScript> = emptyList()
@@ -262,7 +262,7 @@ object JamesDspController {
     private var companderGains = FloatArray(7) { 0f }
 
     private var isUserEqEnabled = false
-    private var eqFilterMode = 2 // 2 = IIR 4th Order по умолчанию
+    private var eqFilterMode = 2
     private var eqInterpolationMode = 0
     private var is15BandMode = true
     private var userEqGains10 = FloatArray(10) { 0f }
@@ -343,10 +343,6 @@ object JamesDspController {
         activeEffectsMask = mask
     }
 
-    /**
-     * Сканирует локальные папки приложения (dsp_vdc, dsp_eel, dsp_ir) и возвращает все
-     * добавленные пользователем .vdc, .eel и .wav/.irs файлы, чтобы они отображались в UI.
-     */
     @Synchronized
     fun refreshUserFiles(context: Context) {
         val vdcDir = File(context.filesDir, "dsp_vdc").apply { if (!exists()) mkdirs() }
@@ -518,8 +514,7 @@ object JamesDspController {
                 }
                 isConvolverEnabled = true
                 PrefsManager.saveConvolverEnabled(true)
-                updateActiveEffectsMask()
-                recalculateHeadroomAndSyncEq()
+                recalculateHeadroomOnly()
                 syncConvolverInternal(engineHandle)
             }
             added
@@ -590,7 +585,7 @@ object JamesDspController {
             limThresholdDb = PrefsManager.getLimThreshold()
             limReleaseMs = PrefsManager.getLimRelease()
             postGainDb = PrefsManager.getPostGain()
-            updateActiveEffectsMask()
+            recalculateHeadroomOnly()
             hasRestoredFromPrefs = true
         } catch (_: Exception) {}
     }
@@ -600,14 +595,15 @@ object JamesDspController {
         if (!hasRestoredFromPrefs) {
             syncFromPrefs()
         }
-        if (engineHandle != 0L && currentSampleRate != sampleRate) {
+        if (engineHandle != 0L && currentSampleRate == sampleRate) {
+            return
+        }
+        if (engineHandle != 0L) {
             release()
         }
-        if (engineHandle == 0L) {
-            currentSampleRate = sampleRate
-            engineHandle = nativeInit(sampleRate)
-            applyAllCurrentSettings()
-        }
+        currentSampleRate = sampleRate
+        engineHandle = nativeInit(sampleRate)
+        applyAllCurrentSettings()
     }
 
     @Synchronized
@@ -668,7 +664,10 @@ object JamesDspController {
         return if (is15BandMode) userEqGains15 else interpolate10To15Bands(userEqGains10)
     }
 
-    private fun recalculateHeadroomAndSyncEq() {
+    /**
+     * Быстрый O(1) пересчет коэффициента пред-аттенюации (Headroom) БЕЗ повторного синтеза FIR-эквалайзера в C++.
+     */
+    private fun recalculateHeadroomOnly() {
         updateActiveEffectsMask()
         val activeUser15 = getActiveUserEq15Bands()
         var maxPositiveEqDb = 0f
@@ -704,9 +703,13 @@ object JamesDspController {
 
         currentHeadroomDb = requiredAttenuationDb
         preAmpLinear = 10.0.pow(requiredAttenuationDb.toDouble() / 20.0).toFloat().coerceIn(0.15f, 1.0f)
+    }
 
+    private fun syncEqToNative() {
+        recalculateHeadroomOnly()
         val handle = engineHandle
         if (handle != 0L) {
+            val activeUser15 = getActiveUserEq15Bands()
             nativeSetEqualizer(handle, isUserEqEnabled, eqFilterMode, eqInterpolationMode, activeUser15)
             syncArbitraryEqInternal(handle)
         }
@@ -910,7 +913,7 @@ object JamesDspController {
     private fun applyAllCurrentSettings() {
         val handle = engineHandle
         if (handle == 0L) return
-        recalculateHeadroomAndSyncEq()
+        syncEqToNative()
         nativeSetBass(handle, isBassEnabled, bassGainDb)
         nativeSetCompander(
             handle,
@@ -939,13 +942,13 @@ object JamesDspController {
     @Synchronized
     fun setAutoHeadroom(enabled: Boolean) {
         isAutoHeadroomEnabled = enabled
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
     }
 
     @Synchronized
     fun setEqualizerEnabled(enabled: Boolean) {
         isUserEqEnabled = enabled
-        recalculateHeadroomAndSyncEq()
+        syncEqToNative()
     }
 
     @Synchronized
@@ -957,7 +960,7 @@ object JamesDspController {
             }
             is15BandMode = enabled15Bands
             PrefsManager.saveEq15BandMode(enabled15Bands)
-            recalculateHeadroomAndSyncEq()
+            syncEqToNative()
         }
     }
 
@@ -965,14 +968,14 @@ object JamesDspController {
     fun setEqFilterMode(mode: Int) {
         eqFilterMode = mode.coerceIn(0, 6)
         PrefsManager.saveEqFilterMode(eqFilterMode)
-        recalculateHeadroomAndSyncEq()
+        syncEqToNative()
     }
 
     @Synchronized
     fun setEqInterpolationMode(mode: Int) {
         eqInterpolationMode = mode.coerceIn(0, 1)
         PrefsManager.saveEqInterpolationMode(eqInterpolationMode)
-        recalculateHeadroomAndSyncEq()
+        syncEqToNative()
     }
 
     @Synchronized
@@ -985,40 +988,43 @@ object JamesDspController {
                 userEqGains15 = interpolate10To15Bands(userEqGains10)
             }
         }
-        recalculateHeadroomAndSyncEq()
+        syncEqToNative()
     }
 
     @Synchronized
     fun setEqualizerGains15(gains15: FloatArray) {
         userEqGains15 = gains15.copyOf()
-        recalculateHeadroomAndSyncEq()
+        syncEqToNative()
     }
 
     @Synchronized
     fun setAutoEqEnabled(enabled: Boolean) {
         isAutoEqEnabled = enabled
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
+        syncArbitraryEqInternal(engineHandle)
     }
 
     @Synchronized
     fun applyAutoEq(gains: FloatArray) {
         autoEqGains = gains.copyOf()
         isAutoEqEnabled = true
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
+        syncArbitraryEqInternal(engineHandle)
     }
 
     @Synchronized
     fun setCustomGraphicEqString(str: String) {
         customGraphicEqString = str.trim()
         PrefsManager.saveCustomGraphicEqString(customGraphicEqString)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
+        syncArbitraryEqInternal(engineHandle)
     }
 
     @Synchronized
     fun setCompanderEnabled(enabled: Boolean) {
         isCompanderEnabled = enabled
         PrefsManager.saveCompanderEnabled(enabled)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L) {
             nativeSetCompander(
                 engineHandle,
@@ -1037,7 +1043,7 @@ object JamesDspController {
         companderGranularity = granularity.coerceIn(1, 4)
         companderTfResolution = tfResolution.coerceIn(0, 3)
         companderGains = gains7.copyOf()
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L && isCompanderEnabled) {
             nativeSetCompander(
                 engineHandle,
@@ -1053,28 +1059,28 @@ object JamesDspController {
     @Synchronized
     fun setBassEnabled(enabled: Boolean) {
         isBassEnabled = enabled
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L) nativeSetBass(engineHandle, enabled, bassGainDb)
     }
 
     @Synchronized
     fun setBassGain(gainDb: Short) {
         bassGainDb = gainDb.toFloat().coerceIn(0f, 15f)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L && isBassEnabled) nativeSetBass(engineHandle, true, bassGainDb)
     }
 
     @Synchronized
     fun setBassGainFloat(gainDb: Float) {
         bassGainDb = gainDb.coerceIn(0f, 15f)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L && isBassEnabled) nativeSetBass(engineHandle, true, bassGainDb)
     }
 
     @Synchronized
     fun setReverbEnabled(enabled: Boolean) {
         isReverbEnabled = enabled
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L) nativeSetReverb(engineHandle, enabled, reverbPreset)
     }
 
@@ -1113,14 +1119,14 @@ object JamesDspController {
     @Synchronized
     fun setTubeEnabled(enabled: Boolean) {
         isTubeEnabled = enabled
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L) nativeSetTube(engineHandle, enabled, tubeDriveDb)
     }
 
     @Synchronized
     fun setTubeDrive(drive: Float) {
         tubeDriveDb = drive.coerceIn(0f, 12f)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         if (engineHandle != 0L && isTubeEnabled) nativeSetTube(engineHandle, true, tubeDriveDb)
     }
 
@@ -1152,7 +1158,7 @@ object JamesDspController {
     fun setConvolverEnabled(enabled: Boolean) {
         isConvolverEnabled = enabled
         PrefsManager.saveConvolverEnabled(enabled)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         syncConvolverInternal(engineHandle)
     }
 
@@ -1196,7 +1202,7 @@ object JamesDspController {
     fun setLiveprogEnabled(enabled: Boolean) {
         isLiveprogEnabled = enabled
         PrefsManager.saveLiveprogEnabled(enabled)
-        recalculateHeadroomAndSyncEq()
+        recalculateHeadroomOnly()
         syncLiveprogInternal(engineHandle)
     }
 

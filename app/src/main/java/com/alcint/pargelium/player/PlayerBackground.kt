@@ -50,7 +50,8 @@ fun PlayerBackground(
     dynamicSeedColor: Color,
     isPlaying: Boolean,
     imageLoader: ImageLoader,
-    appContext: Context
+    appContext: Context,
+    enableBackdropCapture: Boolean = true
 ) {
     val isBlurred = blurRadius > 0.dp && !isVideo
     val imageBlurModifier = remember(isBlurred, blurRadius) {
@@ -61,14 +62,17 @@ fun PlayerBackground(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .layerBackdrop(playerBackdrop)
-    ) {
+    // Не записываем offscreen-буфер LayerBackdrop, если кнопки не в режиме Liquid Glass или если играет аппаратное видео
+    val rootModifier = if (enableBackdropCapture && !(backgroundState == "canvas" && isVideo)) {
+        Modifier.fillMaxSize().layerBackdrop(playerBackdrop)
+    } else {
+        Modifier.fillMaxSize()
+    }
+
+    Box(modifier = rootModifier) {
         Crossfade(
             targetState = backgroundState,
-            animationSpec = tween(700),
+            animationSpec = tween(600),
             label = "bg_clear",
             modifier = Modifier.fillMaxSize()
         ) { state ->
@@ -95,7 +99,7 @@ fun PlayerBackground(
                                     .data(canvasUri)
                                     .apply {
                                         if (isBlurred) {
-                                            size(512)
+                                            size(384)
                                             precision(Precision.INEXACT)
                                         }
                                     }
@@ -113,12 +117,16 @@ fun PlayerBackground(
                     }
                 }
                 "cover" -> {
-                    val artModel = remember(track.id, track.albumId) {
-                        val saavnTrack = SaavnApi.trackCache[track.id]
-                        when {
-                            saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-                            track.albumId != 0L -> ContentUris.withAppendedId(ALBUM_ART_BASE_URI, track.albumId)
-                            else -> null
+                    val artModel = remember(track.id, track.albumId, track.coverUrl) {
+                        if (!track.coverUrl.isNullOrBlank() && track.coverUrl != "null") {
+                            track.coverUrl
+                        } else {
+                            val saavnTrack = SaavnApi.trackCache[track.id]
+                            when {
+                                saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
+                                track.albumId > 0L -> ContentUris.withAppendedId(ALBUM_ART_BASE_URI, track.albumId)
+                                else -> null
+                            }
                         }
                     }
                     if (artModel != null) {
@@ -127,7 +135,7 @@ fun PlayerBackground(
                                 .data(artModel)
                                 .apply {
                                     if (isBlurred) {
-                                        size(512)
+                                        size(384)
                                         precision(Precision.INEXACT)
                                     }
                                 }

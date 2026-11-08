@@ -71,11 +71,9 @@ fun BackdropEffectScope.lens(
 
 private const val ROUNDED_RECT_SDF = """
 float radiusAt(float2 coord, float4 radii) {
-    if (coord.x >= 0.0) {
-        return (coord.y <= 0.0) ? radii.y : radii.z;
-    } else {
-        return (coord.y <= 0.0) ? radii.x : radii.w;
-    }
+    float2 rightRadii = mix(radii.yz, radii.zy, step(0.0, coord.y));
+    float2 leftRadii = mix(radii.xw, radii.wx, step(0.0, coord.y));
+    return mix(leftRadii.x, rightRadii.x, step(0.0, coord.x));
 }
 
 float sdRoundedRect(float2 coord, float2 halfSize, float radius) {
@@ -87,13 +85,19 @@ float sdRoundedRect(float2 coord, float2 halfSize, float radius) {
 
 float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {
     float2 cornerCoord = abs(coord) - (halfSize - float2(radius));
-    if (cornerCoord.x >= 0.0 || cornerCoord.y >= 0.0) {
-        float2 clamped = max(cornerCoord, 0.0);
-        return sign(coord) * (clamped / max(length(clamped), 0.0001));
-    } else {
-        float gradX = step(cornerCoord.y, cornerCoord.x);
-        return sign(coord) * float2(gradX, 1.0 - gradX);
-    }
+    float2 clamped = max(cornerCoord, 0.0);
+    float lenSq = dot(clamped, clamped);
+    float isCorner = step(0.0001, lenSq);
+    float2 cornerGrad = clamped * inversesqrt(max(lenSq, 0.0001));
+    float gradX = step(cornerCoord.y, cornerCoord.x);
+    float2 edgeGrad = float2(gradX, 1.0 - gradX);
+    return sign(coord) * mix(edgeGrad, cornerGrad, isCorner);
+}
+
+float lensProfile(float normalizedDepth) {
+    float t = clamp(1.0 - normalizedDepth, 0.0, 1.0);
+    float smoothT = t * t * (3.0 - 2.0 * t);
+    return smoothT * (1.0 - sqrt(max(1.0 - t * t, 0.0)));
 }
 """
 
@@ -109,10 +113,6 @@ uniform float depthEffect;
 
 $ROUNDED_RECT_SDF
 
-float circleMap(float x) {
-    return 1.0 - sqrt(max(1.0 - x * x, 0.0));
-}
-
 half4 main(float2 coord) {
     float2 halfSize = size * 0.5;
     float2 centeredCoord = (coord + offset) - halfSize;
@@ -124,11 +124,11 @@ half4 main(float2 coord) {
     }
     sd = min(sd, 0.0);
 
-    float d = circleMap(1.0 - (-sd / refractionHeight)) * refractionAmount;
-    float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));
-    float2 safeCenterDir = centeredCoord / max(length(centeredCoord), 0.0001);
-    float2 rawGrad = gradSdRoundedRect(centeredCoord, halfSize, gradRadius) + depthEffect * safeCenterDir;
-    float2 grad = rawGrad / max(length(rawGrad), 0.0001);
+    float d = lensProfile(-sd / refractionHeight) * refractionAmount;
+    float gradRadius = min(radius * 1.25, min(halfSize.x, halfSize.y));
+    float2 aspectNormCenter = centeredCoord / max(halfSize, float2(1.0));
+    float2 rawGrad = gradSdRoundedRect(centeredCoord, halfSize, gradRadius) + (depthEffect * 0.35) * aspectNormCenter;
+    float2 grad = rawGrad * inversesqrt(max(dot(rawGrad, rawGrad), 0.0001));
 
     return content.eval(coord + d * grad);
 }
@@ -147,10 +147,6 @@ uniform float chromaticAberration;
 
 $ROUNDED_RECT_SDF
 
-float circleMap(float x) {
-    return 1.0 - sqrt(max(1.0 - x * x, 0.0));
-}
-
 half4 main(float2 coord) {
     float2 halfSize = size * 0.5;
     float2 centeredCoord = (coord + offset) - halfSize;
@@ -162,17 +158,17 @@ half4 main(float2 coord) {
     }
     sd = min(sd, 0.0);
 
-    float d = circleMap(1.0 - (-sd / refractionHeight)) * refractionAmount;
-    float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));
-    float2 safeCenterDir = centeredCoord / max(length(centeredCoord), 0.0001);
-    float2 rawGrad = gradSdRoundedRect(centeredCoord, halfSize, gradRadius) + depthEffect * safeCenterDir;
-    float2 grad = rawGrad / max(length(rawGrad), 0.0001);
+    float d = lensProfile(-sd / refractionHeight) * refractionAmount;
+    float gradRadius = min(radius * 1.25, min(halfSize.x, halfSize.y));
+    float2 aspectNormCenter = centeredCoord / max(halfSize, float2(1.0));
+    float2 rawGrad = gradSdRoundedRect(centeredCoord, halfSize, gradRadius) + (depthEffect * 0.35) * aspectNormCenter;
+    float2 grad = rawGrad * inversesqrt(max(dot(rawGrad, rawGrad), 0.0001));
 
     float2 refractedCoord = coord + d * grad;
     float dispersionIntensity = chromaticAberration * ((centeredCoord.x * centeredCoord.y) / max(halfSize.x * halfSize.y, 1.0));
     float2 dispersedCoord = d * grad * dispersionIntensity;
 
-    if (dot(dispersedCoord, dispersedCoord) < 0.02) {
+    if (dot(dispersedCoord, dispersedCoord) < 0.025) {
         return content.eval(refractedCoord);
     }
 
@@ -184,7 +180,7 @@ half4 main(float2 coord) {
     color.r = sPlus.r * 0.72 + sMid.r * 0.28;
     color.g = sMid.g * 0.64 + (sPlus.g + sMinus.g) * 0.18;
     color.b = sMinus.b * 0.72 + sMid.b * 0.28;
-    color.a = (sPlus.a + sMid.a + sMinus.a) * (1.0 / 3.0);
+    color.a = (sPlus.a + sMid.a + sMinus.a) * 0.33333334;
     return color;
 }
 """

@@ -12,22 +12,13 @@ import android.os.Environment
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MotionScheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.media3.common.util.UnstableApi
 import com.alcint.pargelium.library.LibraryScreen
 import com.alcint.pargelium.onboarding.OnboardingScreen
 import com.alcint.pargelium.onboarding.isPargeliumThemeLight
-import com.alcint.pargelium.onboarding.rememberPargeliumExpressiveColorScheme
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
@@ -46,17 +37,16 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
-        val intent = Intent(this, PlaybackService::class.java)
-        startService(intent)
-
-        UpdateManager.checkForUpdates(this, isManual = false)
+        if (PrefsManager.isOnboardingCompleted()) {
+            startService(Intent(this, PlaybackService::class.java))
+            UpdateManager.checkForUpdates(this, isManual = false)
+        }
 
         setContent {
             val backdrop = rememberLayerBackdrop()
             var isOnboardingDone by remember { mutableStateOf(PrefsManager.isOnboardingCompleted()) }
             var activeThemeMode by remember { mutableIntStateOf(PrefsManager.getThemeMode()) }
 
-            val colorScheme = rememberPargeliumExpressiveColorScheme(activeThemeMode)
             val isLight = isPargeliumThemeLight(activeThemeMode)
 
             LaunchedEffect(isLight) {
@@ -65,38 +55,24 @@ class MainActivity : AppCompatActivity() {
                 insetsController.isAppearanceLightNavigationBars = isLight
             }
 
-            MaterialExpressiveTheme(
-                colorScheme = colorScheme,
-                motionScheme = MotionScheme.expressive()
-            ) {
-                CompositionLocalProvider(LocalBackdrop provides backdrop) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        Crossfade(
-                            targetState = isOnboardingDone,
-                            animationSpec = tween(380),
-                            label = "onboardingTransition"
-                        ) { completed ->
-                            if (!completed) {
-                                OnboardingScreen(
-                                    onThemePreviewChanged = { newMode ->
-                                        activeThemeMode = newMode
-                                    },
-                                    onComplete = {
-                                        activeThemeMode = PrefsManager.getThemeMode()
-                                        AudioRepository.clearCache()
-                                        isOnboardingDone = true
-                                    }
-                                )
-                            } else {
-                                LibraryScreen(
-                                    onSecureRequest = { isSecure -> setSecureMode(isSecure) }
-                                )
-                            }
+            CompositionLocalProvider(LocalBackdrop provides backdrop) {
+                if (!isOnboardingDone) {
+                    OnboardingScreen(
+                        onThemePreviewChanged = { newMode ->
+                            activeThemeMode = newMode
+                        },
+                        onComplete = {
+                            activeThemeMode = PrefsManager.getThemeMode()
+                            AudioRepository.clearCache()
+                            startService(Intent(this@MainActivity, PlaybackService::class.java))
+                            UpdateManager.checkForUpdates(this@MainActivity, isManual = false)
+                            isOnboardingDone = true
                         }
-                    }
+                    )
+                } else {
+                    LibraryScreen(
+                        onSecureRequest = { isSecure -> setSecureMode(isSecure) }
+                    )
                 }
             }
         }

@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Compress
 import androidx.compose.material.icons.rounded.Delete
@@ -215,10 +214,25 @@ fun EqualizerScreen(seedColor: Color) {
     var limRelease by remember { mutableFloatStateOf(PrefsManager.getLimRelease()) }
     var postGain by remember { mutableFloatStateOf(PrefsManager.getPostGain()) }
 
-    // Сохраненные пользовательские полные профили JamesDSP
     var savedSnapshots by remember { mutableStateOf(PrefsManager.getSavedDspSnapshots()) }
     var showSaveSnapshotDialog by remember { mutableStateOf(false) }
     var snapshotNameInput by remember { mutableStateOf("") }
+
+    fun loadAutoEqIndex(force: Boolean = false) {
+        scope.launch {
+            isAutoEqListLoading = true
+            autoEqErrorText = null
+            try {
+                autoEqDatabaseList = withContext(Dispatchers.IO) {
+                    AutoEqApi.getDatabaseIndex(forceRefresh = force)
+                }
+            } catch (e: Exception) {
+                autoEqErrorText = e.message
+            } finally {
+                isAutoEqListLoading = false
+            }
+        }
+    }
 
     val vdcFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -298,15 +312,7 @@ fun EqualizerScreen(seedColor: Color) {
         }
         userFilesVersion++
         irWaveform = JamesDspController.currentIrWaveformPreview
-        try {
-            isAutoEqListLoading = true
-            autoEqErrorText = null
-            autoEqDatabaseList = withContext(Dispatchers.IO) { AutoEqApi.getDatabaseIndex() }
-        } catch (e: Exception) {
-            autoEqErrorText = e.message
-        } finally {
-            isAutoEqListLoading = false
-        }
+        loadAutoEqIndex(force = false)
     }
 
     var connectedDeviceName by remember { mutableStateOf<String?>(null) }
@@ -420,6 +426,7 @@ fun EqualizerScreen(seedColor: Color) {
     ) {
         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
+        // Исправленная шапка: заголовок не сжимает статус-бейдж в узкую колонку
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -427,16 +434,24 @@ fun EqualizerScreen(seedColor: Color) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = stringResource(id = R.string.sound_effects_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = stringResource(id = R.string.sound_effects_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold
-                    )
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = if (isEnabled) accentColor.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
@@ -450,19 +465,22 @@ fun EqualizerScreen(seedColor: Color) {
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (isEnabled) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
-                }
-                if (connectedDeviceName != null) {
-                    Text(
-                        text = "🎧 $connectedDeviceName",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                    if (connectedDeviceName != null) {
+                        Text(
+                            text = "🎧 $connectedDeviceName",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -508,7 +526,14 @@ fun EqualizerScreen(seedColor: Color) {
                         AssistChip(
                             onClick = { showSaveSnapshotDialog = true },
                             leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            label = { Text(stringResource(id = R.string.dsp_save_profile_btn), fontWeight = FontWeight.Bold) },
+                            label = {
+                                Text(
+                                    text = stringResource(id = R.string.dsp_save_profile_btn),
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
                             shape = RoundedCornerShape(12.dp)
                         )
                     }
@@ -605,7 +630,14 @@ fun EqualizerScreen(seedColor: Color) {
                                 PrefsManager.savePostGain(postGain)
                                 JamesDspController.setLimiterParams(limThreshold, limRelease, postGain)
                             },
-                            label = { Text(snap.name, fontWeight = FontWeight.SemiBold) },
+                            label = {
+                                Text(
+                                    text = snap.name,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.Delete,
@@ -693,7 +725,12 @@ fun EqualizerScreen(seedColor: Color) {
                                 onClick = { showGraphicEqEditor = !showGraphicEqEditor },
                                 shape = RoundedCornerShape(14.dp)
                             ) {
-                                Text(stringResource(id = R.string.dsp_graphiceq_btn), fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = stringResource(id = R.string.dsp_graphiceq_btn),
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
 
@@ -778,7 +815,9 @@ fun EqualizerScreen(seedColor: Color) {
                                         } else {
                                             stringResource(id = R.string.dsp_badge_10_band)
                                         },
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 },
                                 shape = RoundedCornerShape(12.dp)
@@ -792,7 +831,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     eqInterpMode = if (eqInterpMode == 0) 1 else 0
                                     JamesDspController.setEqInterpolationMode(eqInterpMode)
                                 },
-                                label = { Text(splineLabel) },
+                                label = { Text(splineLabel, maxLines = 1, softWrap = false) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -804,7 +843,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     eqFilterMode = idx
                                     JamesDspController.setEqFilterMode(idx)
                                 },
-                                label = { Text(modeName) },
+                                label = { Text(modeName, maxLines = 1, softWrap = false) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -832,7 +871,14 @@ fun EqualizerScreen(seedColor: Color) {
                                     PrefsManager.saveUserEqGains15(arr15)
                                     JamesDspController.setEqualizerGains(if (is15BandMode) arr15 else arr10)
                                 },
-                                label = { Text(preset.name, fontWeight = FontWeight.SemiBold) },
+                                label = {
+                                    Text(
+                                        text = preset.name,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -850,12 +896,16 @@ fun EqualizerScreen(seedColor: Color) {
                             val gainVal = activeGainsList[i]
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 5.dp)
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .padding(horizontal = 2.dp)
                             ) {
                                 Text(
                                     text = String.format(Locale.US, "%+.1f", gainVal),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     color = if (abs(gainVal) > 0.2f) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Box(
@@ -870,7 +920,6 @@ fun EqualizerScreen(seedColor: Color) {
                                             activePresetName = null
                                             if (is15BandMode) {
                                                 userEqGains15[i] = newValue
-                                                // Для IIR-режимов обновляем мгновенно, для тяжелого FIR — по завершении жеста
                                                 if (eqFilterMode >= 2) {
                                                     JamesDspController.setEqualizerGains15(userEqGains15.toFloatArray())
                                                 }
@@ -908,7 +957,9 @@ fun EqualizerScreen(seedColor: Color) {
                                 Text(
                                     text = activeLabels[i],
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -1016,7 +1067,7 @@ fun EqualizerScreen(seedColor: Color) {
                                         companderTc, companderGranularity, companderTfRes, companderGains.toFloatArray()
                                     )
                                 },
-                                label = { Text(label) },
+                                label = { Text(label, maxLines = 1, softWrap = false) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -1033,12 +1084,16 @@ fun EqualizerScreen(seedColor: Color) {
                             val gVal = companderGains[i]
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 6.dp)
+                                modifier = Modifier
+                                    .width(46.dp)
+                                    .padding(horizontal = 2.dp)
                             ) {
                                 Text(
                                     text = String.format(Locale.US, "%+.1f", gVal),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     color = if (abs(gVal) > 0.2f) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Box(
@@ -1075,7 +1130,9 @@ fun EqualizerScreen(seedColor: Color) {
                                 Text(
                                     text = companderLabels[i],
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -1122,7 +1179,14 @@ fun EqualizerScreen(seedColor: Color) {
                                     }
                                     JamesDspController.setLiveprogScript(script.id)
                                 },
-                                label = { Text(script.fileName, fontWeight = FontWeight.Bold) },
+                                label = {
+                                    Text(
+                                        text = script.fileName,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                },
                                 trailingIcon = if (script.isUserFile) {
                                     {
                                         Icon(
@@ -1178,7 +1242,12 @@ fun EqualizerScreen(seedColor: Color) {
                         ) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(stringResource(id = R.string.dsp_import_eel_btn), fontWeight = FontWeight.Bold)
+                            Text(
+                                text = stringResource(id = R.string.dsp_import_eel_btn),
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
 
                         FilledTonalButton(
@@ -1191,7 +1260,9 @@ fun EqualizerScreen(seedColor: Color) {
                                 text = stringResource(
                                     id = if (showEelSourceEditor) R.string.dsp_hide_code_btn else R.string.dsp_eel_editor_btn
                                 ),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -1580,7 +1651,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     PrefsManager.saveReverbMode(index)
                                     JamesDspController.setReverbPreset(index.toShort())
                                 },
-                                label = { Text(name) },
+                                label = { Text(name, maxLines = 1, softWrap = false) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -1646,7 +1717,7 @@ fun EqualizerScreen(seedColor: Color) {
                                     PrefsManager.saveBs2bMode(index)
                                     JamesDspController.setBs2bMode(index.toShort())
                                 },
-                                label = { Text(name) },
+                                label = { Text(name, maxLines = 1, softWrap = false) },
                                 shape = RoundedCornerShape(12.dp)
                             )
                         }
@@ -1770,6 +1841,7 @@ fun EqualizerScreen(seedColor: Color) {
             databaseList = autoEqDatabaseList,
             isListLoading = isAutoEqListLoading,
             errorText = autoEqErrorText,
+            onRetryLoad = { loadAutoEqIndex(force = true) },
             onDismiss = { showAutoEqSheet = false },
             onProfileSelected = {
                 currentProfile = PrefsManager.getCurrentAutoEqProfile()
@@ -1805,7 +1877,6 @@ private fun DspSignalTelemetryDeck(
             streamBitDepth = globalAudioBitDepth
             streamIsFloat = globalAudioIsFloat
             streamSampleRate = globalAudioSampleRate
-            // Если звук на паузе/тишина, опрашиваем в 4 раза реже для нулевого расхода батареи
             delay(if (loud > 0.002f) 100L else 400L)
         }
         if (!isEnabled) {
@@ -1847,7 +1918,10 @@ private fun DspSignalTelemetryDeck(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.GraphicEq,
@@ -1858,7 +1932,9 @@ private fun DspSignalTelemetryDeck(
                         Text(
                             text = formatBitStr,
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = if (autoHeadroomEnabled) {
@@ -1867,7 +1943,9 @@ private fun DspSignalTelemetryDeck(
                                 stringResource(id = R.string.dsp_telemetry_manual_preamp_fmt, livePeakDb)
                             },
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -1886,7 +1964,9 @@ private fun DspSignalTelemetryDeck(
                         Text(
                             text = stringResource(id = R.string.dsp_anti_clip_label),
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     },
                     shape = RoundedCornerShape(50)
@@ -2033,7 +2113,9 @@ private fun SectionHeaderTitle(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -2065,7 +2147,16 @@ fun SettingSlider(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
+            )
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = accentColor.copy(alpha = 0.14f)
@@ -2075,6 +2166,8 @@ fun SettingSlider(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = accentColor,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                 )
             }
@@ -2092,6 +2185,11 @@ fun SettingSlider(
     }
 }
 
+/**
+ * Исправленная карточка эффекта:
+ * 1) Заголовок имеет Modifier.weight(1f, fill = false), поэтому НЕ выдавливает бейдж в узкую 2dp-щель.
+ * 2) Бейдж имеет maxLines = 1 и softWrap = false, поэтому никогда не распадается по буквам в столбик.
+ */
 @Composable
 fun EffectCardWithSettings(
     title: String,
@@ -2141,25 +2239,33 @@ fun EffectCardWithSettings(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = title,
                             fontWeight = FontWeight.ExtraBold,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         if (!badge.isNullOrBlank()) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = accentColor.copy(alpha = 0.18f)
+                                color = accentColor.copy(alpha = 0.18f),
+                                modifier = Modifier.widthIn(max = 136.dp)
                             ) {
                                 Text(
                                     text = badge,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = accentColor,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                 )
                             }
                         }
@@ -2196,6 +2302,7 @@ fun AutoEqSelectionSheet(
     databaseList: List<AutoEqProfile>,
     isListLoading: Boolean,
     errorText: String?,
+    onRetryLoad: () -> Unit = {},
     onDismiss: () -> Unit,
     onProfileSelected: () -> Unit
 ) {
@@ -2209,7 +2316,11 @@ fun AutoEqSelectionSheet(
             val base = if (searchQuery.isBlank()) {
                 databaseList
             } else {
-                databaseList.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                val tokens = searchQuery.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                databaseList.filter { prof ->
+                    val lower = prof.name.lowercase()
+                    tokens.all { lower.contains(it) }
+                }
             }
             val dev = connectedDeviceName?.trim()
             if (!dev.isNullOrEmpty() && searchQuery.isBlank()) {
@@ -2254,7 +2365,7 @@ fun AutoEqSelectionSheet(
                             searchQuery = if (searchQuery.equals(connectedDeviceName, ignoreCase = true)) "" else connectedDeviceName
                         },
                         leadingIcon = { Icon(Icons.Default.Headphones, null, modifier = Modifier.size(16.dp)) },
-                        label = { Text(connectedDeviceName) },
+                        label = { Text(connectedDeviceName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -2288,14 +2399,30 @@ fun AutoEqSelectionSheet(
                 if (isListLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 } else if (errorText != null || downloadError != null) {
-                    Text(
-                        text = errorText ?: downloadError ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
+                    Column(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(32.dp)
-                    )
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = errorText ?: downloadError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                        FilledTonalButton(
+                            onClick = {
+                                downloadError = null
+                                onRetryLoad()
+                            },
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(id = R.string.action_refresh_library), fontWeight = FontWeight.Bold)
+                        }
+                    }
                 } else if (filtered.isEmpty()) {
                     Text(
                         text = stringResource(id = R.string.search_no_results),
@@ -2306,7 +2433,7 @@ fun AutoEqSelectionSheet(
                     LazyColumn {
                         itemsIndexed(
                             items = filtered,
-                            key = { index, item -> "${index}_${item.name}" },
+                            key = { index, item -> "${index}_${item.path}" },
                             contentType = { _, _ -> "autoeq_item" }
                         ) { _, profile ->
                             val isSelected = profile.name == currentProfileName
@@ -2318,9 +2445,21 @@ fun AutoEqSelectionSheet(
                                     Text(
                                         text = profile.name,
                                         fontWeight = if (isSelected || isConnectedMatch) FontWeight.ExtraBold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 },
+                                supportingContent = if (profile.source.isNotBlank()) {
+                                    {
+                                        Text(
+                                            text = profile.source,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                } else null,
                                 leadingContent = {
                                     Icon(
                                         imageVector = Icons.Default.Headphones,

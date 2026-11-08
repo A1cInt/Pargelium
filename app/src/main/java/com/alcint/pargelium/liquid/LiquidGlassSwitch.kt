@@ -4,37 +4,35 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
-
-private val CachedTrackInnerShadow = InnerShadow(
-    radius = 5.dp,
-    offset = DpOffset(0.dp, 2.dp),
-    color = Color.Black.copy(alpha = 0.24f)
-)
 
 @Composable
 fun LiquidGlassSwitch(
@@ -45,7 +43,6 @@ fun LiquidGlassSwitch(
 ) {
     val isInDark = isSystemInDarkTheme()
     val haptic = LocalHapticFeedback.current
-    val shape = CircleShape
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -79,48 +76,17 @@ fun LiquidGlassSwitch(
         label = "trackColor"
     )
 
-    val rimBrush = remember(isInDark, checked, primaryColor) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.White.copy(alpha = if (checked) 0.52f else if (isInDark) 0.28f else 0.45f),
-                (if (checked) primaryColor else Color.White).copy(alpha = if (isInDark) 0.12f else 0.18f)
-            )
-        )
-    }
-
-    val thumbLensBrush = remember {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.White,
-                Color(0xFFF2F4F8),
-                Color(0xFFE4E8F0)
-            )
-        )
-    }
-
-    val thumbRimBrush = remember {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.White,
-                Color.White.copy(alpha = 0.35f)
-            )
-        )
-    }
-
-    Box(
+    Spacer(
         modifier = modifier
             .width(56.dp)
             .height(32.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
             .shadow(
-                elevation = if (checked) 6.dp else 3.dp,
-                shape = shape,
+                elevation = if (checked) 5.dp else 2.dp,
+                shape = CircleShape,
                 spotColor = if (checked) primaryColor.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.25f)
             )
-            .clip(shape)
-            .background(trackColor)
-            .innerShadow(shape) { CachedTrackInnerShadow }
-            .border(width = 1.dp, brush = rimBrush, shape = shape)
+            .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -130,76 +96,128 @@ fun LiquidGlassSwitch(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onCheckedChange(!checked)
             }
-            .padding(3.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        val travelDistance = 24.dp
+            .drawWithCache {
+                val trackCorner = CornerRadius(size.height / 2f, size.height / 2f)
+                val strokeW = 1.dp.toPx()
+                val padPx = 3.dp.toPx()
+                val thumbDiameter = size.height - padPx * 2f
+                val thumbRadius = thumbDiameter / 2f
+                val travelPx = (size.width - size.height).coerceAtLeast(0f)
 
-        // Внутренний световой ореол под каплей
-        if (progress > 0.02f) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val centerX = (size.height * 0.5f) + progress * (size.width - size.height)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.35f * progress),
-                            Color.Transparent
-                        ),
-                        center = Offset(centerX, size.height * 0.5f),
-                        radius = size.height * 0.75f
-                    ),
-                    center = Offset(centerX, size.height * 0.5f),
-                    radius = size.height * 0.75f
-                )
-            }
-        }
-
-        // 3D капля-бегунок с бликом линзы и светящимся ядром
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .graphicsLayer {
-                    translationX = progress * travelDistance.toPx()
-                    scaleX = motionStretch * pressStretch
-                    scaleY = pressSquishY
-                }
-                .shadow(
-                    elevation = 4.dp,
-                    shape = CircleShape,
-                    spotColor = if (checked) primaryColor.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.35f)
-                )
-                .clip(CircleShape)
-                .background(thumbLensBrush)
-                .border(
-                    width = 1.dp,
-                    brush = thumbRimBrush,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            // Верхний зеркальный блик капли + акцентная микро-линза в центре
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawOval(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.95f),
-                            Color.White.copy(alpha = 0.0f)
-                        ),
-                        startY = 0f,
-                        endY = size.height * 0.52f
-                    ),
-                    topLeft = Offset(size.width * 0.18f, size.height * 0.08f),
-                    size = androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.38f)
+                val innerDepthBrush = Brush.verticalGradient(
+                    0.0f to Color.Black.copy(alpha = 0.24f),
+                    0.35f to Color.Black.copy(alpha = 0.05f),
+                    0.75f to Color.Transparent,
+                    1.0f to Color.White.copy(alpha = 0.08f)
                 )
 
-                if (progress > 0.05f) {
-                    drawCircle(
-                        color = primaryColor.copy(alpha = 0.85f * progress),
-                        radius = (size.minDimension * 0.16f) * progress,
-                        center = center
+                val rimBrush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = if (checked) 0.52f else if (isInDark) 0.28f else 0.45f),
+                        (if (checked) primaryColor else Color.White).copy(alpha = if (isInDark) 0.12f else 0.18f)
                     )
+                )
+
+                val thumbLensBrush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White,
+                        Color(0xFFF2F4F8),
+                        Color(0xFFE4E8F0)
+                    )
+                )
+
+                val thumbSpecularBrush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.95f),
+                        Color.White.copy(alpha = 0.0f)
+                    ),
+                    startY = 0f,
+                    endY = thumbDiameter * 0.52f
+                )
+
+                onDrawBehind {
+                    // 1. Фон стеклянного желоба + мягкая внутренняя тень глубины (без тяжелого BlurEffect)
+                    drawRoundRect(
+                        color = trackColor,
+                        cornerRadius = trackCorner
+                    )
+                    drawRoundRect(
+                        brush = innerDepthBrush,
+                        cornerRadius = trackCorner
+                    )
+                    drawRoundRect(
+                        brush = rimBrush,
+                        cornerRadius = trackCorner,
+                        style = Stroke(width = strokeW)
+                    )
+
+                    val centerX = padPx + thumbRadius + progress * travelPx
+                    val centerY = size.height * 0.5f
+
+                    // 2. Световой ореол под каплей
+                    if (progress > 0.02f) {
+                        val glowRadius = size.height * 0.72f
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.34f * progress),
+                                    Color.Transparent
+                                ),
+                                center = Offset(centerX, centerY),
+                                radius = glowRadius
+                            ),
+                            center = Offset(centerX, centerY),
+                            radius = glowRadius
+                        )
+                    }
+
+                    // 3. 3D капля-бегунок с упругой деформацией, тенью, зеркальным бликом и неоновым ядром
+                    val sx = motionStretch * pressStretch
+                    val sy = pressSquishY
+
+                    withTransform({
+                        translate(left = centerX, top = centerY)
+                        scale(scaleX = sx, scaleY = sy, pivot = Offset.Zero)
+                    }) {
+                        // Мягкая контактная тень под каплей
+                        drawCircle(
+                            color = if (checked) primaryColor.copy(alpha = 0.32f) else Color.Black.copy(alpha = 0.22f),
+                            radius = thumbRadius + 1.5.dp.toPx(),
+                            center = Offset(0f, 1.5.dp.toPx())
+                        )
+
+                        // Тело капли
+                        drawCircle(
+                            brush = thumbLensBrush,
+                            radius = thumbRadius,
+                            center = Offset.Zero
+                        )
+
+                        // Верхний зеркальный блик линзы
+                        drawOval(
+                            brush = thumbSpecularBrush,
+                            topLeft = Offset(-thumbRadius * 0.64f, -thumbRadius * 0.84f),
+                            size = Size(thumbDiameter * 0.64f, thumbDiameter * 0.38f)
+                        )
+
+                        // Кромка капли
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.85f),
+                            radius = thumbRadius,
+                            center = Offset.Zero,
+                            style = Stroke(width = strokeW)
+                        )
+
+                        // Акцентная микро-линза в центре
+                        if (progress > 0.05f) {
+                            drawCircle(
+                                color = primaryColor.copy(alpha = 0.85f * progress),
+                                radius = (thumbDiameter * 0.16f) * progress,
+                                center = Offset.Zero
+                            )
+                        }
+                    }
                 }
             }
-        }
-    }
+    )
 }

@@ -48,6 +48,7 @@ class CustomAudioProcessor : AudioProcessor {
     private var inputEnded = false
 
     private var floatBuffer = FloatArray(8192)
+    private var shortScratch = ShortArray(8192)
 
     override fun configure(inputAudioFormat: AudioFormat): AudioFormat {
         if (inputAudioFormat.channelCount != 2) {
@@ -64,10 +65,10 @@ class CustomAudioProcessor : AudioProcessor {
         }
 
         inputFormat = inputAudioFormat
-        outputFormat = if (encoding == C.ENCODING_PCM_FLOAT) {
-            inputAudioFormat
-        } else {
+        outputFormat = if (encoding == C.ENCODING_PCM_16BIT) {
             AudioFormat(inputAudioFormat.sampleRate, inputAudioFormat.channelCount, C.ENCODING_PCM_16BIT)
+        } else {
+            AudioFormat(inputAudioFormat.sampleRate, inputAudioFormat.channelCount, C.ENCODING_PCM_FLOAT)
         }
         isProcessorActive = true
 
@@ -85,9 +86,6 @@ class CustomAudioProcessor : AudioProcessor {
 
     override fun isActive(): Boolean = isProcessorActive
 
-    /**
-     * Быстрая рациональная аппроксимация Паде для tanh(x) без вызова тяжелого Math.tanh().
-     */
     private fun fastTanh(x: Float): Float {
         if (x > 3.0f) return 1.0f
         if (x < -3.0f) return -1.0f
@@ -112,9 +110,9 @@ class CustomAudioProcessor : AudioProcessor {
         if (sizeBytes <= 0) return
 
         val encoding = inputFormat.encoding
+        val dspActive = JamesDspController.hasActiveProcessing()
 
-        // Быстрый путь (Zero-DSP overhead), если эффекты отключены и формат совпадает:
-        if (!JamesDspController.hasActiveProcessing() && encoding == outputFormat.encoding) {
+        if (!dspActive && encoding == outputFormat.encoding) {
             val resultBuffer = obtainOutputBuffer(sizeBytes)
             resultBuffer.put(inputBuffer)
             resultBuffer.flip()
@@ -139,37 +137,41 @@ class CustomAudioProcessor : AudioProcessor {
 
         when (encoding) {
             C.ENCODING_PCM_16BIT -> {
-                val shortBuffer = inputBuffer.asShortBuffer()
+                if (shortScratch.size < sampleCount) {
+                    shortScratch = ShortArray(sampleCount)
+                }
+                inputBuffer.asShortBuffer().get(shortScratch, 0, sampleCount)
+                val dst = floatBuffer
+                val src = shortScratch
                 for (i in 0 until sampleCount) {
-                    floatBuffer[i] = shortBuffer.get() * INV_32768
+                    dst[i] = src[i] * INV_32768
                 }
             }
             C.ENCODING_PCM_FLOAT -> {
-                val fb = inputBuffer.asFloatBuffer()
-                for (i in 0 until sampleCount) {
-                    floatBuffer[i] = fb.get()
-                }
+                inputBuffer.asFloatBuffer().get(floatBuffer, 0, sampleCount)
             }
             C.ENCODING_PCM_24BIT -> {
                 var idx = position
+                val dst = floatBuffer
                 for (i in 0 until sampleCount) {
                     val b0 = inputBuffer.get(idx).toInt() and 0xFF
                     val b1 = inputBuffer.get(idx + 1).toInt() and 0xFF
                     val b2 = inputBuffer.get(idx + 2).toInt()
                     val int24 = (b2 shl 16) or (b1 shl 8) or b0
-                    floatBuffer[i] = int24 * INV_8388608
+                    dst[i] = int24 * INV_8388608
                     idx += 3
                 }
             }
             C.ENCODING_PCM_32BIT -> {
                 val ib = inputBuffer.asIntBuffer()
+                val dst = floatBuffer
                 for (i in 0 until sampleCount) {
-                    floatBuffer[i] = (ib.get() shr 8) * INV_8388608
+                    dst[i] = (ib.get() shr 8) * INV_8388608
                 }
             }
         }
 
-        if (JamesDspController.hasActiveProcessing()) {
+        if (dspActive) {
             JamesDspController.process(floatBuffer, sampleCount)
         }
 
@@ -182,30 +184,37 @@ class CustomAudioProcessor : AudioProcessor {
 
         var peakMagnitude = 0.0f
         var softClippedInBlock = false
+        val samples = floatBuffer
 
         if (outputFormat.encoding == C.ENCODING_PCM_FLOAT) {
             for (i in 0 until sampleCount) {
-                val raw = floatBuffer[i]
+                val raw = samples[i]
                 val absRaw = abs(raw)
                 if (absRaw > peakMagnitude) peakMagnitude = absRaw
-                val clean = if (absRaw > SOFT_KNEE_THRESHOLD) {
+                if (absRaw > SOFT_KNEE_THRESHOLD) {
                     if (absRaw > 0.96f) softClippedInBlock = true
-                    softKneeClip(raw)
-                } else raw
-                resultBuffer.putFloat(clean)
+                    samples[i] = softKneeClip(raw)
+                }
             }
+            resultBuffer.asFloatBuffer().put(samples, 0, sampleCount)
+            resultBuffer.position(outBytes)
         } else {
+            if (shortScratch.size < sampleCount) {
+                shortScratch = ShortArray(sampleCount)
+            }
+            val outShorts = shortScratch
             for (i in 0 until sampleCount) {
-                val raw = floatBuffer[i]
+                val raw = samples[i]
                 val absRaw = abs(raw)
                 if (absRaw > peakMagnitude) peakMagnitude = absRaw
                 val clean = if (absRaw > SOFT_KNEE_THRESHOLD) {
                     if (absRaw > 0.96f) softClippedInBlock = true
                     softKneeClip(raw)
                 } else raw
-                val pcmShort = (clean * 32767.0f).toInt().coerceIn(-32768, 32767).toShort()
-                resultBuffer.putShort(pcmShort)
+                outShorts[i] = (clean * 32767.0f).toInt().coerceIn(-32768, 32767).toShort()
             }
+            resultBuffer.asShortBuffer().put(outShorts, 0, sampleCount)
+            resultBuffer.position(outBytes)
         }
 
         val currentLoudness = globalAudioLoudness
@@ -258,7 +267,6 @@ class CustomAudioProcessor : AudioProcessor {
         inputFormat = AudioFormat.NOT_SET
         outputFormat = AudioFormat.NOT_SET
         isProcessorActive = false
-        floatBuffer = FloatArray(8192)
     }
 
     fun release() {

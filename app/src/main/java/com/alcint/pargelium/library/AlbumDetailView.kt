@@ -59,7 +59,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -86,6 +88,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.alcint.pargelium.AlbumArtworkItem
@@ -98,12 +103,14 @@ import com.alcint.pargelium.R as AppR
 import com.alcint.pargelium.rememberDominantColor
 import com.alcint.pargelium.tiltOnTouch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.sin
 
 @Composable
 fun SharedTransitionScope.AlbumDetailView(
@@ -152,6 +159,10 @@ fun SharedTransitionScope.AlbumDetailView(
     }
     val isAlbumLoadedInPlayer = remember(currentTrack?.albumId, album.id) {
         currentTrack?.albumId == album.id
+    }
+
+    val isHeroVisible by remember {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 }
     }
 
     LaunchedEffect(album.id, artistAvatarUri) {
@@ -333,7 +344,7 @@ fun SharedTransitionScope.AlbumDetailView(
                         manualVinylIndex = idx
                     },
                     animatedVisibilityScope = animatedVisibilityScope,
-                    isAlbumPlaying = isAlbumCurrentlyPlaying,
+                    isAlbumPlaying = isAlbumCurrentlyPlaying && isHeroVisible,
                     accentColor = accentColor,
                     totalDurationMs = totalDurationMs,
                     techMetadata = albumTechMetadata,
@@ -800,9 +811,20 @@ private fun SharedTransitionScope.AlbumHeroSection(
     onShuffleAlbumClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val motionScheme = MaterialTheme.motionScheme
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var isAppResumed by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            isAppResumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     var isBoxFlippedToBack: Boolean by rememberSaveable(album.id) { mutableStateOf(false) }
     val boxFlipAngle by animateFloatAsState(
@@ -817,18 +839,15 @@ private fun SharedTransitionScope.AlbumHeroSection(
         label = "discPeek"
     )
 
-    val rotationAnim = remember { Animatable(18f) }
+    var rotationDegrees by remember { mutableFloatStateOf(18f) }
     var isUserScratching by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isAlbumPlaying, isUserScratching, isBoxFlippedToBack) {
-        if (isAlbumPlaying && !isUserScratching && !isBoxFlippedToBack) {
+    // Энергоэффективный таймер 30 FPS вместо 120 Гц Animatable; спит при скролле вниз и в фоне
+    LaunchedEffect(isAlbumPlaying, isUserScratching, isBoxFlippedToBack, isAppResumed) {
+        if (isAlbumPlaying && !isUserScratching && !isBoxFlippedToBack && isAppResumed) {
             while (isActive) {
-                val startAngle = rotationAnim.value % 360f
-                rotationAnim.snapTo(startAngle)
-                rotationAnim.animateTo(
-                    targetValue = startAngle + 360f,
-                    animationSpec = tween(durationMillis = 10000, easing = LinearEasing)
-                )
+                delay(33L)
+                rotationDegrees = (rotationDegrees + 1.18f) % 360f
             }
         }
     }
@@ -878,12 +897,12 @@ private fun SharedTransitionScope.AlbumHeroSection(
                 )
             }
 
+            // Внешний контейнер держит статичную круглую тень (0 пересчетов тени при вращении диска!)
             Box(
                 modifier = Modifier
                     .offset(x = discPeekOffset)
                     .size(198.dp)
                     .graphicsLayer {
-                        rotationZ = rotationAnim.value
                         alpha = 1f - (boxFlipAngle / 180f).coerceIn(0f, 1f)
                     }
                     .shadow(16.dp, CircleShape)
@@ -892,9 +911,7 @@ private fun SharedTransitionScope.AlbumHeroSection(
                     .draggable(
                         orientation = Orientation.Vertical,
                         state = rememberDraggableState { delta ->
-                            scope.launch {
-                                rotationAnim.snapTo((rotationAnim.value + delta * 0.45f) % 360f)
-                            }
+                            rotationDegrees = (rotationDegrees + delta * 0.45f) % 360f
                         },
                         onDragStarted = {
                             isUserScratching = true
@@ -911,34 +928,40 @@ private fun SharedTransitionScope.AlbumHeroSection(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = remember(discArtworkUri) {
-                        ImageRequest.Builder(context)
-                            .data(discArtworkUri)
-                            .size(512)
-                            .crossfade(true)
-                            .build()
-                    },
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(if (hasAuthenticDiscArt) 0.96f else 0.84f)
-                )
+                        .graphicsLayer { rotationZ = rotationDegrees }
+                ) {
+                    AsyncImage(
+                        model = remember(discArtworkUri) {
+                            ImageRequest.Builder(context)
+                                .data(discArtworkUri)
+                                .size(512)
+                                .crossfade(true)
+                                .build()
+                        },
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(if (hasAuthenticDiscArt) 0.96f else 0.84f)
+                    )
 
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(brush = cachedShineBrush)
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(brush = cachedShineBrush)
 
-                    if (!hasAuthenticDiscArt) {
-                        val grooveColor = Color.White.copy(alpha = 0.12f)
-                        drawCircle(color = grooveColor, radius = size.minDimension * 0.46f, style = Stroke(width = 1.2f))
-                        drawCircle(color = grooveColor, radius = size.minDimension * 0.39f, style = Stroke(width = 1f))
-                        drawCircle(color = grooveColor, radius = size.minDimension * 0.31f, style = Stroke(width = 1f))
-                        drawCircle(color = accentColor.copy(alpha = 0.85f), radius = size.minDimension * 0.16f)
+                        if (!hasAuthenticDiscArt) {
+                            val grooveColor = Color.White.copy(alpha = 0.12f)
+                            drawCircle(color = grooveColor, radius = size.minDimension * 0.46f, style = Stroke(width = 1.2f))
+                            drawCircle(color = grooveColor, radius = size.minDimension * 0.39f, style = Stroke(width = 1f))
+                            drawCircle(color = grooveColor, radius = size.minDimension * 0.31f, style = Stroke(width = 1f))
+                            drawCircle(color = accentColor.copy(alpha = 0.85f), radius = size.minDimension * 0.16f)
+                        }
+
+                        drawCircle(color = Color(0xFF101012), radius = size.minDimension * 0.10f)
+                        drawCircle(color = Color.White.copy(alpha = 0.75f), radius = size.minDimension * 0.034f)
                     }
-
-                    drawCircle(color = Color(0xFF101012), radius = size.minDimension * 0.10f)
-                    drawCircle(color = Color.White.copy(alpha = 0.75f), radius = size.minDimension * 0.034f)
                 }
             }
 
@@ -1464,7 +1487,7 @@ private fun AlbumBoxBackplateView(
                                 drawRect(
                                     color = Color.Black,
                                     topLeft = Offset(i * step, 0f),
-                                    size = androidx.compose.ui.geometry.Size(w, size.height)
+                                    size = Size(w, size.height)
                                 )
                             }
                         }
@@ -1927,6 +1950,9 @@ private fun InteractiveCollectorDesk(
     }
 }
 
+/**
+ * Отрисовка спектра длительностей одним Canvas (1 RenderNode вместо сотен Box в Row).
+ */
 @Composable
 private fun AlbumDurationSpectrumBar(
     tracks: List<AudioTrack>,
@@ -1934,37 +1960,59 @@ private fun AlbumDurationSpectrumBar(
     accentColor: Color,
     onTrackClick: (AudioTrack) -> Unit
 ) {
-    Column(
+    val bgTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    val latestTracks by rememberUpdatedState(tracks)
+    val latestOnTrackClick by rememberUpdatedState(onTrackClick)
+
+    val weights = remember(tracks) {
+        FloatArray(tracks.size) { i -> tracks[i].duration.coerceAtLeast(15_000L).toFloat() }
+    }
+    val totalWeight = remember(weights) {
+        weights.sum().coerceAtLeast(1f)
+    }
+
+    Canvas(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 6.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            tracks.forEachIndexed { index, track ->
-                val weight = track.duration.coerceAtLeast(15_000L).toFloat()
-                val isCurrent = track.id == currentTrackId
-                val segmentAlpha = if (isCurrent) 1f else (0.28f + (index % 3) * 0.1f)
-
-                Box(
-                    modifier = Modifier
-                        .weight(weight)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(
-                            if (isCurrent) accentColor
-                            else accentColor.copy(alpha = segmentAlpha)
-                        )
-                        .clickable { onTrackClick(track) }
-                )
+            .height(12.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(bgTrackColor)
+            .pointerInput(tracks.size, totalWeight) {
+                detectTapGestures { tapOffset ->
+                    val w = size.width.toFloat().coerceAtLeast(1f)
+                    val targetWeight = (tapOffset.x / w).coerceIn(0f, 1f) * totalWeight
+                    var acc = 0f
+                    for (i in weights.indices) {
+                        acc += weights[i]
+                        if (targetWeight <= acc || i == weights.lastIndex) {
+                            latestTracks.getOrNull(i)?.let { latestOnTrackClick(it) }
+                            break
+                        }
+                    }
+                }
             }
+    ) {
+        val count = tracks.size
+        if (count == 0) return@Canvas
+        val gapPx = if (count > 80) 0.5.dp.toPx() else 2.dp.toPx()
+        val totalGap = gapPx * (count - 1).coerceAtLeast(0)
+        val availWidth = (size.width - totalGap).coerceAtLeast(1f)
+        val corner = CornerRadius(3.dp.toPx(), 3.dp.toPx())
+
+        var curX = 0f
+        for (i in 0 until count) {
+            val segW = (weights[i] / totalWeight) * availWidth
+            val isCurrent = tracks[i].id == currentTrackId
+            val segAlpha = if (isCurrent) 1f else (0.28f + (i % 3) * 0.1f)
+
+            drawRoundRect(
+                color = accentColor.copy(alpha = segAlpha),
+                topLeft = Offset(curX, 0f),
+                size = Size(segW.coerceAtLeast(1f), size.height),
+                cornerRadius = corner
+            )
+            curX += segW + gapPx
         }
     }
 }
@@ -2455,46 +2503,45 @@ private fun AlbumTrackItem(
     }
 }
 
+/**
+ * Энергоэффективный индикатор играющего трека (~16 FPS вместо трех 120 Гц InfiniteTransition).
+ */
 @Composable
 private fun AnimatedPlayingBars(isPlaying: Boolean, color: Color) {
-    val bar1: Float
-    val bar2: Float
-    val bar3: Float
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isAppResumed by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            isAppResumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
-    if (isPlaying) {
-        val infiniteTransition = rememberInfiniteTransition(label = "bars")
-        val b1 by infiniteTransition.animateFloat(
-            initialValue = 0.25f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-            label = "b1"
-        )
-        val b2 by infiniteTransition.animateFloat(
-            initialValue = 0.85f,
-            targetValue = 0.2f,
-            animationSpec = infiniteRepeatable(tween(360, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-            label = "b2"
-        )
-        val b3 by infiniteTransition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 0.95f,
-            animationSpec = infiniteRepeatable(tween(510, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-            label = "b3"
-        )
-        bar1 = b1
-        bar2 = b2
-        bar3 = b3
-    } else {
-        bar1 = 0.28f
-        bar2 = 0.48f
-        bar3 = 0.34f
+    var phase by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isPlaying, isAppResumed) {
+        if (isPlaying && isAppResumed) {
+            while (isActive) {
+                delay(65L)
+                phase = (phase + 0.42f) % 6.283185f
+            }
+        }
     }
 
     Canvas(modifier = Modifier.size(18.dp)) {
         val barWidth = size.width / 5f
         val maxH = size.height
-        val fractions = floatArrayOf(bar1, bar2, bar3)
-        for (idx in fractions.indices) {
+        val p = phase
+
+        val b1 = if (isPlaying) 0.30f + 0.65f * abs(sin(p)) else 0.28f
+        val b2 = if (isPlaying) 0.25f + 0.70f * abs(sin(p * 1.3f + 1.1f)) else 0.48f
+        val b3 = if (isPlaying) 0.35f + 0.60f * abs(sin(p * 0.85f + 2.3f)) else 0.34f
+
+        val fractions = floatArrayOf(b1, b2, b3)
+        for (idx in 0..2) {
             val fraction = fractions[idx]
             val x = (idx * 2 + 0.5f) * barWidth
             val h = (maxH * fraction).coerceAtLeast(4f)

@@ -45,7 +45,7 @@ private object VideoCacheHolder {
             cache ?: synchronized(this) {
                 cache ?: SimpleCache(
                     File(context.cacheDir, "canvas_video_cache"),
-                    LeastRecentlyUsedCacheEvictor(120L * 1024L * 1024L),
+                    LeastRecentlyUsedCacheEvictor(80L * 1024L * 1024L),
                     StandaloneDatabaseProvider(context)
                 ).also { cache = it }
             }
@@ -71,19 +71,23 @@ fun VideoBackground(
 
     val videoAlpha by animateFloatAsState(
         targetValue = if (isFirstFrameRendered) 1f else 0f,
-        animationSpec = tween(400),
+        animationSpec = tween(350),
         label = "videoFadeIn"
     )
 
-    val exoPlayer = remember(appContext) {
+    val isLocalFile = remember(videoUri) {
+        videoUri.scheme == "file" || videoUri.scheme == "content"
+    }
+
+    val exoPlayer = remember(appContext, isLocalFile) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(8000)
             .setReadTimeoutMs(10000)
 
         val upstreamFactory = DefaultDataSource.Factory(appContext, httpDataSourceFactory)
-        val simpleCache = VideoCacheHolder.get(appContext)
+        val simpleCache = if (!isLocalFile) VideoCacheHolder.get(appContext) else null
         val dataSourceFactory = if (simpleCache != null) {
             CacheDataSource.Factory()
                 .setCache(simpleCache)
@@ -94,7 +98,7 @@ fun VideoBackground(
         }
 
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1500, 5000, 400, 800)
+            .setBufferDurationsMs(1500, 4000, 500, 1000)
             .build()
 
         ExoPlayer.Builder(appContext)
@@ -105,8 +109,12 @@ fun VideoBackground(
                 volume = 0f
                 repeatMode = Player.REPEAT_MODE_ONE
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                // Ограничиваем HLS-потоки Apple Music до 720p / 30 FPS / 1.8 Мбит/с для устранения нагрева декодера
                 trackSelectionParameters = trackSelectionParameters
                     .buildUpon()
+                    .setMaxVideoSize(720, 1280)
+                    .setMaxVideoFrameRate(30)
+                    .setMaxVideoBitrate(1_800_000)
                     .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
                     .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                     .build()
@@ -117,10 +125,9 @@ fun VideoBackground(
         isFirstFrameRendered = false
         exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
         exoPlayer.prepare()
-        if (isPlaying && isLifecycleResumed) {
-            exoPlayer.playWhenReady = true
-            exoPlayer.play()
-        }
+        val shouldPlay = isPlaying && isLifecycleResumed
+        exoPlayer.playWhenReady = shouldPlay
+        if (shouldPlay) exoPlayer.play()
     }
 
     LaunchedEffect(isPlaying, isLifecycleResumed) {
@@ -138,15 +145,12 @@ fun VideoBackground(
 
     DisposableEffect(lifecycleOwner, exoPlayer) {
         val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> isLifecycleResumed = true
-                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> isLifecycleResumed = false
-                else -> {}
-            }
+            isLifecycleResumed = event.targetState.isAtLeast(Lifecycle.State.RESUMED)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            exoPlayer.clearVideoSurface()
             exoPlayer.release()
         }
     }
@@ -160,7 +164,8 @@ fun VideoBackground(
 
             val textureView = TextureView(ctx).apply {
                 layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-                isOpaque = false
+                // isOpaque = true отключает дорогое попиксельное альфа-смешивание 1080x2400 на GPU
+                isOpaque = true
             }
 
             aspectRatioFrame.addView(textureView)

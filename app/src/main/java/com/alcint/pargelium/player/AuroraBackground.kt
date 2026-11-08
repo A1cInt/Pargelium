@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -19,12 +18,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.alcint.pargelium.globalAudioLoudness
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 private const val TWO_PI = (2 * PI).toFloat()
+private const val FRAME_DELAY_MS = 50L // Настоящий сон потока между кадрами (20 FPS, 0% холостой нагрузки на 120 Гц VSYNC)
 
 @Composable
 fun AuroraBackground(
@@ -75,16 +76,9 @@ fun AuroraBackground(
     LaunchedEffect(isPlaying, isAppResumed) {
         if (!isAppResumed) return@LaunchedEffect
 
-        var lastNanos = withFrameNanos { it }
-        var skipFrame = false
-
+        val dt = FRAME_DELAY_MS / 1000f
         while (isActive && (isPlaying || animState.loudness > 0.002f)) {
-            val frameNanos = withFrameNanos { it }
-            skipFrame = !skipFrame
-            if (skipFrame) continue
-
-            val dt = ((frameNanos - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.25f)
-            lastNanos = frameNanos
+            delay(FRAME_DELAY_MS)
 
             val rotationSpeed = if (isPlaying) TWO_PI / 14f else TWO_PI / 45f
             animState.offset = (animState.offset + rotationSpeed * dt) % TWO_PI
@@ -104,10 +98,10 @@ fun AuroraBackground(
                 if (peak > animState.loudness) {
                     animState.loudness = animState.loudness * 0.45f + peak * 0.55f
                 } else {
-                    animState.loudness *= 0.93f
+                    animState.loudness *= 0.88f
                 }
             } else {
-                animState.loudness *= 0.86f
+                animState.loudness *= 0.80f
                 if (animState.loudness <= 0.002f) {
                     animState.loudness = 0f
                     animState.fast = 0f
@@ -121,10 +115,12 @@ fun AuroraBackground(
 
     val brushCache = remember { AuroraBrushCache() }
 
-    Canvas(modifier = modifier.fillMaxSize().background(baseBackground)) {
+    Canvas(modifier = modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
         if (width <= 0f || height <= 0f) return@Canvas
+
+        drawRect(color = baseBackground)
 
         @Suppress("UNUSED_VARIABLE")
         val tick = frameTick
@@ -132,17 +128,16 @@ fun AuroraBackground(
         brushCache.updateIfNeeded(currentColor)
 
         val loud = animState.loudness
-        val currentBeat = 1.0f + (loud * 4.2f).coerceIn(0f, 0.65f)
+        val currentBeat = 1.0f + (loud * 4.0f).coerceIn(0f, 0.60f)
         val curOffset = animState.offset
         val curScale = animState.slowScale
 
         val cosOffset = cos(curOffset)
         val sinOffset = sin(curOffset)
 
-        // Первое основное сияние
         val x1 = width * 0.48f + cosOffset * width * 0.22f
         val y1 = height * 0.34f + sinOffset * height * 0.12f
-        val r1 = ((width * 0.82f * curScale) * currentBeat).coerceAtLeast(1f)
+        val r1 = ((width * 0.74f * curScale) * currentBeat).coerceAtLeast(1f)
 
         withTransform({
             translate(left = x1, top = y1)
@@ -151,10 +146,9 @@ fun AuroraBackground(
             drawCircle(brush = brushCache.brush1, radius = 1f, center = Offset.Zero)
         }
 
-        // Второе противофазное сияние
         val x2 = width * 0.52f - cosOffset * width * 0.28f
         val y2 = height * 0.62f - sinOffset * height * 0.18f
-        val r2 = ((width * 0.88f * (2f - curScale)) * currentBeat).coerceAtLeast(1f)
+        val r2 = ((width * 0.78f * (2f - curScale)) * currentBeat).coerceAtLeast(1f)
 
         withTransform({
             translate(left = x2, top = y2)
@@ -163,10 +157,9 @@ fun AuroraBackground(
             drawCircle(brush = brushCache.brush2, radius = 1f, center = Offset.Zero)
         }
 
-        // Третье комплементарное пятно для глубины
         val x3 = width * 0.5f + sinOffset * width * 0.24f
         val y3 = height * 0.22f - cosOffset * height * 0.1f
-        val r3 = ((width * 0.65f * curScale) * (0.95f + loud * 2f)).coerceAtLeast(1f)
+        val r3 = ((width * 0.58f * curScale) * (0.95f + loud * 1.8f)).coerceAtLeast(1f)
 
         withTransform({
             translate(left = x3, top = y3)
@@ -208,17 +201,17 @@ private class AuroraBrushCache {
             val shiftedColor = Color(android.graphics.Color.HSVToColor(hsv))
 
             brush1 = Brush.radialGradient(
-                colors = listOf(color.copy(alpha = 0.62f), Color.Transparent),
+                colors = listOf(color.copy(alpha = 0.60f), Color.Transparent),
                 center = Offset.Zero,
                 radius = 1f
             )
             brush2 = Brush.radialGradient(
-                colors = listOf(color.copy(alpha = 0.42f), Color.Transparent),
+                colors = listOf(color.copy(alpha = 0.40f), Color.Transparent),
                 center = Offset.Zero,
                 radius = 1f
             )
             brush3 = Brush.radialGradient(
-                colors = listOf(shiftedColor.copy(alpha = 0.34f), Color.Transparent),
+                colors = listOf(shiftedColor.copy(alpha = 0.32f), Color.Transparent),
                 center = Offset.Zero,
                 radius = 1f
             )

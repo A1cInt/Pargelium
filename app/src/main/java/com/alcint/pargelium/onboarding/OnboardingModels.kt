@@ -17,6 +17,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -47,68 +48,67 @@ fun rememberPargeliumExpressiveColorScheme(themeMode: Int): ColorScheme {
     val systemDark = isSystemInDarkTheme()
     val hasDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    return when (themeMode) {
-        0 -> {
-            if (hasDynamicColor) {
-                if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            } else {
-                if (systemDark) darkColorScheme() else lightColorScheme()
+    return remember(context, themeMode, systemDark, hasDynamicColor) {
+        when (themeMode) {
+            0 -> {
+                if (hasDynamicColor) {
+                    if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+                } else {
+                    if (systemDark) darkColorScheme() else lightColorScheme()
+                }
             }
+            1 -> {
+                if (hasDynamicColor) dynamicLightColorScheme(context) else lightColorScheme()
+            }
+            2 -> {
+                if (hasDynamicColor) dynamicDarkColorScheme(context) else darkColorScheme()
+            }
+            3 -> {
+                val base = if (hasDynamicColor) dynamicDarkColorScheme(context) else darkColorScheme()
+                base.copy(
+                    background = Color.Black,
+                    surface = Color.Black,
+                    surfaceContainerLowest = Color.Black,
+                    surfaceContainerLow = Color(0xFF0A0A0D),
+                    surfaceContainer = Color(0xFF101014),
+                    surfaceContainerHigh = Color(0xFF16161C),
+                    surfaceContainerHighest = Color(0xFF1F1F26)
+                )
+            }
+            4 -> {
+                darkColorScheme(
+                    primary = Color(0xFF64FFDA),
+                    onPrimary = Color(0xFF00382B),
+                    primaryContainer = Color(0xFF005140),
+                    onPrimaryContainer = Color(0xFF82F8D5),
+                    secondary = Color(0xFF80CBC4),
+                    tertiary = Color(0xFF80DEEA),
+                    background = Color(0xFF070C10),
+                    surface = Color(0xFF070C10),
+                    surfaceContainerLow = Color(0xFF0D151B),
+                    surfaceContainer = Color(0xFF111C24),
+                    surfaceContainerHigh = Color(0xFF172630),
+                    surfaceContainerHighest = Color(0xFF1E303C)
+                )
+            }
+            5 -> {
+                darkColorScheme(
+                    primary = Color(0xFFFF5252),
+                    onPrimary = Color(0xFF3E0006),
+                    primaryContainer = Color(0xFF68000F),
+                    onPrimaryContainer = Color(0xFFFFDAD7),
+                    secondary = Color(0xFFFF8A80),
+                    tertiary = Color(0xFFFFD180),
+                    background = Color(0xFF0E0607),
+                    surface = Color(0xFF0E0607),
+                    surfaceContainerLow = Color(0xFF170B0D),
+                    surfaceContainer = Color(0xFF200F12),
+                    surfaceContainerHigh = Color(0xFF2B1519),
+                    surfaceContainerHighest = Color(0xFF361B20)
+                )
+            }
+            else -> if (systemDark) darkColorScheme() else lightColorScheme()
         }
-        1 -> {
-            if (hasDynamicColor) dynamicLightColorScheme(context) else lightColorScheme()
-        }
-        2 -> {
-            if (hasDynamicColor) dynamicDarkColorScheme(context) else darkColorScheme()
-        }
-        3 -> {
-            // AMOLED Pitch Black
-            val base = if (hasDynamicColor) dynamicDarkColorScheme(context) else darkColorScheme()
-            base.copy(
-                background = Color.Black,
-                surface = Color.Black,
-                surfaceContainerLowest = Color.Black,
-                surfaceContainerLow = Color(0xFF0A0A0D),
-                surfaceContainer = Color(0xFF101014),
-                surfaceContainerHigh = Color(0xFF16161C),
-                surfaceContainerHighest = Color(0xFF1F1F26)
-            )
-        }
-        4 -> {
-            // Black Opal
-            darkColorScheme(
-                primary = Color(0xFF64FFDA),
-                onPrimary = Color(0xFF00382B),
-                primaryContainer = Color(0xFF005140),
-                onPrimaryContainer = Color(0xFF82F8D5),
-                secondary = Color(0xFF80CBC4),
-                tertiary = Color(0xFF80DEEA),
-                background = Color(0xFF070C10),
-                surface = Color(0xFF070C10),
-                surfaceContainerLow = Color(0xFF0D151B),
-                surfaceContainer = Color(0xFF111C24),
-                surfaceContainerHigh = Color(0xFF172630),
-                surfaceContainerHighest = Color(0xFF1E303C)
-            )
-        }
-        5 -> {
-            // Pargelia Crimson
-            darkColorScheme(
-                primary = Color(0xFFFF5252),
-                onPrimary = Color(0xFF3E0006),
-                primaryContainer = Color(0xFF68000F),
-                onPrimaryContainer = Color(0xFFFFDAD7),
-                secondary = Color(0xFFFF8A80),
-                tertiary = Color(0xFFFFD180),
-                background = Color(0xFF0E0607),
-                surface = Color(0xFF0E0607),
-                surfaceContainerLow = Color(0xFF170B0D),
-                surfaceContainer = Color(0xFF200F12),
-                surfaceContainerHigh = Color(0xFF2B1519),
-                surfaceContainerHighest = Color(0xFF361B20)
-            )
-        }
-        else -> if (systemDark) darkColorScheme() else lightColorScheme()
     }
 }
 

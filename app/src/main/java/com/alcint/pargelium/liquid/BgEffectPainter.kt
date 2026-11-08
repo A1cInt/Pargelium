@@ -1,5 +1,3 @@
-// Mirrored from compose-miuix-ui example.
-
 package com.alcint.pargelium.liquid
 
 import android.os.Build
@@ -7,6 +5,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.Brush
 import top.yukonga.miuix.kmp.blur.RuntimeShader
 import top.yukonga.miuix.kmp.blur.asBrush
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -19,7 +18,7 @@ internal class BgEffectPainter {
         }
     }
 
-    val brush: Brush get() = runtimeShader.asBrush()
+    val brush: Brush by lazy { runtimeShader.asBrush() }
 
     private val resolution = FloatArray(2)
     private val bound = FloatArray(4)
@@ -43,7 +42,6 @@ internal class BgEffectPainter {
     private var cachedPointsAnimPreset: BgEffectConfig.Config? = null
 
     companion object {
-
         private const val U_TRANSLATE_Y = 0f
         private const val U_ALPHA_MULTI = 1f
         private const val U_NOISE_SCALE = 1.5f
@@ -65,13 +63,18 @@ internal class BgEffectPainter {
     }
 
     fun updateAnimTime(time: Float) {
-        if (animTime == time) return
+        if (!animTime.isNaN() && abs(animTime - time) < 0.015f) return
         animTime = time
         runtimeShader.setFloatUniform("uAnimTime", animTime)
     }
 
     fun updatePointsAnim(time: Float, preset: BgEffectConfig.Config) {
-        if (cachedPointsAnimTime == time && cachedPointsAnimPreset === preset) return
+        if (!cachedPointsAnimTime.isNaN() &&
+            abs(cachedPointsAnimTime - time) < 0.015f &&
+            cachedPointsAnimPreset === preset
+        ) {
+            return
+        }
 
         val offset = preset.pointOffset
         var i = 0
@@ -91,7 +94,9 @@ internal class BgEffectPainter {
     }
 
     fun updateColors(preset: BgEffectConfig.Config, stage: Float) {
-        if (cachedColorsPreset === preset && cachedColorStage == stage) return
+        if (cachedColorsPreset === preset && !cachedColorStage.isNaN() && abs(cachedColorStage - stage) < 0.005f) {
+            return
+        }
 
         val base = stage.toInt()
         val fraction = stage - base

@@ -1,6 +1,9 @@
 package com.alcint.pargelium.library
 
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -20,6 +23,7 @@ fun HeadlessPlaybackTracker(
         val player = playerController ?: return@LaunchedEffect
         val track = currentTrack ?: return@LaunchedEffect
 
+        var ticksSinceSave = 0
         while (isPlaying) {
             val pos = player.currentPosition.coerceAtLeast(0L)
             val dur = player.duration
@@ -30,8 +34,13 @@ fun HeadlessPlaybackTracker(
                 hasCountedPlay = true
             }
 
-            PrefsManager.saveLastPosition(pos)
-            delay(if (hasCountedPlay) 4000L else 1500L)
+            ticksSinceSave++
+            if (ticksSinceSave >= 5) {
+                PrefsManager.saveLastPosition(pos)
+                ticksSinceSave = 0
+            }
+
+            delay(if (hasCountedPlay) 6000L else 2500L)
         }
     }
 }
@@ -40,9 +49,22 @@ fun HeadlessPlaybackTracker(
 fun PlayerPositionProvider(
     playerController: MediaController?,
     isPlaying: Boolean,
+    pollIntervalMs: Long = 800L,
     content: @Composable (currentPositionProvider: () -> Long) -> Unit
 ) {
     var pos by remember { mutableLongStateOf(playerController?.currentPosition ?: 0L) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isUiVisible by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            isUiVisible = event.targetState.isAtLeast(Lifecycle.State.STARTED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     DisposableEffect(playerController) {
         val player = playerController ?: return@DisposableEffect onDispose {}
@@ -69,12 +91,12 @@ fun PlayerPositionProvider(
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(isPlaying, playerController) {
+    LaunchedEffect(isPlaying, isUiVisible, playerController, pollIntervalMs) {
         val player = playerController ?: return@LaunchedEffect
         pos = player.currentPosition.coerceAtLeast(0L)
-        while (isPlaying) {
+        while (isPlaying && isUiVisible) {
             pos = player.currentPosition.coerceAtLeast(0L)
-            delay(400L)
+            delay(pollIntervalMs)
         }
     }
 

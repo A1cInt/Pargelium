@@ -579,4 +579,71 @@
     <string name="booklet_mode_spread">Разворот (2 стр.)</string>
     <string name="booklet_mode_single">По 1 стр.</string>
     <string name="booklet_tap_to_zoom">Нажмите для зума</string>
+
+    <string name="action_refresh_library">Обновить медиатеку</string>
+
+    <!-- Profile & Chronotype -->
+    <string name="profile_listening_time_label">Время в музыке</string>
+    <string name="profile_period_all_time">За всё время</string>
+    <string name="profile_period_30_days">30 дней</string>
+    <string name="profile_period_7_days">7 дней</string>
+    <string name="profile_chronotype_subtitle">Биоритм прослушиваний</string>
+    <string name="chronotype_morning">Утро</string>
+    <string name="chronotype_afternoon">День</string>
+    <string name="chronotype_evening">Вечер</string>
+    <string name="chronotype_night">Ночь</string>
+    <string name="chronotype_title_morning">Утренний Энерджайзер</string>
+    <string name="chronotype_title_afternoon">Дневной Ритм</string>
+    <string name="chronotype_title_evening">Вечерний Меломан</string>
+    <string name="chronotype_title_night">Ночной Аудиофил</string>
+
+    <!-- Streaming Hub & Radio -->
+    <string name="cd_random_wave">Случайная волна</string>
+    <string name="stream_search_hint">Поиск в YouTube Music, SoundCloud, Audius…</string>
+    <string name="stream_search_error_fmt">Ошибка поиска: %1$s</string>
+    <string name="radio_favorites_chip_fmt">Избранное (%1$d)</string>
+    <string name="stream_provider_all">Все источники</string>
+    <string name="stream_provider_yt_music">YouTube Music</string>
+    <string name="stream_provider_soundcloud">SoundCloud</string>
+    <string name="stream_provider_audius">Audius</string>
+    <string name="stream_provider_saavn">JioSaavn</string>
+    <string name="stream_provider_hearthis">Hearthis.at</string>
+    <string name="stream_provider_jamendo">Jamendo</string>
+    <string name="stream_section_yt_trending">Витрина YouTube Music</string>
+    <string name="stream_section_yt_subtitle">Прямые потоки через протокол InnerTube</string>
+    <string name="stream_section_sc_radar">Радар SoundCloud</string>
+    <string name="stream_section_sc_subtitle">Электроника, ремиксы и инди-релизы</string>
+    <string name="stream_section_audius_title">Андерграунд Audius</string>
+    <string name="stream_section_audius_subtitle">Открытые потоки 320 кбит/с</string>
+    <string name="stream_section_global_charts">Мировые чарты 320 кбит/с</string>
+    <string name="stream_section_global_subtitle">Популярные треки в высоком качестве</string>
+    <string name="genre_top_hits">Топ хиты</string>
+    <string name="genre_electronic">Электроника</string>
+    <string name="genre_house">Хаус / EDM</string>
+    <string name="genre_synthwave">Синтвейв</string>
+    <string name="genre_french_house">Френч-хаус</string>
+    <string name="genre_lofi">Lo-Fi</string>
+    <string name="genre_rock">Рок / Инди</string>
+    <string name="genre_dnb">Драм-н-бейс</string>
+    <string name="genre_ambient">Эмбиент</string>
+    <string name="genre_jazz">Джаз</string>
+
+    <string name="monet_section_title">Monet и динамическая палитра</string>
+    <string name="monet_source_track">Обложка трека</string>
+    <string name="monet_source_track_desc">Извлекает самый выразительный акцентный цвет из обложки играющего трека</string>
+    <string name="monet_source_wallpaper">Обои системы</string>
+    <string name="monet_source_wallpaper_desc">Использует системный цвет обоев устройства Material You</string>
+    <string name="monet_source_custom">Свой цвет</string>
+    <string name="monet_source_custom_desc">Строит полную тональную палитру на основе выбранного оттенка</string>
+    <string name="monet_custom_color_title">Базовый оттенок</string>
+    <string name="monet_hue_slider_label">Тон (Hue): %1$d°</string>
+    <string name="monet_chroma_slider_label">Насыщенность (Chroma): %1$d%%</string>
+    <string name="monet_palette_style_title">Стиль палитры</string>
+    <string name="monet_style_tonal_spot">Tonal Spot</string>
+    <string name="monet_style_vibrant">Vibrant (Яркий)</string>
+    <string name="monet_style_expressive">Expressive (M3E)</string>
+    <string name="monet_style_content">Content (Точный)</string>
+    <string name="monet_style_neutral">Neutral (Мягкий)</string>
+    <string name="monet_style_monochrome">Monochrome (Ч/Б)</string>
+    <string name="monet_contrast_label">Контрастность палитры</string>
 </resources>

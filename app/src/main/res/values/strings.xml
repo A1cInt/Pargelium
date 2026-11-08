@@ -596,4 +596,71 @@
     <string name="booklet_mode_spread">2-Page Spread</string>
     <string name="booklet_mode_single">1-Page</string>
     <string name="booklet_tap_to_zoom">Tap to zoom</string>
+
+    <string name="action_refresh_library">Refresh Library</string>
+
+    <!-- Profile & Chronotype -->
+    <string name="profile_listening_time_label">Time in Music</string>
+    <string name="profile_period_all_time">All Time</string>
+    <string name="profile_period_30_days">30 Days</string>
+    <string name="profile_period_7_days">7 Days</string>
+    <string name="profile_chronotype_subtitle">Listening Biorhythm</string>
+    <string name="chronotype_morning">Morning</string>
+    <string name="chronotype_afternoon">Afternoon</string>
+    <string name="chronotype_evening">Evening</string>
+    <string name="chronotype_night">Night</string>
+    <string name="chronotype_title_morning">Morning Energizer</string>
+    <string name="chronotype_title_afternoon">Daytime Rhythm</string>
+    <string name="chronotype_title_evening">Evening Melomane</string>
+    <string name="chronotype_title_night">Night Audiophile</string>
+
+    <!-- Streaming Hub & Radio -->
+    <string name="cd_random_wave">Random Wave</string>
+    <string name="stream_search_hint">Search YouTube Music, SoundCloud, Audius…</string>
+    <string name="stream_search_error_fmt">Search error: %1$s</string>
+    <string name="radio_favorites_chip_fmt">Favorites (%1$d)</string>
+    <string name="stream_provider_all">All Sources</string>
+    <string name="stream_provider_yt_music">YouTube Music</string>
+    <string name="stream_provider_soundcloud">SoundCloud</string>
+    <string name="stream_provider_audius">Audius</string>
+    <string name="stream_provider_saavn">JioSaavn</string>
+    <string name="stream_provider_hearthis">Hearthis.at</string>
+    <string name="stream_provider_jamendo">Jamendo</string>
+    <string name="stream_section_yt_trending">YouTube Music Spotlight</string>
+    <string name="stream_section_yt_subtitle">Direct InnerTube audio streams</string>
+    <string name="stream_section_sc_radar">SoundCloud Radar</string>
+    <string name="stream_section_sc_subtitle">Electronic, remixes &amp; indie releases</string>
+    <string name="stream_section_audius_title">Audius Underground</string>
+    <string name="stream_section_audius_subtitle">Open decentralized 320 kbps streams</string>
+    <string name="stream_section_global_charts">Global High-Bitrate Charts</string>
+    <string name="stream_section_global_subtitle">Popular 320 kbps tracks</string>
+    <string name="genre_top_hits">Top Hits</string>
+    <string name="genre_electronic">Electronic</string>
+    <string name="genre_house">House / EDM</string>
+    <string name="genre_synthwave">Synthwave</string>
+    <string name="genre_french_house">French House</string>
+    <string name="genre_lofi">Lo-Fi</string>
+    <string name="genre_rock">Rock / Indie</string>
+    <string name="genre_dnb">Drum &amp; Bass</string>
+    <string name="genre_ambient">Ambient</string>
+    <string name="genre_jazz">Jazz</string>
+
+    <string name="monet_section_title">Monet &amp; Dynamic Palette</string>
+    <string name="monet_source_track">Track Cover</string>
+    <string name="monet_source_track_desc">Extracts the most vibrant accent color from the currently playing track artwork</string>
+    <string name="monet_source_wallpaper">Wallpaper</string>
+    <string name="monet_source_wallpaper_desc">Uses your device system Material You wallpaper palette</string>
+    <string name="monet_source_custom">Custom Color</string>
+    <string name="monet_source_custom_desc">Generates a full tonal palette from your custom seed color</string>
+    <string name="monet_custom_color_title">Seed Color</string>
+    <string name="monet_hue_slider_label">Hue: %1$d°</string>
+    <string name="monet_chroma_slider_label">Chroma: %1$d%%</string>
+    <string name="monet_palette_style_title">Palette Variant</string>
+    <string name="monet_style_tonal_spot">Tonal Spot</string>
+    <string name="monet_style_vibrant">Vibrant</string>
+    <string name="monet_style_expressive">Expressive</string>
+    <string name="monet_style_content">Content</string>
+    <string name="monet_style_neutral">Neutral</string>
+    <string name="monet_style_monochrome">Monochrome</string>
+    <string name="monet_contrast_label">Palette Contrast</string>
 </resources>

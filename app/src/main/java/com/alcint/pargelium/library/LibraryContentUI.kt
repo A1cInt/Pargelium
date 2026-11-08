@@ -51,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -105,14 +104,15 @@ fun LiquidBottomNavStyle(
     backdrop: LayerBackdrop,
     onTabSelected: (Int) -> Unit
 ) {
+    val currentPage = pagerState.currentPage
     FloatingBottomBar(
-        selectedIndex = pagerState.currentPage,
+        selectedIndex = currentPage,
         onSelected = onTabSelected,
         backdrop = backdrop,
         tabsCount = navItems.size
     ) { activateTab ->
         navItems.forEachIndexed { index, item ->
-            val isSelected = pagerState.currentPage == index
+            val isSelected = currentPage == index
             FloatingBottomBarItem(
                 selected = isSelected,
                 onClick = { activateTab(index) },
@@ -415,11 +415,6 @@ private fun ExpressiveLibraryPillTabs(
     tracksCount: Int,
     onTabSelected: (Int) -> Unit
 ) {
-    val motionScheme = MaterialTheme.motionScheme
-    val w0 by animateFloatAsState(if (selectedTab == 0) 1.2f else 0.9f, motionScheme.defaultSpatialSpec(), label = "w0")
-    val w1 by animateFloatAsState(if (selectedTab == 1) 1.2f else 0.9f, motionScheme.defaultSpatialSpec(), label = "w1")
-    val w2 by animateFloatAsState(if (selectedTab == 2) 1.2f else 0.9f, motionScheme.defaultSpatialSpec(), label = "w2")
-
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -437,7 +432,7 @@ private fun ExpressiveLibraryPillTabs(
                 label = stringResource(id = R.string.tab_albums),
                 badgeCount = albumsCount,
                 onClick = { onTabSelected(0) },
-                modifier = Modifier.weight(w0)
+                modifier = Modifier.weight(if (selectedTab == 0) 1.18f else 0.91f)
             )
             ExpressiveTabPill(
                 selected = selectedTab == 1,
@@ -445,7 +440,7 @@ private fun ExpressiveLibraryPillTabs(
                 label = stringResource(id = R.string.tab_artists),
                 badgeCount = artistsCount,
                 onClick = { onTabSelected(1) },
-                modifier = Modifier.weight(w1)
+                modifier = Modifier.weight(if (selectedTab == 1) 1.18f else 0.91f)
             )
             ExpressiveTabPill(
                 selected = selectedTab == 2,
@@ -453,7 +448,7 @@ private fun ExpressiveLibraryPillTabs(
                 label = stringResource(id = R.string.tab_tracks),
                 badgeCount = tracksCount,
                 onClick = { onTabSelected(2) },
-                modifier = Modifier.weight(w2)
+                modifier = Modifier.weight(if (selectedTab == 2) 1.18f else 0.91f)
             )
         }
     }
@@ -554,9 +549,14 @@ private fun SonicAuraBentoDeck(
         label = "bentoCorner"
     )
 
-    // Фиксируем витрину по количеству альбомов, чтобы при смене сортировки она не вызывала лишних рекомпозиций
-    val spotlightAlbums = remember(albums.size) {
-        if (albums.size <= 8) albums else albums.shuffled().take(8)
+    val spotlightAlbumIds = rememberSaveable(albums.size) {
+        val picked = if (albums.size <= 8) albums else albums.shuffled().take(8)
+        ArrayList(picked.map { it.id })
+    }
+
+    val spotlightAlbums = remember(albums, spotlightAlbumIds) {
+        val byId = albums.associateBy { it.id }
+        spotlightAlbumIds.mapNotNull { byId[it] }.ifEmpty { albums.take(8) }
     }
 
     Column(
@@ -795,10 +795,11 @@ fun SharedTransitionScope.LibrarySearchResults(
                     key = { it.id },
                     contentType = { "track_row" }
                 ) { track ->
+                    val isCurrent = currentTrack?.id == track.id
                     TrackRow(
                         track = track,
-                        isPlaying = isPlaying,
-                        isCurrentTrack = currentTrack?.id == track.id,
+                        isPlaying = isCurrent && isPlaying,
+                        isCurrentTrack = isCurrent,
                         albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) },
                         onClick = { onTrackClick(track, filteredTracks) },
                         onPlayNext = { onPlayNext(track) },
@@ -837,6 +838,16 @@ fun SharedTransitionScope.LibraryMainGrids(
     animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     val cellSize = gridDensity.minCellSizeDp.dp
+    val albumLetterProvider = remember(filteredAlbums) {
+        { index: Int ->
+            filteredAlbums.getOrNull(index)?.title?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: ""
+        }
+    }
+    val artistLetterProvider = remember(filteredArtists) {
+        { index: Int ->
+            filteredArtists.getOrNull(index)?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: ""
+        }
+    }
 
     when (libraryTab) {
         0 -> {
@@ -887,9 +898,7 @@ fun SharedTransitionScope.LibraryMainGrids(
                             FastScrollThumb(
                                 itemCount = filteredAlbums.size,
                                 state = albumGridState,
-                                getLetter = { index ->
-                                    filteredAlbums.getOrNull(index)?.title?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: ""
-                                }
+                                getLetter = albumLetterProvider
                             )
                         }
                     }
@@ -929,9 +938,7 @@ fun SharedTransitionScope.LibraryMainGrids(
                             FastScrollThumb(
                                 itemCount = filteredArtists.size,
                                 state = artistGridState,
-                                getLetter = { index ->
-                                    filteredArtists.getOrNull(index)?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: ""
-                                }
+                                getLetter = artistLetterProvider
                             )
                         }
                     }
@@ -954,10 +961,11 @@ fun SharedTransitionScope.LibraryMainGrids(
                         key = { it.id },
                         contentType = { "track_row" }
                     ) { track ->
+                        val isCurrent = currentTrack?.id == track.id
                         TrackRow(
                             track = track,
-                            isPlaying = isPlaying,
-                            isCurrentTrack = currentTrack?.id == track.id,
+                            isPlaying = isCurrent && isPlaying,
+                            isCurrentTrack = isCurrent,
                             albumArt = remember(track.albumId) { AudioRepository.getAlbumArtUri(track.albumId) },
                             onClick = { onTrackClick(track, allTracks) },
                             onPlayNext = { onPlayNext(track) },

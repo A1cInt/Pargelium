@@ -1,24 +1,15 @@
-// Mirrored from compose-miuix-ui example.
-
 package com.alcint.pargelium.liquid
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlin.math.floor
-import kotlin.time.Duration.Companion.milliseconds
-import androidx.compose.foundation.isSystemInDarkTheme
 
 @Composable
 fun BgEffectBackground(
@@ -34,9 +25,7 @@ fun BgEffectBackground(
         Box(modifier = modifier, content = content)
         return
     }
-    Box(
-        modifier = modifier,
-    ) {
+    Box(modifier = modifier) {
         val surface = MiuixTheme.colorScheme.surface
         val deviceType = DeviceType.PHONE
         val isDarkTheme = isSystemInDarkTheme()
@@ -46,24 +35,7 @@ fun BgEffectBackground(
             BgEffectConfig.get(deviceType, isDarkTheme)
         }
 
-        val colorStage = remember { Animatable(0f) }
-
-        LaunchedEffect(dynamicBackground, preset) {
-            if (!dynamicBackground) return@LaunchedEffect
-            val animatesColors = preset.colors1 !== preset.colors2 || preset.colors2 !== preset.colors3
-            if (!animatesColors) return@LaunchedEffect
-
-            var targetStage = floor(colorStage.value) + 1f
-            while (isActive) {
-                delay((preset.colorInterpPeriod * 500).toLong().milliseconds)
-                colorStage.animateTo(
-                    targetValue = targetStage,
-                    animationSpec = spring(dampingRatio = 0.9f, stiffness = 35f),
-                )
-                targetStage += 1f
-            }
-        }
-
+        // Плавная смена цветовой фазы рассчитывается внутри единого 20 FPS цикла BgEffectNode без отдельного 120 Гц Animatable
         Spacer(
             modifier = Modifier
                 .fillMaxSize()
@@ -77,7 +49,7 @@ fun BgEffectBackground(
                     effectBackground = effectBackground,
                     isFullSize = isFullSize,
                     playing = dynamicBackground,
-                    colorStage = { colorStage.value },
+                    colorStage = { 0f },
                     alpha = alpha,
                 ),
         )

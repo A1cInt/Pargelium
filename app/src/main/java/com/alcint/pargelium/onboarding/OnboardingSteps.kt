@@ -4,14 +4,8 @@
 )
 package com.alcint.pargelium.onboarding
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +23,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FolderSpecial
@@ -40,7 +35,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -50,7 +45,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.alcint.pargelium.MorphingPillIndicator
 import com.alcint.pargelium.R
 import com.alcint.pargelium.liquid.LiquidGlassIconButton
 import com.alcint.pargelium.liquid.LiquidGlassPlayPauseButton
@@ -68,7 +62,6 @@ fun LanguageStepContent(
     onConfirmDetectedAndContinue: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val motionScheme = MaterialTheme.motionScheme
 
     val filteredLanguages = remember(searchQuery) {
         if (searchQuery.isBlank()) {
@@ -210,42 +203,28 @@ fun LanguageStepContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            items(filteredLanguages, key = { it.tag }) { lang ->
+            items(
+                items = filteredLanguages,
+                key = { it.tag },
+                contentType = { "onboarding_lang_item" }
+            ) { lang ->
                 val isSelected = selectedLanguageTag.equals(lang.tag, ignoreCase = true)
-                val interactionSource = remember { MutableInteractionSource() }
-                val isPressed by interactionSource.collectIsPressedAsState()
-                val scale by animateFloatAsState(
-                    targetValue = if (isPressed) 0.97f else 1f,
-                    animationSpec = motionScheme.fastSpatialSpec(),
-                    label = "langScale"
-                )
-                val cornerRadius by animateDpAsState(
-                    targetValue = if (isSelected) 26.dp else 18.dp,
-                    animationSpec = motionScheme.defaultSpatialSpec(),
-                    label = "langCorner"
-                )
-                val bgColor by animateColorAsState(
-                    targetValue = if (isSelected) {
+                val shape = RoundedCornerShape(if (isSelected) 24.dp else 18.dp)
+
+                Surface(
+                    onClick = { onSelectLanguage(lang) },
+                    shape = shape,
+                    color = if (isSelected) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
-                    animationSpec = motionScheme.defaultEffectsSpec(),
-                    label = "langBg"
-                )
-
-                Surface(
-                    onClick = { onSelectLanguage(lang) },
-                    interactionSource = interactionSource,
-                    shape = RoundedCornerShape(cornerRadius),
-                    color = bgColor,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .scale(scale)
                         .border(
                             width = if (isSelected) 1.5.dp else 0.dp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            shape = RoundedCornerShape(cornerRadius)
+                            shape = shape
                         )
                 ) {
                     Row(
@@ -311,7 +290,10 @@ fun StyleStepContent(
     selectedStyle: Int,
     onSelectStyle: (Int) -> Unit
 ) {
-    val motionScheme = MaterialTheme.motionScheme
+    val liquidPreviewBackdrop = rememberLayerBackdrop()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+
     val styleCards = listOf(
         Triple(
             0,
@@ -345,29 +327,13 @@ fun StyleStepContent(
 
         styleCards.forEach { (styleId, title, desc) ->
             val isSelected = selectedStyle == styleId
-            val interactionSource = remember { MutableInteractionSource() }
-            val isPressed by interactionSource.collectIsPressedAsState()
-            val scale by animateFloatAsState(
-                targetValue = if (isPressed) 0.96f else 1f,
-                animationSpec = motionScheme.fastSpatialSpec(),
-                label = "styleScale"
-            )
-            val cornerSize by animateDpAsState(
-                targetValue = if (isSelected) 32.dp else 24.dp,
-                animationSpec = motionScheme.defaultSpatialSpec(),
-                label = "styleCorner"
-            )
-
+            val cardShape = RoundedCornerShape(if (isSelected) 30.dp else 24.dp)
             var previewPlaying by remember { mutableStateOf(true) }
             var previewSwitch by remember { mutableStateOf(true) }
-            val liquidPreviewBackdrop = rememberLayerBackdrop()
-            val primaryColor = MaterialTheme.colorScheme.primary
-            val tertiaryColor = MaterialTheme.colorScheme.tertiary
 
             Surface(
                 onClick = { onSelectStyle(styleId) },
-                interactionSource = interactionSource,
-                shape = RoundedCornerShape(cornerSize),
+                shape = cardShape,
                 color = if (isSelected) {
                     MaterialTheme.colorScheme.surfaceContainerHigh
                 } else {
@@ -375,7 +341,6 @@ fun StyleStepContent(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .scale(scale)
                     .border(
                         width = if (isSelected) 2.dp else 1.dp,
                         color = if (isSelected) {
@@ -383,7 +348,7 @@ fun StyleStepContent(
                         } else {
                             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                         },
-                        shape = RoundedCornerShape(cornerSize)
+                        shape = cardShape
                     )
             ) {
                 Column(
@@ -414,49 +379,48 @@ fun StyleStepContent(
                         )
                     }
 
-                    // Настоящее интерактивное превью компонентов каждого стиля
                     when (styleId) {
                         0 -> {
-                            // 0: НАСТОЯЩИЕ компоненты из пакета com.alcint.pargelium.liquid поверх LayerBackdrop
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(92.dp)
                                     .clip(RoundedCornerShape(24.dp))
                             ) {
-                                Canvas(
+                                // Кэшируем градиентные кисти один раз через drawWithCache (0 аллокаций в кадр)
+                                Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .layerBackdrop(liquidPreviewBackdrop)
-                                ) {
-                                    drawRect(
-                                        brush = Brush.linearGradient(
-                                            colors = listOf(
-                                                Color(0xFF14111F),
-                                                Color(0xFF231934),
-                                                Color(0xFF0E1D2A)
+                                        .drawWithCache {
+                                            val bgBrush = Brush.linearGradient(
+                                                colors = listOf(
+                                                    Color(0xFF14111F),
+                                                    Color(0xFF231934),
+                                                    Color(0xFF0E1D2A)
+                                                )
                                             )
-                                        )
-                                    )
-                                    drawCircle(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(primaryColor.copy(alpha = 0.85f), Color.Transparent),
-                                            center = Offset(size.width * 0.28f, size.height * 0.5f),
-                                            radius = size.height * 0.8f
-                                        ),
-                                        center = Offset(size.width * 0.28f, size.height * 0.5f),
-                                        radius = size.height * 0.8f
-                                    )
-                                    drawCircle(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(tertiaryColor.copy(alpha = 0.8f), Color.Transparent),
-                                            center = Offset(size.width * 0.72f, size.height * 0.5f),
-                                            radius = size.height * 0.75f
-                                        ),
-                                        center = Offset(size.width * 0.72f, size.height * 0.5f),
-                                        radius = size.height * 0.75f
-                                    )
-                                }
+                                            val c1 = Offset(size.width * 0.28f, size.height * 0.5f)
+                                            val r1 = size.height * 0.8f
+                                            val orb1Brush = Brush.radialGradient(
+                                                colors = listOf(primaryColor.copy(alpha = 0.85f), Color.Transparent),
+                                                center = c1,
+                                                radius = r1
+                                            )
+                                            val c2 = Offset(size.width * 0.72f, size.height * 0.5f)
+                                            val r2 = size.height * 0.75f
+                                            val orb2Brush = Brush.radialGradient(
+                                                colors = listOf(tertiaryColor.copy(alpha = 0.8f), Color.Transparent),
+                                                center = c2,
+                                                radius = r2
+                                            )
+                                            onDrawBehind {
+                                                drawRect(brush = bgBrush)
+                                                drawCircle(brush = orb1Brush, center = c1, radius = r1)
+                                                drawCircle(brush = orb2Brush, center = c2, radius = r2)
+                                            }
+                                        }
+                                        .layerBackdrop(liquidPreviewBackdrop)
+                                )
 
                                 Row(
                                     modifier = Modifier
@@ -516,7 +480,6 @@ fun StyleStepContent(
                         }
 
                         1 -> {
-                            // 1: НАСТОЯЩИЕ компоненты Material 3 Expressive из com.alcint.pargelium.material
                             Surface(
                                 shape = RoundedCornerShape(24.dp),
                                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
@@ -555,18 +518,25 @@ fun StyleStepContent(
                                         iconSize = 24.dp
                                     )
 
-                                    Box(
-                                        modifier = Modifier.size(42.dp),
-                                        contentAlignment = Alignment.Center
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        modifier = Modifier.size(42.dp)
                                     ) {
-                                        MorphingPillIndicator()
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
 
                         else -> {
-                            // 2: Классические кнопки и минималистичная капсула
                             Surface(
                                 shape = RoundedCornerShape(24.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
@@ -632,8 +602,6 @@ fun ThemeAndAudioStepContent(
     jamesDspEnabled: Boolean,
     onToggleJamesDsp: (Boolean) -> Unit
 ) {
-    val motionScheme = MaterialTheme.motionScheme
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -648,7 +616,7 @@ fun ThemeAndAudioStepContent(
             color = MaterialTheme.colorScheme.primary
         )
 
-        val rows = OnboardingCatalog.themes.chunked(2)
+        val rows = remember { OnboardingCatalog.themes.chunked(2) }
         rows.forEach { pair ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -656,14 +624,10 @@ fun ThemeAndAudioStepContent(
             ) {
                 pair.forEach { theme ->
                     val isSelected = selectedTheme == theme.id
-                    val cornerRadius by animateDpAsState(
-                        targetValue = if (isSelected) 28.dp else 20.dp,
-                        animationSpec = motionScheme.defaultSpatialSpec(),
-                        label = "themeCorner"
-                    )
+                    val shape = RoundedCornerShape(if (isSelected) 26.dp else 20.dp)
                     Surface(
                         onClick = { onSelectTheme(theme.id) },
-                        shape = RoundedCornerShape(cornerRadius),
+                        shape = shape,
                         color = if (isSelected) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
@@ -678,7 +642,7 @@ fun ThemeAndAudioStepContent(
                                 } else {
                                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                                 },
-                                shape = RoundedCornerShape(cornerRadius)
+                                shape = shape
                             )
                     ) {
                         Column(
@@ -764,7 +728,7 @@ fun ThemeAndAudioStepContent(
                         )
                     },
                     trailingContent = {
-                        LiquidGlassSwitch(
+                        Switch(
                             checked = jamesDspEnabled,
                             onCheckedChange = onToggleJamesDsp
                         )
@@ -789,7 +753,7 @@ fun ThemeAndAudioStepContent(
                         )
                     },
                     trailingContent = {
-                        LiquidGlassSwitch(
+                        Switch(
                             checked = autoDetectHeadphones,
                             onCheckedChange = onToggleAutoDetectHeadphones
                         )
@@ -814,7 +778,7 @@ fun ThemeAndAudioStepContent(
                         )
                     },
                     trailingContent = {
-                        LiquidGlassSwitch(
+                        Switch(
                             checked = showTrackInfoBar,
                             onCheckedChange = onToggleTrackInfoBar
                         )

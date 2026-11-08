@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
+)
 package com.alcint.pargelium.settings
 
 import android.content.ClipData
@@ -9,10 +12,19 @@ import android.net.Uri
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,16 +33,21 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Language
@@ -45,23 +62,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.ColorUtils
 import androidx.core.os.LocaleListCompat
 import coil.compose.AsyncImage
 import com.alcint.pargelium.AudioRepository
 import com.alcint.pargelium.EasterEggActivity
 import com.alcint.pargelium.LyricsManager
+import com.alcint.pargelium.MonetColorSource
+import com.alcint.pargelium.MonetConfigState
+import com.alcint.pargelium.MonetPaletteStyle
 import com.alcint.pargelium.MorphingPillIndicator
 import com.alcint.pargelium.PrefsManager
 import com.alcint.pargelium.R
 import com.alcint.pargelium.UpdateManager
 import com.alcint.pargelium.audio.JamesDspController
+import com.alcint.pargelium.boostColorForVariant
 import com.alcint.pargelium.liquid.LiquidGlassSwitch
 import com.alcint.pargelium.player.OnlineCanvasManager
 import kotlinx.coroutines.Dispatchers
@@ -87,12 +112,29 @@ private data class ThemeOptionItem(
     val previewColors: List<Color>
 )
 
+private val PRESET_MONET_COLORS = listOf(
+    Color(0xFFD0BCFF),
+    Color(0xFFFF2A54),
+    Color(0xFF00E5FF),
+    Color(0xFF64FFDA),
+    Color(0xFFFF6D00),
+    Color(0xFF7C4DFF),
+    Color(0xFFFFD600),
+    Color(0xFF00E676),
+    Color(0xFFFF4081),
+    Color(0xFF536DFE)
+)
+
 @Composable
 fun AppearancePanel(
     currentThemeMode: Int,
     onThemeChanged: (Int) -> Unit
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    LaunchedEffect(Unit) { MonetConfigState.ensureInitialized() }
+
     var isTrackInfoBarEnabled by remember { mutableStateOf(PrefsManager.getShowTrackInfoBar()) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var langSearchQuery by remember { mutableStateOf("") }
@@ -105,7 +147,6 @@ fun AppearancePanel(
         "auto"
     }
 
-    // Все 27 языковых локалей из strings.xml
     val allLanguages = remember {
         listOf(
             LanguageOption("auto", R.string.lang_system, "System Default"),
@@ -209,7 +250,7 @@ fun AppearancePanel(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 20.dp)
+                .padding(top = 4.dp, bottom = 18.dp)
         ) {
             items(themes, key = { it.id }) { theme ->
                 ThemeCard(
@@ -222,6 +263,12 @@ fun AppearancePanel(
                 )
             }
         }
+
+        SettingsSectionHeader(title = stringResource(R.string.monet_section_title))
+
+        MonetEngineSettingsCard()
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         SettingsGroup {
             ListItem(
@@ -398,6 +445,7 @@ fun AppearancePanel(
                                     else Color.Transparent
                                 )
                                 .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     if (lang.tag == "auto") {
                                         AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
                                     } else {
@@ -410,6 +458,372 @@ fun AppearancePanel(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonetEngineSettingsCard() {
+    val haptic = LocalHapticFeedback.current
+    val motionScheme = MaterialTheme.motionScheme
+    val currentPrimary = MaterialTheme.colorScheme.primary
+
+    val activeSource = MonetColorSource.fromId(MonetConfigState.colorSource)
+    val activeStyle = MonetPaletteStyle.fromId(MonetConfigState.paletteStyle)
+    val customArgb = MonetConfigState.customColorArgb
+    val customColor = Color(customArgb)
+    val contrastLevel = MonetConfigState.contrastLevel
+
+    val currentHsl = remember(customArgb) {
+        FloatArray(3).also { ColorUtils.colorToHSL(customArgb, it) }
+    }
+    var hueSlider by remember(customArgb) { mutableFloatStateOf(currentHsl[0]) }
+    var satSlider by remember(customArgb) { mutableFloatStateOf(currentHsl[1].coerceIn(0.2f, 1f)) }
+
+    SettingsGroup {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MonetColorSource.entries.forEach { source ->
+                    val isSelected = activeSource == source
+                    val weight by animateFloatAsState(
+                        targetValue = if (isSelected) 1.25f else 0.92f,
+                        animationSpec = motionScheme.defaultSpatialSpec(),
+                        label = "monetSourceWeight"
+                    )
+                    val corner by animateDpAsState(
+                        targetValue = if (isSelected) 22.dp else 16.dp,
+                        animationSpec = motionScheme.fastSpatialSpec(),
+                        label = "monetSourceCorner"
+                    )
+                    val containerColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        animationSpec = motionScheme.defaultEffectsSpec(),
+                        label = "monetSourceBg"
+                    )
+                    val contentColor = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    val sourceIcon = when (source) {
+                        MonetColorSource.TRACK_COVER -> Icons.Default.Album
+                        MonetColorSource.DEVICE_WALLPAPER -> Icons.Default.Wallpaper
+                        MonetColorSource.CUSTOM_COLOR -> Icons.Default.Colorize
+                    }
+
+                    Surface(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            MonetConfigState.updateSource(source.id)
+                        },
+                        shape = RoundedCornerShape(corner),
+                        color = containerColor,
+                        modifier = Modifier
+                            .weight(weight)
+                            .height(82.dp)
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.dp,
+                                color = if (isSelected) currentPrimary else Color.Transparent,
+                                shape = RoundedCornerShape(corner)
+                            )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Icon(
+                                imageVector = sourceIcon,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = stringResource(id = source.titleRes),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                color = contentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = stringResource(id = activeSource.descRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+
+            AnimatedVisibility(
+                visible = activeSource == MonetColorSource.CUSTOM_COLOR,
+                enter = expandVertically(motionScheme.defaultSpatialSpec()) + fadeIn(),
+                exit = shrinkVertically(motionScheme.defaultSpatialSpec()) + fadeOut()
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.65f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.monet_custom_color_title),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    currentPrimary,
+                                    MaterialTheme.colorScheme.secondary,
+                                    MaterialTheme.colorScheme.tertiary,
+                                    MaterialTheme.colorScheme.primaryContainer
+                                ).forEach { swatch ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clip(CircleShape)
+                                            .background(swatch)
+                                            .border(1.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                                    )
+                                }
+                            }
+                        }
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(PRESET_MONET_COLORS, key = { it.toArgb() }) { preset ->
+                                val isPresetSelected = customColor.toArgb() == preset.toArgb()
+                                val itemCorner by animateDpAsState(
+                                    targetValue = if (isPresetSelected) 12.dp else 20.dp,
+                                    animationSpec = motionScheme.fastSpatialSpec(),
+                                    label = "swatchCorner"
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(itemCorner))
+                                        .background(preset)
+                                        .border(
+                                            width = if (isPresetSelected) 2.5.dp else 1.dp,
+                                            color = if (isPresetSelected) Color.White else Color.White.copy(alpha = 0.25f),
+                                            shape = RoundedCornerShape(itemCorner)
+                                        )
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            MonetConfigState.updateCustomColor(preset.toArgb())
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isPresetSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = stringResource(id = R.string.monet_hue_slider_label, hueSlider.toInt()),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = hueSlider,
+                                onValueChange = { newHue ->
+                                    hueSlider = newHue
+                                    val newArgb = ColorUtils.HSLToColor(floatArrayOf(newHue, satSlider, 0.62f))
+                                    MonetConfigState.updateCustomColor(newArgb)
+                                },
+                                valueRange = 0f..360f
+                            )
+
+                            Text(
+                                text = stringResource(id = R.string.monet_chroma_slider_label, (satSlider * 100).toInt()),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = satSlider,
+                                onValueChange = { newSat ->
+                                    satSlider = newSat
+                                    val newArgb = ColorUtils.HSLToColor(floatArrayOf(hueSlider, newSat, 0.62f))
+                                    MonetConfigState.updateCustomColor(newArgb)
+                                },
+                                valueRange = 0.2f..1.0f
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        tint = currentPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = stringResource(id = R.string.monet_palette_style_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(MonetPaletteStyle.entries, key = { it.id }) { styleItem ->
+                        val isSelected = activeStyle == styleItem
+                        val interaction = remember { MutableInteractionSource() }
+                        val isPressed by interaction.collectIsPressedAsState()
+                        val corner by animateDpAsState(
+                            targetValue = when {
+                                isPressed -> 12.dp
+                                isSelected -> 16.dp
+                                else -> 24.dp
+                            },
+                            animationSpec = motionScheme.fastSpatialSpec(),
+                            label = "styleChipCorner"
+                        )
+                        val previewTriad = remember(currentPrimary, styleItem) {
+                            boostColorForVariant(
+                                color = currentPrimary,
+                                isLightMode = false,
+                                style = styleItem,
+                                contrastLevel = 0f
+                            )
+                        }
+
+                        Surface(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                MonetConfigState.updatePaletteStyle(styleItem.id)
+                            },
+                            interactionSource = interaction,
+                            shape = RoundedCornerShape(corner),
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                            modifier = Modifier.border(
+                                width = if (isSelected) 1.5.dp else 0.dp,
+                                color = if (isSelected) currentPrimary else Color.Transparent,
+                                shape = RoundedCornerShape(corner)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
+                                    listOf(previewTriad.first, previewTriad.second, previewTriad.third).forEach { dotColor ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(dotColor)
+                                                .border(0.8.dp, Color.Black.copy(alpha = 0.4f), CircleShape)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = stringResource(id = styleItem.titleRes),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Contrast,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = stringResource(id = R.string.monet_contrast_label),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Text(
+                        text = String.format(Locale.US, "%+.0f%%", contrastLevel * 100f),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = currentPrimary
+                    )
+                }
+
+                Slider(
+                    value = contrastLevel,
+                    onValueChange = { MonetConfigState.updateContrastLevel(it) },
+                    valueRange = -0.3f..0.8f,
+                    steps = 10
+                )
             }
         }
     }

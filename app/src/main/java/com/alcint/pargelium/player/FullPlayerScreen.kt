@@ -94,6 +94,38 @@ private fun getSharedAnimatedImageLoader(context: Context): ImageLoader {
     }
 }
 
+private fun resolveTrackArtworkModel(track: AudioTrack?): Any? {
+    if (track == null) return null
+    if (!track.coverUrl.isNullOrBlank() && track.coverUrl != "null") {
+        return track.coverUrl
+    }
+    val saavnTrack = SaavnApi.trackCache[track.id]
+    if (saavnTrack != null && saavnTrack.coverUrl.isNotEmpty()) {
+        return saavnTrack.coverUrl
+    }
+    if (track.albumId > 0L) {
+        return ContentUris.withAppendedId(ALBUM_ART_URI, track.albumId)
+    }
+    return null
+}
+
+private suspend fun resolveIsCanvasVideo(context: Context, uri: Uri): Boolean {
+    val s = uri.toString().lowercase()
+    if (
+        s.endsWith(".mp4") ||
+        s.endsWith(".webm") ||
+        s.endsWith(".m3u8") ||
+        s.contains(".mp4?") ||
+        s.contains(".m3u8?") ||
+        s.contains("canvaz.scdn.co") ||
+        s.contains("spotify_canvas_videos") ||
+        s.contains("mvod.itunes.apple.com")
+    ) {
+        return true
+    }
+    return isVideoUriAsync(context, uri)
+}
+
 @Composable
 fun FullPlayerScreen(
     track: AudioTrack,
@@ -165,7 +197,9 @@ fun FullPlayerScreen(
 
     var canvasUri by remember { mutableStateOf<Uri?>(null) }
     var isVideo by remember { mutableStateOf(false) }
-    var dynamicSeedColor by remember(seedColor) { mutableStateOf(seedColor) }
+    var customCanvasSeedColor by remember { mutableStateOf<Color?>(null) }
+
+    val dynamicSeedColor = customCanvasSeedColor ?: seedColor
     val iconTint = if (dynamicSeedColor == Color.Unspecified || dynamicSeedColor == Color.Transparent) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -185,7 +219,7 @@ fun FullPlayerScreen(
             PrefsManager.saveCustomCanvas(trackKey, uri.toString())
             canvasUri = uri
             scope.launch {
-                isVideo = isVideoUriAsync(appContext, uri)
+                isVideo = resolveIsCanvasVideo(appContext, uri)
             }
         }
     }
@@ -234,6 +268,7 @@ fun FullPlayerScreen(
     LaunchedEffect(track.id, track.uri, trackKey, isOnlineCanvasEnabled, canvasSourceMode) {
         canvasUri = null
         isVideo = false
+        customCanvasSeedColor = null
 
         val customCanvasStr = PrefsManager.getCustomCanvas(trackKey)
             ?: PrefsManager.getCustomCanvas(legacyTrackKey)
@@ -241,16 +276,16 @@ fun FullPlayerScreen(
         if (!customCanvasStr.isNullOrBlank()) {
             val uri = Uri.parse(customCanvasStr)
             canvasUri = uri
-            isVideo = isVideoUriAsync(appContext, uri)
+            isVideo = resolveIsCanvasVideo(appContext, uri)
             return@LaunchedEffect
         }
 
         val localCanvas = withContext(Dispatchers.IO) {
-            AudioRepository.findCanvasForTrack(appContext, track.uri)
+            if (track.albumId > 0L) AudioRepository.findCanvasForTrack(appContext, track.uri) else null
         }
         if (localCanvas != null) {
             canvasUri = localCanvas
-            isVideo = isVideoUriAsync(appContext, localCanvas)
+            isVideo = resolveIsCanvasVideo(appContext, localCanvas)
             return@LaunchedEffect
         }
 
@@ -258,81 +293,76 @@ fun FullPlayerScreen(
             val onlineCanvas = OnlineCanvasManager.findOnlineCanvas(appContext, track)
             if (onlineCanvas != null) {
                 canvasUri = onlineCanvas
-                isVideo = isVideoUriAsync(appContext, onlineCanvas)
+                isVideo = resolveIsCanvasVideo(appContext, onlineCanvas)
             }
         }
     }
 
-    LaunchedEffect(track.id, track.albumId, canvasUri, isVideo, seedColor) {
-        val cacheKey = if (!isVideo && canvasUri != null) canvasUri.toString() else "track_${track.id}_${track.albumId}"
-        GlobalSeedColorCache.get(cacheKey)?.let { cachedColor ->
-            dynamicSeedColor = cachedColor
+    // Декодируем цвет только если выбран статический картинка-канвас; для обычных обложек используем уже готовый seedColor
+    LaunchedEffect(canvasUri, isVideo) {
+        val staticCanvas = if (!isVideo) canvasUri else null
+        if (staticCanvas == null) {
+            customCanvasSeedColor = null
             return@LaunchedEffect
         }
 
-        val saavnTrack = SaavnApi.trackCache[track.id]
-        val imageUrl: Any? = when {
-            !isVideo && canvasUri != null -> canvasUri
-            saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-            track.albumId != 0L -> ContentUris.withAppendedId(ALBUM_ART_URI, track.albumId)
-            else -> null
+        val cacheKey = staticCanvas.toString()
+        GlobalSeedColorCache.get(cacheKey)?.let { cachedColor ->
+            customCanvasSeedColor = cachedColor
+            return@LaunchedEffect
         }
 
-        if (imageUrl != null) {
-            val extractedColor = withContext(Dispatchers.IO) {
-                try {
-                    val request = ImageRequest.Builder(appContext)
-                        .data(imageUrl)
-                        .size(64)
-                        .allowHardware(false)
-                        .build()
-                    val result = appContext.imageLoader.execute(request)
-                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@withContext null
+        val extractedColor = withContext(Dispatchers.IO) {
+            try {
+                val request = ImageRequest.Builder(appContext)
+                    .data(staticCanvas)
+                    .size(64)
+                    .allowHardware(false)
+                    .build()
+                val result = appContext.imageLoader.execute(request)
+                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@withContext null
 
-                    var r = 0L
-                    var g = 0L
-                    var b = 0L
-                    var count = 0
-                    val width = bitmap.width
-                    val height = bitmap.height
-                    val pixels = IntArray(width * height)
-                    bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+                var r = 0L
+                var g = 0L
+                var b = 0L
+                var count = 0
+                val width = bitmap.width
+                val height = bitmap.height
+                val pixels = IntArray(width * height)
+                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
-                    var i = 0
-                    while (i < pixels.size) {
-                        val color = pixels[i]
-                        r += (color shr 16) and 0xFF
-                        g += (color shr 8) and 0xFF
-                        b += color and 0xFF
-                        count++
-                        i += 4
-                    }
-
-                    if (count > 0) {
-                        val avgColorInt = android.graphics.Color.rgb(
-                            (r / count).toInt(),
-                            (g / count).toInt(),
-                            (b / count).toInt()
-                        )
-                        val hsv = FloatArray(3)
-                        android.graphics.Color.colorToHSV(avgColorInt, hsv)
-                        hsv[1] = (hsv[1] * 1.5f).coerceIn(0.4f, 1f)
-                        hsv[2] = (hsv[2] * 1.5f).coerceIn(0.5f, 1f)
-                        Color(android.graphics.Color.HSVToColor(hsv))
-                    } else null
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    null
+                var i = 0
+                while (i < pixels.size) {
+                    val color = pixels[i]
+                    r += (color shr 16) and 0xFF
+                    g += (color shr 8) and 0xFF
+                    b += color and 0xFF
+                    count++
+                    i += 4
                 }
-            }
 
-            val finalColor = extractedColor ?: seedColor
-            dynamicSeedColor = finalColor
-            GlobalSeedColorCache.put(cacheKey, finalColor)
-        } else {
-            dynamicSeedColor = seedColor
-            GlobalSeedColorCache.put(cacheKey, seedColor)
+                if (count > 0) {
+                    val avgColorInt = android.graphics.Color.rgb(
+                        (r / count).toInt(),
+                        (g / count).toInt(),
+                        (b / count).toInt()
+                    )
+                    val hsv = FloatArray(3)
+                    android.graphics.Color.colorToHSV(avgColorInt, hsv)
+                    hsv[1] = (hsv[1] * 1.5f).coerceIn(0.4f, 1f)
+                    hsv[2] = (hsv[2] * 1.5f).coerceIn(0.5f, 1f)
+                    Color(android.graphics.Color.HSVToColor(hsv))
+                } else null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        if (extractedColor != null) {
+            GlobalSeedColorCache.put(cacheKey, extractedColor)
+            customCanvasSeedColor = extractedColor
         }
     }
 
@@ -460,6 +490,9 @@ fun FullPlayerScreen(
         }
     }
 
+    // Когда на фоне играет тяжелое видео, переключаем кнопки в облегченный режим без тройного захвата текстуры экрана
+    val effectiveButtonStyle = if (backgroundState == "canvas" && isVideo && playerBtnStyle == 0) 2 else playerBtnStyle
+
     val parallaxTransitionSpec: AnimatedContentTransitionScope<Boolean>.() -> ContentTransform = remember {
         {
             if (targetState) {
@@ -492,7 +525,8 @@ fun FullPlayerScreen(
             dynamicSeedColor = dynamicSeedColor,
             isPlaying = isPlaying,
             imageLoader = imageLoader,
-            appContext = appContext
+            appContext = appContext,
+            enableBackdropCapture = effectiveButtonStyle == 0
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
@@ -548,17 +582,12 @@ fun FullPlayerScreen(
                                     )
                                 }
                             } else {
-                                val artModel = remember(track.id, track.albumId) {
-                                    val saavnTrack = SaavnApi.trackCache[track.id]
-                                    when {
-                                        saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-                                        track.albumId != 0L -> ContentUris.withAppendedId(ALBUM_ART_URI, track.albumId)
-                                        else -> null
-                                    }
+                                val artModel = remember(track.id, track.albumId, track.coverUrl) {
+                                    resolveTrackArtworkModel(track)
                                 }
                                 var preferredDiscUri by remember(track.id, track.albumId) { mutableStateOf<Uri?>(null) }
                                 LaunchedEffect(track.id, track.albumId, isVinylMode) {
-                                    if (isVinylMode) {
+                                    if (isVinylMode && track.albumId > 0L) {
                                         preferredDiscUri = withContext(Dispatchers.IO) {
                                             AudioRepository.getPreferredDiscArtworkUri(appContext, track)
                                         }
@@ -598,7 +627,7 @@ fun FullPlayerScreen(
                         }
                         Box(modifier = Modifier.align(Alignment.TopStart)) {
                             HookedIconButton(
-                                buttonStyle = playerBtnStyle,
+                                buttonStyle = effectiveButtonStyle,
                                 icon = Icons.Default.KeyboardArrowDown,
                                 onClick = onCollapse,
                                 tint = Color.White,
@@ -631,7 +660,7 @@ fun FullPlayerScreen(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Spacer(modifier = Modifier.height(16.dp))
                             PlayerControlsRowHooked(
-                                buttonStyle = playerBtnStyle,
+                                buttonStyle = effectiveButtonStyle,
                                 repeatMode = repeatMode,
                                 isPlaying = isPlaying,
                                 iconTint = iconTint,
@@ -677,13 +706,13 @@ fun FullPlayerScreen(
                             PrefsManager.saveCustomCanvas(legacyTrackKey, null)
                             scope.launch {
                                 val localCanvas = withContext(Dispatchers.IO) {
-                                    AudioRepository.findCanvasForTrack(appContext, track.uri)
+                                    if (track.albumId > 0L) AudioRepository.findCanvasForTrack(appContext, track.uri) else null
                                 }
                                 val resolved = localCanvas ?: if (isOnlineCanvasEnabled) {
                                     OnlineCanvasManager.findOnlineCanvas(appContext, track)
                                 } else null
                                 canvasUri = resolved
-                                isVideo = resolved?.let { isVideoUriAsync(appContext, it) } ?: false
+                                isVideo = resolved?.let { resolveIsCanvasVideo(appContext, it) } ?: false
                             }
                         },
                         onBookmarksClick = { showBookmarks = true },
@@ -779,20 +808,15 @@ fun FullPlayerScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) { page ->
                                             val itemTrack = if (playlist.isNotEmpty()) playlist.getOrNull(page) else track
-                                            val artModel = remember(itemTrack?.id, itemTrack?.albumId) {
-                                                val saavnTrack = itemTrack?.let { SaavnApi.trackCache[it.id] }
-                                                when {
-                                                    saavnTrack != null && saavnTrack.coverUrl.isNotEmpty() -> saavnTrack.coverUrl
-                                                    itemTrack != null && itemTrack.albumId != 0L -> ContentUris.withAppendedId(ALBUM_ART_URI, itemTrack.albumId)
-                                                    else -> null
-                                                }
+                                            val artModel = remember(itemTrack?.id, itemTrack?.albumId, itemTrack?.coverUrl) {
+                                                resolveTrackArtworkModel(itemTrack)
                                             }
 
                                             var pageDiscUri by remember(itemTrack?.id, itemTrack?.albumId) {
                                                 mutableStateOf<Uri?>(null)
                                             }
                                             LaunchedEffect(itemTrack?.id, itemTrack?.albumId, isVinylMode) {
-                                                if (isVinylMode && itemTrack != null) {
+                                                if (isVinylMode && itemTrack != null && itemTrack.albumId > 0L) {
                                                     pageDiscUri = withContext(Dispatchers.IO) {
                                                         AudioRepository.getPreferredDiscArtworkUri(appContext, itemTrack)
                                                     }
@@ -900,7 +924,7 @@ fun FullPlayerScreen(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         PlayerControlsRowHooked(
-                            buttonStyle = playerBtnStyle,
+                            buttonStyle = effectiveButtonStyle,
                             repeatMode = repeatMode,
                             isPlaying = isPlaying,
                             iconTint = iconTint,
@@ -964,20 +988,17 @@ private fun PlayerArtworkDeck(
     )
 
     val isVisibleOnScreen = coverAlpha > 0.05f
-    val rotationAnim = remember { Animatable(0f) }
+    var rotationDegrees by remember { mutableFloatStateOf(0f) }
 
+    // Энергоэффективное вращение винила на 30 FPS вместо 120 Гц Animatable
     LaunchedEffect(isVinylMode, isPlaying, isVisibleOnScreen) {
         if (isVinylMode && isPlaying && isVisibleOnScreen) {
             while (isActive) {
-                val start = rotationAnim.value % 360f
-                rotationAnim.snapTo(start)
-                rotationAnim.animateTo(
-                    targetValue = start + 360f,
-                    animationSpec = tween(durationMillis = 11000, easing = LinearEasing)
-                )
+                delay(33L)
+                rotationDegrees = (rotationDegrees + 1.08f) % 360f
             }
-        } else if (!isVinylMode && rotationAnim.value != 0f) {
-            rotationAnim.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
+        } else if (!isVinylMode) {
+            rotationDegrees = 0f
         }
     }
 
@@ -1038,7 +1059,7 @@ private fun PlayerArtworkDeck(
                 .fillMaxSize(if (isVinylMode) 0.92f else 1f)
                 .graphicsLayer {
                     alpha = coverAlpha
-                    rotationZ = rotationAnim.value
+                    rotationZ = rotationDegrees
                 }
                 .border(
                     width = 1.dp,
@@ -1052,7 +1073,7 @@ private fun PlayerArtworkDeck(
                         model = remember(artModel) {
                             ImageRequest.Builder(context)
                                 .data(artModel)
-                                .size(900)
+                                .size(768)
                                 .crossfade(true)
                                 .build()
                         },
@@ -1124,14 +1145,16 @@ private fun LyricsHeaderBadge(
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 maxLines = 1,
-                modifier = Modifier.weight(1f, fill = false).basicMarquee()
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
             Text(
                 text = " • ${track.artist}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.72f),
                 maxLines = 1,
-                modifier = Modifier.weight(1f, fill = false).basicMarquee()
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
         }
     }

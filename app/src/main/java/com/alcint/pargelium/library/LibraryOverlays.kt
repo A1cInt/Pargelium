@@ -41,6 +41,7 @@ import androidx.compose.ui.zIndex
 import com.alcint.pargelium.AudioTrack
 import com.alcint.pargelium.PrefsManager
 import com.alcint.pargelium.R
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
 @Composable
@@ -94,7 +95,9 @@ fun FullPlayerDraggableWrapper(
                     velocityTracker.addPosition(change.uptimeMillis, change.position)
                     change.consume()
                     val newOffset = (playerOffsetY.value + dragAmount).coerceIn(0f, hiddenOffsetPx)
-                    scope.launch { playerOffsetY.snapTo(newOffset) }
+                    scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                        playerOffsetY.snapTo(newOffset)
+                    }
                 }
             }
     ) {
